@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
                     status: 'received',
                     channel: channel,
                     media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+                    is_read: false,
                 });
             } catch (logErr) {
                 console.error('[twilio-sms] Inbound log error:', logErr);
@@ -158,6 +159,7 @@ Deno.serve(async (req) => {
                 status: twilioResult.status || 'queued',
                 user_id: user.id,
                 channel: channel,
+                is_read: true,
             });
         } catch (logErr) {
             console.error('[twilio-sms] Log error:', logErr);

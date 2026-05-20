@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { TelephonyService, type SMSLog } from '../../services/database/telephony.service';
 import toast from 'react-hot-toast';
 
 export const SMSInboxPage: React.FC = () => {
-    const [conversations, setConversations] = useState<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number }[]>([]);
+    const [conversations, setConversations] = useState<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number; unreadCount: number; contactName: string | null }[]>([]);
     const [selectedNumber, setSelectedNumber] = useState<string | null>(null);
     const [thread, setThread] = useState<SMSLog[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+
+    // Total unread across all conversations
+    const totalUnread = useMemo(() => conversations.reduce((sum, c) => sum + c.unreadCount, 0), [conversations]);
 
     useEffect(() => {
         loadConversations();
@@ -17,6 +20,13 @@ export const SMSInboxPage: React.FC = () => {
     useEffect(() => {
         if (selectedNumber) {
             loadThread(selectedNumber);
+            // Mark as read when opening conversation
+            TelephonyService.markSMSThreadRead(selectedNumber).then(() => {
+                // Update unread count locally
+                setConversations(prev => prev.map(c =>
+                    c.phoneNumber === selectedNumber ? { ...c, unreadCount: 0 } : c
+                ));
+            });
         }
     }, [selectedNumber]);
 
@@ -57,18 +67,43 @@ export const SMSInboxPage: React.FC = () => {
         }
     };
 
+    // Get display name for a conversation
+    const getDisplayName = (conv: { phoneNumber: string; contactName: string | null }) => {
+        return conv.contactName || conv.phoneNumber;
+    };
+
+    // Get selected conversation's contact name
+    const selectedConv = conversations.find(c => c.phoneNumber === selectedNumber);
+
     return (
         <div className="max-w-6xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-800">Wiadomości SMS</h1>
-                <p className="text-slate-500 text-sm mt-1">Konwersacje SMS z klientami</p>
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800">Wiadomości SMS</h1>
+                    <p className="text-slate-500 text-sm mt-1">Konwersacje SMS z klientami</p>
+                </div>
+                {totalUnread > 0 && (
+                    <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
+                        <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">{totalUnread}</span>
+                        </div>
+                        <span className="text-sm font-medium text-blue-800">
+                            {totalUnread === 1 ? 'nieodczytana wiadomość' : totalUnread < 5 ? 'nieodczytane wiadomości' : 'nieodczytanych wiadomości'}
+                        </span>
+                    </div>
+                )}
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex" style={{ height: 'calc(100vh - 200px)', minHeight: '500px' }}>
                 {/* Conversations list */}
                 <div className="w-80 border-r border-slate-200 flex flex-col shrink-0">
-                    <div className="p-3 border-b border-slate-100">
+                    <div className="p-3 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-slate-600">Konwersacje ({conversations.length})</h3>
+                        {totalUnread > 0 && (
+                            <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
+                                {totalUnread} nowych
+                            </span>
+                        )}
                     </div>
                     <div className="flex-1 overflow-auto">
                         {loading ? (
@@ -81,15 +116,37 @@ export const SMSInboxPage: React.FC = () => {
                                     key={conv.phoneNumber}
                                     onClick={() => setSelectedNumber(conv.phoneNumber)}
                                     className={`w-full px-4 py-3 text-left border-b border-slate-50 hover:bg-slate-50 transition-colors ${selectedNumber === conv.phoneNumber ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
-                                        }`}
+                                        } ${conv.unreadCount > 0 ? 'bg-blue-50/40' : ''}`}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <p className="font-semibold text-sm text-slate-800 font-mono">{conv.phoneNumber}</p>
-                                        <span className="text-[10px] text-slate-400">
-                                            {new Date(conv.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                        </span>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                            {/* Unread dot */}
+                                            {conv.unreadCount > 0 && (
+                                                <div className="w-2.5 h-2.5 bg-blue-600 rounded-full shrink-0" />
+                                            )}
+                                            <div className="min-w-0 flex-1">
+                                                {/* Contact name */}
+                                                <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
+                                                    {conv.contactName || conv.phoneNumber}
+                                                </p>
+                                                {/* Phone number (shown below name if name exists) */}
+                                                {conv.contactName && (
+                                                    <p className="text-[10px] text-slate-400 font-mono">{conv.phoneNumber}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-0.5 shrink-0">
+                                            <span className="text-[10px] text-slate-400">
+                                                {new Date(conv.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                            </span>
+                                            {conv.unreadCount > 0 && (
+                                                <span className="text-[10px] font-bold bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center">
+                                                    {conv.unreadCount}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                                    <p className={`text-xs mt-0.5 truncate ${conv.unreadCount > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
                                         {conv.lastMessage.direction === 'outbound' ? '→ ' : '← '}
                                         {conv.lastMessage.body}
                                     </p>
@@ -105,13 +162,20 @@ export const SMSInboxPage: React.FC = () => {
                     {selectedNumber ? (
                         <>
                             {/* Thread header */}
-                            <div className="p-3 border-b border-slate-100 flex items-center gap-2">
-                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                    </svg>
+                            <div className="p-3 border-b border-slate-100 flex items-center gap-3">
+                                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                                    <span className="text-white text-sm font-bold">
+                                        {selectedConv?.contactName ? selectedConv.contactName.charAt(0).toUpperCase() : '📱'}
+                                    </span>
                                 </div>
-                                <span className="font-bold text-slate-800 font-mono">{selectedNumber}</span>
+                                <div>
+                                    <p className="font-bold text-slate-800">
+                                        {selectedConv?.contactName || selectedNumber}
+                                    </p>
+                                    {selectedConv?.contactName && (
+                                        <p className="text-xs text-slate-400 font-mono">{selectedNumber}</p>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Messages */}

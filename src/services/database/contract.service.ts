@@ -814,11 +814,57 @@ export const ContractService = {
         const customerId = (contractRow.offer as any)?.customer_id;
         const commission = Number(contractData?.commission) || 0;
 
-        // 2. Logistics — orderedItems purchaseCost
+        // 2. Logistics — orderedItems purchaseCost + warehouse inventory issuances
         const orderedItems: any[] = contractData?.orderedItems || [];
-        const logisticsItems = orderedItems
+        const logisticsItems: { name: string; cost: number }[] = orderedItems
             .filter((item: any) => item.purchaseCost && item.purchaseCost > 0)
             .map((item: any) => ({ name: item.name || 'Towar', cost: Number(item.purchaseCost) }));
+
+        // 2b. Warehouse materials — inventory_transactions linked to this contract's installation
+        if (offerId) {
+            const { data: instRows } = await supabase
+                .from('installations')
+                .select('id')
+                .eq('offer_id', offerId);
+
+            const instId = instRows?.[0]?.id;
+            if (instId) {
+                const { data: invTxns } = await supabase
+                    .from('inventory_transactions')
+                    .select('change_amount, inventory_item_id, comment')
+                    .eq('reference_id', instId)
+                    .eq('reference_type', 'installation')
+                    .eq('operation_type', 'usage');
+
+                if (invTxns && invTxns.length > 0) {
+                    // Get item details (name + purchase_price) for cost calculation
+                    const itemIds = [...new Set(invTxns.map((t: any) => t.inventory_item_id))];
+                    const { data: invItems } = await supabase
+                        .from('inventory_items')
+                        .select('id, name, purchase_price, unit')
+                        .in('id', itemIds);
+
+                    const itemMap: Record<string, { name: string; price: number; unit: string }> = {};
+                    (invItems || []).forEach((it: any) => {
+                        itemMap[it.id] = { name: it.name, price: Number(it.purchase_price) || 0, unit: it.unit || 'szt' };
+                    });
+
+                    for (const txn of invTxns) {
+                        const item = itemMap[txn.inventory_item_id];
+                        if (!item) continue;
+                        const qty = Math.abs(txn.change_amount);
+                        const cost = qty * item.price;
+                        if (cost > 0) {
+                            logisticsItems.push({
+                                name: `📦 ${item.name} (${qty} ${item.unit} × ${item.price.toFixed(2)} €)`,
+                                cost: Math.round(cost * 100) / 100
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         const logisticsTotal = logisticsItems.reduce((sum: number, item: any) => sum + item.cost, 0);
 
         // 3. Measurement costs — customer_costs

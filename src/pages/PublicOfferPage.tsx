@@ -14,6 +14,7 @@ import { MeasurementRequestModal } from '../components/public-offer/MeasurementR
 import { FAQSection } from '../components/public-offer/FAQSection';
 import { ModelAdvantagesSection } from '../components/public-offer/ModelAdvantagesSection';
 import { UpsellSection } from '../components/public-offer/UpsellSection';
+import { AttachmentLightbox } from '../components/public-offer/AttachmentLightbox';
 import { getModelDisplayName } from '../config/modelImages';
 
 // Translate internal color keys to German display names
@@ -55,12 +56,31 @@ export const PublicOfferPage: React.FC = () => {
     const [siblingOffers, setSiblingOffers] = useState<SiblingOffer[]>([]);
     const [showAcceptConfirm, setShowAcceptConfirm] = useState(false);
     const [accepting, setAccepting] = useState(false);
+    // Embedded variants (from single offer)
+    const [activeVariantIdx, setActiveVariantIdx] = useState(0);
+    const [viewingAttachment, setViewingAttachment] = useState<any>(null);
+    const embeddedVariants: any[] = (offer as any)?.variants || (offer as any)?.product?.variants || [];
+    const hasEmbeddedVariants = embeddedVariants.length > 0;
 
     // Creator's client-facing contact info (fallback to company defaults)
     const creatorPhone = offer?.creator?.clientPhone || offer?.creator?.phone || COMPANY_PHONE;
     const creatorPhoneHref = creatorPhone.replace(/\s/g, '').replace(/^0/, '+49');
     const creatorEmail = offer?.creator?.clientEmail || offer?.creator?.email || COMPANY_EMAIL;
     const creatorName = offer?.creator ? `${offer.creator.firstName} ${offer.creator.lastName}` : 'Polendach24';
+
+    // Format phone for display (e.g. "609410745" → "609 410 745", "03561 501 9981" stays)
+    const formatPhoneDisplay = (phone: string): string => {
+        const clean = phone.replace(/\s/g, '');
+        if (clean.startsWith('+49')) {
+            const local = clean.slice(3);
+            return `+49 ${local.replace(/(\d{3})(\d{3})(\d{3,4})/, '$1 $2 $3')}`;
+        }
+        if (clean.length >= 9 && !clean.includes(' ')) {
+            return clean.replace(/(\d{3})(\d{3})(\d{3,4})/, '$1 $2 $3');
+        }
+        return phone;
+    };
+    const creatorPhoneDisplay = formatPhoneDisplay(creatorPhone);
 
     useEffect(() => {
         const fetchOffer = async () => {
@@ -150,10 +170,12 @@ export const PublicOfferPage: React.FC = () => {
         if (offer?.id) {
             OfferService.trackInteraction(offer.id, 'pdf_download', {
                 action: 'pdf_download',
+                variant: hasEmbeddedVariants ? activeVariantIdx : undefined,
                 timestamp: new Date().toISOString()
             }).catch(err => console.error('Failed to track PDF download', err));
         }
-        window.open(`/print/offer/${token}`, '_blank');
+        const variantParam = hasEmbeddedVariants ? `?variant=${activeVariantIdx}` : '';
+        window.open(`/print/offer/${token}${variantParam}`, '_blank');
     };
 
     const handleScheduleMeasurement = () => {
@@ -203,7 +225,7 @@ export const PublicOfferPage: React.FC = () => {
                     <h1 className="text-2xl font-bold text-slate-800 mb-2">Angebot nicht gefunden</h1>
                     <p className="text-slate-500">Der Link ist möglicherweise ungültig oder abgelaufen. Bitte kontaktieren Sie uns.</p>
                     <a href={`tel:${COMPANY_PHONE_HREF}`} className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-                        📞 {COMPANY_PHONE}
+                        {COMPANY_PHONE}
                     </a>
                 </div>
             </div>
@@ -212,39 +234,6 @@ export const PublicOfferPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 font-sans text-slate-800 pb-28 lg:pb-0">
-
-            {/* ═══════ MULTI-OFFER SWITCHER ═══════ */}
-            {siblingOffers.length > 1 && (
-                <div className="bg-white border-b border-slate-200 shadow-sm">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <div className="flex items-center gap-2 py-3 overflow-x-auto">
-                            <span className="text-xs text-slate-400 font-medium whitespace-nowrap mr-1">Ihre Angebote:</span>
-                            {siblingOffers.map((sibling) => {
-                                const isActive = sibling.publicToken === token;
-                                const modelName = sibling.product?.modelId
-                                    ? getModelDisplayName(sibling.product.modelId)
-                                    : 'Angebot';
-                                const price = sibling.pricing?.sellingPriceGross || sibling.pricing?.selling_price_gross || 0;
-                                return (
-                                    <button
-                                        key={sibling.id}
-                                        onClick={() => handleSwitchOffer(sibling.publicToken)}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${isActive
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
-                                            }`}
-                                    >
-                                        <span className="font-bold">{sibling.offerNumber}</span>
-                                        <span className={`text-xs ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
-                                            {modelName} • {price > 0 ? `${price.toFixed(0)} €` : ''}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* ═══════ HEADER ═══════ */}
             <header className="bg-slate-900 shadow-xl sticky top-0 z-40 border-b border-slate-800">
@@ -261,7 +250,7 @@ export const PublicOfferPage: React.FC = () => {
                     <div className="hidden md:flex items-center gap-3">
                         <a href={`tel:${creatorPhoneHref}`} className="flex items-center gap-2 px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm font-medium">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                            <span>{creatorPhone}</span>
+                            <span>{creatorPhoneDisplay}</span>
                         </a>
                         <button
                             onClick={handleDownloadPDF}
@@ -286,15 +275,186 @@ export const PublicOfferPage: React.FC = () => {
                 </div>
             </header>
 
+            {/* ═══════ EMBEDDED VARIANT SWITCHER — Premium Card Design ═══════ */}
+            {hasEmbeddedVariants && (
+                <div className="bg-gradient-to-b from-slate-50 via-blue-50/40 to-white border-b border-slate-200 shadow-sm">
+                    <div className="max-w-7xl mx-auto px-4 py-5 md:py-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm shadow-blue-200">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-white">
+                                        <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-sm font-bold text-slate-800">Wählen Sie Ihre Variante</h2>
+                                    <p className="text-[11px] text-slate-400">Vergleichen Sie {embeddedVariants.length} Konfigurationen und wählen Sie die beste für Sie</p>
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full hidden sm:inline-block">
+                                {embeddedVariants.length} Varianten
+                            </span>
+                        </div>
+
+                        {/* Variant Cards */}
+                        <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory -mx-1 px-1">
+                            {embeddedVariants.slice(0, 5).map((variant: any, idx: number) => {
+                                const isActive = idx === activeVariantIdx;
+                                const price = variant.pricing?.sellingPriceGross || 0;
+                                const priceNet = variant.pricing?.sellingPriceNet || 0;
+                                const currency = variant.pricing?.currency === 'PLN' ? 'zł' : '€';
+                                const itemCount = (variant.items?.length || 0) + (variant.customItems?.length || 0);
+                                const colorDotStyle = variant.color ? {
+                                    background: variant.color === 'RAL 7016' ? '#383E42' : variant.color === 'RAL 9016' ? '#F1F0EA' : variant.color === 'RAL 9001' ? '#E9E0D2' : variant.color === 'RAL 9006' ? '#A6A9AD' : variant.color === 'DB 703' ? '#695C4F' : '#888'
+                                } : null;
+
+                                return (
+                                    <button
+                                        key={variant.id || idx}
+                                        onClick={() => setActiveVariantIdx(idx)}
+                                        className={`relative flex-shrink-0 snap-start min-w-[180px] md:flex-1 max-w-[280px] rounded-xl text-left transition-all duration-200 overflow-hidden ${isActive
+                                            ? 'bg-white shadow-xl shadow-blue-200/60 border-2 border-blue-500 ring-4 ring-blue-100/60 scale-[1.02]'
+                                            : 'bg-white/70 border border-slate-200 hover:bg-white hover:shadow-lg hover:border-blue-300 hover:scale-[1.01]'
+                                            }`}
+                                    >
+                                        {/* Active indicator top bar */}
+                                        {isActive && (
+                                            <div className="h-1 bg-gradient-to-r from-blue-500 to-blue-600 w-full" />
+                                        )}
+
+                                        <div className={`p-4 ${!isActive ? 'pt-[calc(1rem+1px)]' : ''}`}>
+                                            {/* Header with number and label */}
+                                            <div className="flex items-center gap-2.5 mb-3">
+                                                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 transition-colors ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {idx + 1}
+                                                </span>
+                                                <span className={`font-bold text-sm truncate ${isActive ? 'text-blue-700' : 'text-slate-700'}`}>
+                                                    {variant.label || `Variante ${idx + 1}`}
+                                                </span>
+                                                {isActive && (
+                                                    <svg className="w-4 h-4 text-blue-500 shrink-0 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+
+                                            {/* Specs */}
+                                            <div className="space-y-1 mb-3">
+                                                {variant.modelName && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-3 h-3 text-slate-400 shrink-0">
+                                                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                                        </svg>
+                                                        <span className="text-[11px] text-slate-500 truncate">{variant.modelName}</span>
+                                                    </div>
+                                                )}
+                                                {variant.width > 0 && variant.projection > 0 && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-3 h-3 text-slate-400 shrink-0">
+                                                            <path d="M21 3H3v18" /><path d="M21 3l-8 8" />
+                                                        </svg>
+                                                        <span className="text-[11px] text-slate-500">{variant.width.toLocaleString('de-DE')} × {variant.projection.toLocaleString('de-DE')} mm</span>
+                                                    </div>
+                                                )}
+                                                {variant.color && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        {colorDotStyle ? (
+                                                            <span className="w-3 h-3 rounded-full border border-slate-300 shrink-0" style={colorDotStyle} />
+                                                        ) : (
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-3 h-3 text-slate-400 shrink-0">
+                                                                <circle cx="12" cy="12" r="9" />
+                                                            </svg>
+                                                        )}
+                                                        <span className="text-[11px] text-slate-500 truncate">{translateColorForDisplay(variant.color)}</span>
+                                                    </div>
+                                                )}
+                                                {itemCount > 0 && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-3 h-3 text-slate-400 shrink-0">
+                                                            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                                                            <rect x="9" y="3" width="6" height="4" rx="1" />
+                                                        </svg>
+                                                        <span className="text-[11px] text-slate-500">{itemCount} Positionen</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Price */}
+                                            {price > 0 && (
+                                                <div className={`rounded-lg p-2.5 -mx-1 ${isActive ? 'bg-blue-50 border border-blue-100' : 'bg-slate-50 border border-slate-100'}`}>
+                                                    {priceNet > 0 && (
+                                                        <p className="text-[10px] text-slate-400 mb-0.5 tabular-nums">
+                                                            netto {priceNet.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+                                                        </p>
+                                                    )}
+                                                    <p className={`text-lg font-black tabular-nums tracking-tight ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>
+                                                        {price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400">inkl. MwSt.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════ LEGACY SIBLING OFFER SWITCHER ═══════ */}
+            {!hasEmbeddedVariants && siblingOffers.length > 1 && (
+                <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200">
+                    <div className="max-w-7xl mx-auto px-4 py-3">
+                        <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory">
+                            {siblingOffers.slice(0, 5).map((sibling, idx) => {
+                                const isActive = sibling.publicToken === token;
+                                const modelName = sibling.product?.modelId
+                                    ? getModelDisplayName(sibling.product.modelId)
+                                    : 'Angebot';
+                                const price = sibling.pricing?.sellingPriceGross || sibling.pricing?.selling_price_gross || 0;
+                                return (
+                                    <button
+                                        key={sibling.id}
+                                        onClick={() => handleSwitchOffer(sibling.publicToken)}
+                                        className={`relative flex-shrink-0 snap-start min-w-[140px] md:flex-1 max-w-[220px] p-3 rounded-xl text-left transition-all ${isActive
+                                            ? 'bg-white shadow-lg shadow-blue-200/50 border-2 border-blue-500'
+                                            : 'bg-white/60 border border-slate-200 hover:bg-white hover:shadow-md hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                {idx + 1}
+                                            </span>
+                                            <span className={`font-bold text-sm truncate ${isActive ? 'text-blue-700' : 'text-slate-700'}`}>
+                                                {modelName}
+                                            </span>
+                                        </div>
+                                        {price > 0 && (
+                                            <p className={`text-base font-black mt-1 ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>
+                                                {price.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €
+                                            </p>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className="max-w-7xl mx-auto px-4 py-6 md:py-8">
 
                 {/* ═══════ URGENCY BANNER ═══════ */}
                 {daysRemaining <= 10 && daysRemaining > 0 && (
-                    <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-xl shrink-0">⏰</div>
+                    <div className="mb-6 bg-amber-50/80 border border-amber-200/60 rounded-xl p-4 flex items-center gap-3">
+                        <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
+                            <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={1.5} /><path strokeLinecap="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>
+                        </div>
                         <div>
                             <p className="font-bold text-amber-800 text-sm">Nur noch {daysRemaining} Tage gültig</p>
-                            <p className="text-amber-700 text-xs mt-0.5">Dieses Angebot ist zeitlich begrenzt. Sichern Sie sich jetzt Ihren Preis!</p>
+                            <p className="text-amber-700/80 text-xs mt-0.5">Sichern Sie sich jetzt Ihren Angebotspreis.</p>
                         </div>
                     </div>
                 )}
@@ -312,6 +472,31 @@ export const PublicOfferPage: React.FC = () => {
 
                         {/* Full Specification — FIRST: customer wants to see what they're getting */}
                         <div id="details">
+                            {/* Active variant banner */}
+                            {hasEmbeddedVariants && embeddedVariants[activeVariantIdx] && (() => {
+                                const v = embeddedVariants[activeVariantIdx];
+                                const vPrice = v.pricing?.sellingPriceGross || 0;
+                                return (
+                                    <div className="bg-slate-800 text-white rounded-xl px-5 py-4 mb-6 border border-slate-700">
+                                        <div className="flex items-center justify-between flex-wrap gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <span className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center text-xs font-black text-blue-300">{activeVariantIdx + 1}</span>
+                                                <div>
+                                                    <p className="text-sm font-bold text-white">{v.label}</p>
+                                                    <p className="text-slate-400 text-xs mt-0.5">{v.modelName}{v.width ? ` · ${v.width}×${v.projection} mm` : ''}</p>
+                                                </div>
+                                            </div>
+                                            {vPrice > 0 && (
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Brutto</p>
+                                                    <p className="text-xl md:text-2xl font-black tabular-nums">{vPrice.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             <OfferSpecification product={{
                                 ...offer.product,
                                 numberOfPosts: offer.pricing?.numberOfPosts,
@@ -319,28 +504,95 @@ export const PublicOfferPage: React.FC = () => {
                             }} pricing={offer.pricing} />
                         </div>
 
+                        {((offer as any).attachments?.length > 0) && (
+                                <>
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6">
+                                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-base">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 text-blue-600">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                                                <path d="M14 2v6h6" />
+                                            </svg>
+                                            Ihre Unterlagen
+                                        </h2>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {((offer as any).attachments as any[]).map((att: any) => {
+                                                const isImage = /\.(png|jpg|jpeg|webp)$/i.test(att.name || att.url || '');
+                                                const isPdf = /\.pdf$/i.test(att.name || att.url || '');
+                                                const label = att.type === 'visualization' ? '3D-Visualisierung' : 'Technische Zeichnung';
+                                                return (
+                                                    <button
+                                                        key={att.id}
+                                                        onClick={() => {
+                                                            setViewingAttachment(att);
+                                                            if (offer?.id) {
+                                                                OfferService.trackInteraction(offer.id, 'pdf_click', { attachment_type: att.type, name: att.name });
+                                                            }
+                                                        }}
+                                                        className="group flex items-center gap-3 p-3.5 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50/30 transition-all cursor-pointer text-left w-full"
+                                                    >
+                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isImage ? 'bg-purple-50' : 'bg-red-50'}`}>
+                                                            {isPdf ? (
+                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 text-red-500">
+                                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                                                                    <path d="M14 2v6h6" />
+                                                                    <path d="M10 12h4M10 16h2" />
+                                                                </svg>
+                                                            ) : (
+                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 text-purple-500">
+                                                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                                                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-bold text-sm text-slate-800 group-hover:text-blue-700 transition-colors">{label}</p>
+                                                            <p className="text-[11px] text-slate-400 truncate">{att.name}</p>
+                                                        </div>
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors shrink-0">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* ═══════ ATTACHMENT VIEWER LIGHTBOX ═══════ */}
+                                    {viewingAttachment && (
+                                        <AttachmentLightbox
+                                            attachment={viewingAttachment}
+                                            allAttachments={(offer as any)?.attachments || []}
+                                            onClose={() => setViewingAttachment(null)}
+                                            onNavigate={(att) => setViewingAttachment(att)}
+                                        />
+                                    )}
+                                </>
+                        )}
+
                         {/* Model-specific Advantages (Vorteile) — sells the value */}
                         <ModelAdvantagesSection modelId={offer.product.modelId} />
 
                         {/* Inline CTA — immediately after specification while interest is high */}
-                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 md:p-8 text-white text-center shadow-xl shadow-blue-200">
-                            <h3 className="text-xl md:text-2xl font-bold mb-2">Gefällt Ihnen diese Konfiguration?</h3>
-                            <p className="text-blue-100 mb-6 text-sm md:text-base">Wir stehen Ihnen für alle Fragen zur Verfügung und begleiten Sie von der Beratung bis zur fertigen Montage.</p>
+                        <div className="bg-slate-800 rounded-xl p-6 md:p-8 text-white text-center">
+                            <h3 className="text-lg md:text-xl font-bold mb-2">Interesse an dieser Konfiguration?</h3>
+                            <p className="text-slate-300 mb-6 text-sm max-w-lg mx-auto">Von der Beratung bis zur fertigen Montage — wir begleiten Sie persönlich.</p>
                             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                                 <button
                                     onClick={handleAcceptOffer}
                                     disabled={accepting}
-                                    className="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl font-bold shadow-lg hover:bg-blue-50 transition-all text-sm disabled:opacity-50 disabled:cursor-wait flex items-center justify-center gap-2"
+                                    className="w-full sm:w-auto px-8 py-3.5 bg-white text-slate-800 rounded-lg font-bold hover:bg-slate-100 transition-all text-sm disabled:opacity-50 disabled:cursor-wait flex items-center justify-center gap-2"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                     {accepting ? 'Wird bestätigt...' : 'Angebot annehmen'}
                                 </button>
                                 <button
                                     onClick={handleScheduleMeasurement}
-                                    className="w-full sm:w-auto px-8 py-3.5 bg-white/15 text-white border border-white/30 rounded-xl font-bold hover:bg-white/25 transition-all text-sm flex items-center justify-center gap-2"
+                                    className="w-full sm:w-auto px-8 py-3.5 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-sm flex items-center justify-center gap-2"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0l2-2M5 21l-2-2m7-9h4" /></svg>
-                                    Kostenloses Aufmaß vereinbaren
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    Kostenloses Aufmaß
                                 </button>
                             </div>
                         </div>
@@ -363,87 +615,102 @@ export const PublicOfferPage: React.FC = () => {
                             {/* ═══════ PRICE & ACTION CARD (Zusammenfassung) ═══════ */}
                             <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
                                 {/* Price header */}
-                                <div className="p-4 md:p-6 pb-0">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Zusammenfassung</h3>
+                                <div className="p-5 md:p-6">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                        Zusammenfassung
+                                    </h3>
 
                                     {/* Mini product summary */}
-                                    <div className="mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                        <p className="font-bold text-slate-800 text-sm">{getModelDisplayName(offer.product.modelId)} Edition</p>
-                                        {offer.product.width > 0 && offer.product.projection > 0 && (
-                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 3H3v18" /><path strokeLinecap="round" d="M21 3l-8 8" /></svg>{offer.product.width} × {offer.product.projection} mm</p>
-                                        )}
-                                        {offer.product.color && (
-                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9" strokeWidth={2} /><circle cx="12" cy="8" r="1.5" fill="currentColor" opacity={0.4} /></svg>{translateColorForDisplay(offer.product.color)}</p>
-                                        )}
+                                    <div className="mb-5 p-3.5 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl border border-slate-100">
+                                        <p className="font-bold text-slate-800 text-sm">{getModelDisplayName(offer.product.modelId)}</p>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                                            {offer.product.width > 0 && offer.product.projection > 0 && (
+                                                <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                                                    <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 3H3v18" /><path strokeLinecap="round" d="M21 3l-8 8" /></svg>
+                                                    {offer.product.width.toLocaleString('de-DE')} × {offer.product.projection.toLocaleString('de-DE')} mm
+                                                </p>
+                                            )}
+                                            {offer.product.color && (
+                                                <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                                                    <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9" strokeWidth={2} /></svg>
+                                                    {translateColorForDisplay(offer.product.color)}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {(() => {
                                         // NOTE: sellingPriceNet already includes installation costs (montage)
-                                        // Do NOT add installationCosts again — it would double-count.
                                         const installNet = offer.pricing.installationCosts?.totalInstallation || 0;
                                         const totalNet = offer.pricing.sellingPriceNet;
                                         const totalGross = offer.pricing.sellingPriceGross;
                                         const totalVat = totalGross - totalNet;
-                                        // Product-only net (for display breakdown): subtract installation from total
                                         const productOnlyNet = totalNet - installNet;
-                                        const hasDiscount = offer.pricing.discountValue && offer.pricing.discountValue > 0;
+                                        // FIX: Use boolean, not number — {0 && <JSX>} renders "0" in React!
+                                        const hasDiscount = Boolean(offer.pricing.discountValue && offer.pricing.discountValue > 0);
                                         const discountGross = hasDiscount ? offer.pricing.discountValue * 1.19 : 0;
                                         const originalGross = hasDiscount ? totalGross + discountGross : 0;
 
+                                        const fmtPrice = (v: number) => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
                                         return (
-                                        <div className="space-y-2 mb-6">
-                                            {/* Product price */}
-                                            <div className="flex justify-between items-baseline">
-                                                <span className="text-slate-500 text-xs sm:text-sm">Terrassenüberdachung</span>
-                                                <span className="font-semibold text-sm text-slate-700">{productOnlyNet.toFixed(2)} €</span>
-                                            </div>
+                                        <div className="space-y-2.5">
+                                            {/* Product price breakdown — only when there IS montage */}
+                                            {installNet > 0 && (
+                                                <div className="flex justify-between items-baseline">
+                                                    <span className="text-slate-500 text-xs sm:text-sm">Terrassenüberdachung</span>
+                                                    <span className="font-semibold text-sm text-slate-700 tabular-nums">{fmtPrice(productOnlyNet)} €</span>
+                                                </div>
+                                            )}
 
                                             {/* Installation */}
                                             {installNet > 0 && (
                                                 <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-500 text-xs sm:text-sm flex items-center gap-1">
-                                                        Fachgerechte Montage & Lieferung
-                                                    </span>
-                                                    <span className="font-semibold text-sm text-slate-700">{installNet.toFixed(2)} €</span>
+                                                    <span className="text-slate-500 text-xs sm:text-sm">Montage & Lieferung</span>
+                                                    <span className="font-semibold text-sm text-slate-700 tabular-nums">{fmtPrice(installNet)} €</span>
                                                 </div>
                                             )}
 
-                                            {/* Netto subtotal */}
-                                            <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
-                                                <span className="text-slate-600 text-sm font-semibold">Summe netto</span>
-                                                <span className="font-bold text-base text-slate-800">{totalNet.toFixed(2)} €</span>
+                                            {/* Netto subtotal — prominent */}
+                                            <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-100">
+                                                <span className="text-slate-700 text-sm font-bold">Summe netto</span>
+                                                <span className="font-extrabold text-lg md:text-xl text-slate-800 tabular-nums">{fmtPrice(totalNet)} €</span>
                                             </div>
 
                                             {/* VAT */}
                                             <div className="flex justify-between items-baseline">
-                                                <span className="text-slate-400 text-sm">zzgl. MwSt. (19%)</span>
-                                                <span className="text-sm text-slate-500">{totalVat.toFixed(2)} €</span>
+                                                <span className="text-slate-400 text-xs">zzgl. 19% MwSt.</span>
+                                                <span className="text-xs text-slate-400 tabular-nums">{fmtPrice(totalVat)} €</span>
                                             </div>
 
                                             {/* Discount badge */}
                                             {hasDiscount && (
                                                 <>
                                                     <div className="flex justify-between items-baseline pt-1">
-                                                        <span className="text-slate-400 text-sm">Regulärer Bruttopreis</span>
-                                                        <span className="text-sm text-slate-400 line-through">{originalGross.toFixed(2)} €</span>
+                                                        <span className="text-slate-400 text-xs">Regulärer Bruttopreis</span>
+                                                        <span className="text-xs text-slate-400 line-through tabular-nums">{fmtPrice(originalGross)} €</span>
                                                     </div>
                                                     <div className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2 border border-green-100">
-                                                        <span className="text-green-700 text-sm font-bold flex items-center gap-1.5">
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
+                                                        <span className="text-green-700 text-xs sm:text-sm font-bold flex items-center gap-1.5">
+                                                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
                                                             {offer.pricing.discountPercentage
-                                                                ? `−${offer.pricing.discountPercentage}% Sonderrabatt`
-                                                                : `Sie sparen`
+                                                                ? `−${offer.pricing.discountPercentage}%`
+                                                                : 'Rabatt'
                                                             }
                                                         </span>
-                                                        <span className="font-bold text-green-700 text-sm">−{discountGross.toFixed(2)} €</span>
+                                                        <span className="font-bold text-green-700 text-sm tabular-nums">−{fmtPrice(discountGross)} €</span>
                                                     </div>
                                                 </>
                                             )}
 
                                             {/* Grand total brutto */}
-                                            <div className="flex justify-between items-center pt-3 border-t-2 border-slate-200">
-                                                <span className="text-base md:text-lg font-bold text-slate-800">Gesamtpreis brutto</span>
-                                                <span className="text-xl md:text-3xl font-extrabold text-emerald-600 break-all">{totalGross.toFixed(2)} €</span>
+                                            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-4 mt-2 flex justify-between items-center">
+                                                <div>
+                                                    <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Gesamtpreis</span>
+                                                    <span className="text-xs text-slate-400">inkl. MwSt.{installNet > 0 ? ' & Montage' : ''}</span>
+                                                </div>
+                                                <span className="text-2xl md:text-3xl font-black text-white tabular-nums tracking-tight">{fmtPrice(totalGross)} €</span>
                                             </div>
                                         </div>
                                         );
@@ -451,11 +718,11 @@ export const PublicOfferPage: React.FC = () => {
                                 </div>
 
                                 {/* CTAs */}
-                                <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-3">
+                                <div className="px-5 md:px-6 pb-5 md:pb-6 space-y-2.5">
                                     <button
                                         onClick={handleAcceptOffer}
                                         disabled={accepting}
-                                        className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold text-base shadow-lg shadow-green-500/30 hover:from-green-400 hover:to-green-500 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+                                        className="w-full py-3.5 md:py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold text-sm md:text-base shadow-lg shadow-green-500/30 hover:from-green-400 hover:to-green-500 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
                                     >
                                         {accepting ? (
                                             <span>Wird bestätigt...</span>
@@ -469,28 +736,31 @@ export const PublicOfferPage: React.FC = () => {
 
                                     <button
                                         onClick={handleScheduleMeasurement}
-                                        className="w-full py-3.5 bg-white border-2 border-blue-200 text-blue-700 rounded-xl font-bold hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-3 md:py-3.5 bg-white border-2 border-blue-200 text-blue-700 rounded-xl font-bold text-sm hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0l2-2M5 21l-2-2m7-9h4" /></svg>
-                                        Kostenloses Aufmaß vereinbaren
+                                        Kostenloses Aufmaß
                                     </button>
 
                                     <button
                                         onClick={handleDownloadPDF}
-                                        className="w-full py-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-100 transition-all flex items-center justify-center gap-2 text-sm"
+                                        className="w-full py-2.5 md:py-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-100 transition-all flex items-center justify-center gap-2 text-xs md:text-sm"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                        PDF herunterladen
+                                        {hasEmbeddedVariants && embeddedVariants[activeVariantIdx]
+                                            ? `PDF — ${embeddedVariants[activeVariantIdx].label}`
+                                            : 'PDF herunterladen'
+                                        }
                                     </button>
                                 </div>
 
                                 {/* Validity */}
-                                <div className="bg-slate-50 px-6 py-3 border-t border-slate-100">
-                                    <p className="text-xs text-center text-slate-400 flex items-center justify-center gap-1.5">
+                                <div className="bg-slate-50 px-5 py-2.5 border-t border-slate-100">
+                                    <p className="text-[10px] md:text-xs text-center text-slate-400 flex items-center justify-center gap-1.5">
                                         {daysRemaining > 0 ? (
-                                            <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={1.5} /><path strokeLinecap="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>Angebot gültig noch {daysRemaining} Tage</>
+                                            <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={1.5} /><path strokeLinecap="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>Gültig noch {daysRemaining} Tage</>
                                         ) : (
-                                            <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Angebot abgelaufen — kontaktieren Sie uns</>
+                                            <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Abgelaufen — kontaktieren Sie uns</>
                                         )}
                                     </p>
                                 </div>
@@ -505,38 +775,60 @@ export const PublicOfferPage: React.FC = () => {
                             <TimelineSection />
 
                             {/* ═══════ CONTACT / MESSAGE BOX ═══════ */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4">Fragen zum Angebot?</h3>
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="px-5 pt-5 pb-4 md:px-6 md:pt-6">
+                                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4 text-slate-400">
+                                            <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                        Fragen zum Angebot?
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400 mt-0.5 ml-6">Ihre Nachricht wird direkt an Ihren Berater weitergeleitet.</p>
+                                </div>
 
-                                {messageSent ? (
-                                    <div className="bg-green-50 text-green-700 p-4 rounded-xl text-center">
-                                        <p className="font-bold flex items-center justify-center gap-1.5"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Nachricht gesendet!</p>
-                                        <p className="text-sm mt-1">Ihr Berater meldet sich in Kürze.</p>
-                                        <button onClick={() => setMessageSent(false)} className="text-xs underline mt-2">Neue Nachricht</button>
+                                <div className="px-5 pb-5 md:px-6 md:pb-6">
+                                    {messageSent ? (
+                                        <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg text-center">
+                                            <p className="font-bold text-sm flex items-center justify-center gap-1.5">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                                Nachricht gesendet
+                                            </p>
+                                            <p className="text-xs mt-1">Ihr Berater meldet sich in Kürze.</p>
+                                            <button onClick={() => setMessageSent(false)} className="text-[11px] underline mt-2 text-emerald-600 hover:text-emerald-800">Neue Nachricht schreiben</button>
+                                        </div>
+                                    ) : (
+                                        <form onSubmit={handleSendMessage}>
+                                            <textarea
+                                                value={newMessage}
+                                                onChange={e => setNewMessage(e.target.value)}
+                                                placeholder="Schreiben Sie hier Ihre Frage..."
+                                                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none h-24 resize-none text-sm text-slate-700 placeholder:text-slate-300"
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={sending || !newMessage.trim()}
+                                                className="w-full py-2.5 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-40 text-sm flex items-center justify-center gap-2"
+                                            >
+                                                {sending ? 'Wird gesendet...' : (
+                                                    <>
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                        </svg>
+                                                        Nachricht senden
+                                                    </>
+                                                )}
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
+
+                                <div className="bg-slate-50 border-t border-slate-100 px-5 py-4 md:px-6 flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                                     </div>
-                                ) : (
-                                    <form onSubmit={handleSendMessage}>
-                                        <textarea
-                                            value={newMessage}
-                                            onChange={e => setNewMessage(e.target.value)}
-                                            placeholder="Ihre Nachricht an den Berater..."
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-3 focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none text-sm"
-                                        />
-                                        <button
-                                            type="submit"
-                                            disabled={sending || !newMessage.trim()}
-                                            className="w-full py-2.5 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 text-sm"
-                                        >
-                                            {sending ? 'Senden...' : (<><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Nachricht senden</>)}
-                                        </button>
-                                    </form>
-                                )}
-
-                                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg></div>
                                     <div>
-                                        <p className="text-xs text-slate-500">{creatorName} direkt anrufen</p>
-                                        <a href={`tel:${creatorPhoneHref}`} className="font-bold text-slate-800 text-lg hover:text-blue-600 transition-colors">{creatorPhone}</a>
+                                        <p className="text-[11px] text-slate-400">{creatorName} direkt anrufen</p>
+                                        <a href={`tel:${creatorPhoneHref}`} className="font-bold text-slate-800 text-sm hover:text-blue-600 transition-colors">{creatorPhoneDisplay}</a>
                                     </div>
                                 </div>
                             </div>
@@ -547,34 +839,34 @@ export const PublicOfferPage: React.FC = () => {
             </main>
 
             {/* ═══════ MOBILE STICKY ACTION BAR ═══════ */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 lg:hidden z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.12)]">
-                <div className="flex items-center gap-3 p-3 max-w-md mx-auto">
+            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 lg:hidden z-30 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
+                <div className="flex items-center gap-2.5 p-3 max-w-md mx-auto">
                     <div className="flex-shrink-0">
                         {(() => {
-                            // sellingPriceNet already includes installation — no double-counting
                             const totalNet = offer.pricing.sellingPriceNet;
                             const totalGross = offer.pricing.sellingPriceGross;
                             return (
                                 <>
-                                    <p className="text-[9px] text-slate-400 leading-none">netto <span className="font-semibold text-slate-500">{totalNet.toFixed(0)} €</span></p>
-                                    <p className="text-base font-extrabold text-slate-800 leading-tight">{totalGross.toFixed(0)} € <span className="text-[9px] font-normal text-slate-400">brutto</span></p>
+                                    <p className="text-[9px] text-slate-400 leading-none tabular-nums">netto <span className="font-semibold text-slate-500">{totalNet.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €</span></p>
+                                    <p className="text-base font-extrabold text-slate-800 leading-tight tabular-nums">{totalGross.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} € <span className="text-[9px] font-normal text-slate-400">brutto</span></p>
                                 </>
                             );
                         })()}
                     </div>
                     <a
                         href={`tel:${creatorPhoneHref}`}
-                        className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 shrink-0 hover:bg-slate-50"
+                        className="p-2.5 bg-white border border-slate-200 rounded-lg text-slate-500 shrink-0 hover:bg-slate-50"
                         title="Anrufen"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     </a>
                     <button
-                        onClick={handleScheduleMeasurement}
-                        className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+                        onClick={handleAcceptOffer}
+                        disabled={accepting}
+                        className="flex-1 py-3 bg-slate-900 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        Aufmaß vereinbaren
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                        {accepting ? 'Wird bestätigt...' : 'Angebot annehmen'}
                     </button>
                 </div>
             </div>
@@ -603,7 +895,7 @@ export const PublicOfferPage: React.FC = () => {
                                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg></div>
                                     <div>
                                         <p className="text-xs text-slate-400">{creatorName} anrufen</p>
-                                        <a href={`tel:${creatorPhoneHref}`} className="font-bold text-slate-800 hover:text-blue-600 transition-colors">{creatorPhone}</a>
+                                        <a href={`tel:${creatorPhoneHref}`} className="font-bold text-slate-800 hover:text-blue-600 transition-colors">{creatorPhoneDisplay}</a>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">

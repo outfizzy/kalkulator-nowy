@@ -4,6 +4,11 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { useMorningCoffeeData } from './useMorningCoffeeData';
 import { DatabaseService } from '../../services/database';
+import {
+    ChevronDown, Coffee, Target, TrendingUp, AlertCircle, Package, Users,
+    Globe, BarChart3, Sparkles, RefreshCw, Plus, Check, X, ClipboardList,
+    Loader2, Bot, Lightbulb, Truck, Rocket, ListChecks
+} from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
    MORNING COFFEE AI — Business Intelligence Assistant
@@ -40,20 +45,18 @@ function TrendArrow({ current, previous, suffix = '' }: { current: number; previ
 }
 
 // Collapsible section
-function Section({ title, icon, children, defaultOpen = true }: { title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function Section({ title, icon, children, defaultOpen = true }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
     const [open, setOpen] = useState(defaultOpen);
     return (
-        <div className="border border-slate-200/60 rounded-xl overflow-hidden">
-            <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-3 py-2 bg-white/50 hover:bg-white/80 transition-colors text-left">
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50/50 hover:bg-slate-50 transition-colors text-left">
                 <div className="flex items-center gap-2">
-                    <span className="text-sm">{icon}</span>
-                    <span className="text-xs font-bold text-slate-700">{title}</span>
+                    <span className="text-slate-500">{icon}</span>
+                    <span className="text-xs font-semibold text-slate-700">{title}</span>
                 </div>
-                <svg className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
             </button>
-            {open && <div className="px-3 pb-3 pt-1 space-y-2">{children}</div>}
+            {open && <div className="px-3 pb-3 pt-1 space-y-2 bg-white">{children}</div>}
         </div>
     );
 }
@@ -244,30 +247,32 @@ export const MorningCoffeeAI: React.FC = () => {
     // ─── LOADING / ERROR ────────────────────────────────────
     if (state === 'idle' || state === 'loading') {
         return (
-            <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 rounded-2xl border border-amber-200/50 p-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-200 rounded-xl animate-pulse" />
+                    <div className="w-9 h-9 bg-slate-100 rounded-lg animate-pulse" />
                     <div>
-                        <div className="h-5 bg-amber-200 rounded w-48 animate-pulse" />
-                        <div className="h-3 bg-amber-100 rounded w-32 mt-1 animate-pulse" />
+                        <div className="h-4 bg-slate-100 rounded w-40 animate-pulse" />
+                        <div className="h-3 bg-slate-50 rounded w-28 mt-1 animate-pulse" />
                     </div>
                 </div>
-                <div className="grid grid-cols-4 gap-3 mt-4">
-                    {[1, 2, 3, 4].map(n => <div key={n} className="h-16 bg-amber-100 rounded-xl animate-pulse" />)}
+                <div className="grid grid-cols-4 gap-2 mt-4">
+                    {[1, 2, 3, 4].map(n => <div key={n} className="h-14 bg-slate-50 rounded-lg animate-pulse" />)}
                 </div>
             </div>
         );
     }
     if (state === 'error') {
         return (
-            <div className="bg-gradient-to-r from-red-50 to-amber-50 rounded-2xl border border-red-200/50 p-5">
+            <div className="bg-white rounded-xl border border-red-200 p-4">
                 <div className="flex items-center gap-3">
-                    <span className="text-2xl">⚠️</span>
+                    <div className="p-2 bg-red-50 rounded-lg text-red-500"><AlertCircle className="w-5 h-5" /></div>
                     <div>
-                        <h3 className="font-bold text-slate-800">Poranna Kawa — błąd ładowania</h3>
+                        <h3 className="text-sm font-semibold text-slate-800">Poranna Kawa — błąd ładowania</h3>
                         <p className="text-xs text-slate-500">Nie udało się pobrać danych.</p>
                     </div>
-                    <button onClick={refresh} className="ml-auto text-sm bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 font-medium">🔄 Spróbuj ponownie</button>
+                    <button onClick={refresh} className="ml-auto flex items-center gap-1.5 text-xs bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 font-medium">
+                        <RefreshCw className="w-3.5 h-3.5" /> Spróbuj ponownie
+                    </button>
                 </div>
             </div>
         );
@@ -283,29 +288,26 @@ export const MorningCoffeeAI: React.FC = () => {
     // RENDER
     // ═══════════════════════════════════════════════════════════
     return (
-        <div className={`bg-gradient-to-r ${isAdmin ? 'from-amber-50 via-orange-50 to-rose-50' : 'from-blue-50 via-indigo-50 to-purple-50'} rounded-2xl border ${hasUrgent ? 'border-red-200' : 'border-amber-200/50'} shadow-sm overflow-hidden`}>
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
 
             {/* HEADER */}
-            <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-white/30 transition-colors text-left">
+            <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors text-left">
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 bg-gradient-to-br ${isAdmin ? 'from-amber-400 to-orange-500' : 'from-blue-500 to-indigo-600'} rounded-xl flex items-center justify-center text-white shadow-md`}>
-                        <span className="text-lg">{isAdmin ? '☕' : '🎯'}</span>
+                    <div className={`p-2 rounded-lg ${isAdmin ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                        {isAdmin ? <Coffee className="w-5 h-5" /> : <Target className="w-5 h-5" />}
                     </div>
                     <div>
-                        <h3 className="text-base font-bold text-slate-800">{isAdmin ? 'Poranna Kawa z AI' : 'Twój Plan Sprzedażowy'}</h3>
-                        <p className="text-[10px] text-slate-500">{isAdmin ? 'Business Intelligence • Analiza • Strategia' : 'Pipeline • Follow-up • Wyniki'}</p>
+                        <h3 className="text-sm font-semibold text-slate-800">{isAdmin ? 'Poranna Kawa z AI' : 'Twój Plan Sprzedażowy'}</h3>
+                        <p className="text-[10px] text-slate-400">{isAdmin ? 'Business Intelligence • Analiza • Strategia' : 'Pipeline • Follow-up • Wyniki'}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     {hasUrgent && (
-                        <span className={`text-[10px] font-bold ${urgentCount > 5 ? 'text-red-600 bg-red-100 animate-pulse' : 'text-amber-700 bg-amber-100'} px-2 py-1 rounded-full`}>
+                        <span className={`text-[10px] font-semibold ${urgentCount > 5 ? 'text-red-600 bg-red-50' : 'text-amber-700 bg-amber-50'} px-2 py-0.5 rounded-full`}>
                             {isAdmin ? `${adminData?.staleLeads} zaległych` : `${urgentCount} do akcji`}
                         </span>
                     )}
-                    <span className="text-[10px] text-slate-400 font-medium">{collapsed ? 'Rozwiń' : 'Zwiń'}</span>
-                    <svg className={`w-5 h-5 text-slate-400 transition-transform ${collapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
                 </div>
             </button>
 
@@ -317,7 +319,7 @@ export const MorningCoffeeAI: React.FC = () => {
                     {isAdmin && adminData && (
                         <>
                             {/* 1. PULSE FIRMY */}
-                            <Section title="Pulse firmy" icon="📊" defaultOpen={true}>
+                            <Section title="Pulse firmy" icon={<BarChart3 className="w-4 h-4" />} defaultOpen={true}>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     <Link to="/leads" className="bg-white rounded-xl p-2.5 border border-slate-100 hover:border-red-200 hover:shadow-sm transition-all">
                                         <div className="flex items-center gap-1.5 mb-0.5">
@@ -381,7 +383,7 @@ export const MorningCoffeeAI: React.FC = () => {
                             </Section>
 
                             {/* 1b. LOGISTYKA */}
-                            <Section title="Logistyka & Zamówienia" icon="📦" defaultOpen={true}>
+                            <Section title="Logistyka & Zamówienia" icon={<Truck className="w-4 h-4" />} defaultOpen={true}>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     <Link to="/procurement" className="bg-white rounded-xl p-2.5 border border-slate-100 hover:border-amber-200 hover:shadow-sm transition-all">
                                         <div className="flex items-center gap-1.5 mb-0.5">
@@ -422,13 +424,13 @@ export const MorningCoffeeAI: React.FC = () => {
                                         <div className="flex flex-wrap gap-1">{adminData.upcomingInstallationDetails.map((inst, i) => <span key={i} className="text-[10px] bg-white text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-medium">{inst.name}{inst.city ? ` (${inst.city})` : ''} — {new Date(inst.date).toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' })}</span>)}</div>
                                     </div>
                                 )}
-                                <button onClick={() => runClaudeAnalysis('logistics_briefing')} disabled={loadingAI} className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-lg text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                    {loadingAI && aiInsightType === 'logistics_briefing' ? <>⏳ Analizuję logistykę (Claude)...</> : <>📦 AI Plan Logistyki — co zamówić, co pilne</>}
+                                <button onClick={() => runClaudeAnalysis('logistics_briefing')} disabled={loadingAI} className="w-full flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                    {loadingAI && aiInsightType === 'logistics_briefing' ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analizuję logistykę...</> : <><Package className="w-3.5 h-3.5" /> AI Plan Logistyki</>}
                                 </button>
                             </Section>
 
                             {/* 2. TRENDY */}
-                            <Section title="Trendy — miesiąc do miesiąca" icon="📈" defaultOpen={true}>
+                            <Section title="Trendy — miesiąc do miesiąca" icon={<TrendingUp className="w-4 h-4" />} defaultOpen={true}>
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="bg-white rounded-lg p-2 border border-slate-100 text-center">
                                         <p className="text-[9px] font-semibold text-slate-500 uppercase">Umowy</p>
@@ -460,7 +462,7 @@ export const MorningCoffeeAI: React.FC = () => {
 
                             {/* 3. RANKING ZESPOŁU */}
                             {adminData.teamRanking.length > 0 && (
-                                <Section title="Ranking zespołu" icon="👥" defaultOpen={false}>
+                                <Section title="Ranking zespołu" icon={<Users className="w-4 h-4" />} defaultOpen={false}>
                                     <div className="space-y-1.5">
                                         {adminData.teamRanking.map((rep, i) => (
                                             <div key={i} className={`flex items-center justify-between bg-white rounded-lg px-3 py-2 border ${i === 0 ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'}`}>
@@ -481,7 +483,7 @@ export const MorningCoffeeAI: React.FC = () => {
                             )}
 
                             {/* 4. BRANŻA & ROZWÓJ */}
-                            <Section title="Branża & Rozwój" icon="🌍" defaultOpen={false}>
+                            <Section title="Branża & Rozwój" icon={<Globe className="w-4 h-4" />} defaultOpen={false}>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div className="bg-white rounded-lg p-2.5 border border-slate-100">
                                         <div className="flex items-start gap-2">
@@ -506,15 +508,17 @@ export const MorningCoffeeAI: React.FC = () => {
                                     <p className="text-[9px] font-semibold text-slate-500 uppercase mb-1">🔑 Śledzone słowa kluczowe</p>
                                     <div className="flex flex-wrap gap-1">{MARKET_KEYWORDS.map((kw, i) => <span key={i} className="text-[10px] bg-white text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{kw}</span>)}</div>
                                 </div>
-                                <button onClick={() => runClaudeAnalysis('market_analysis')} disabled={loadingAI} className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                    {loadingAI && aiInsightType === 'market_analysis' ? <>⏳ Analizuję rynek (Claude)...</> : <>🧠 AI Analiza Rynku — trendy, konkurencja, rozwój</>}
+                                <button onClick={() => runClaudeAnalysis('market_analysis')} disabled={loadingAI} className="w-full flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                    {loadingAI && aiInsightType === 'market_analysis' ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analizuję rynek...</> : <><Sparkles className="w-3.5 h-3.5" /> AI Analiza Rynku</>}
                                 </button>
                             </Section>
 
                             {/* FOOTER */}
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-amber-200/30 pt-2">
-                                <span>📊 {adminData.totalLeads} leadów • {adminData.newLeadsToday} nowych • pipeline {adminData.pipelineValue > 0 ? `${Math.round(adminData.pipelineValue / 1000)}k€` : '—'}</span>
-                                <button onClick={() => { setAiInsight(''); refresh(); }} className="hover:text-slate-600">🔄 Odśwież</button>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100 pt-2">
+                                <span>{adminData.totalLeads} leadów • {adminData.newLeadsToday} nowych • pipeline {adminData.pipelineValue > 0 ? `${Math.round(adminData.pipelineValue / 1000)}k€` : '—'}</span>
+                                <button onClick={() => { setAiInsight(''); refresh(); }} className="flex items-center gap-1 hover:text-slate-600">
+                                    <RefreshCw className="w-3 h-3" /> Odśwież
+                                </button>
                             </div>
                         </>
                     )}
@@ -556,34 +560,39 @@ export const MorningCoffeeAI: React.FC = () => {
                                     <div className="flex flex-wrap gap-1">{salesData.hotLeadNames.map((n, i) => <span key={i} className="text-[10px] bg-white text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-medium">{n}</span>)}</div>
                                 </div>
                             )}
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-blue-200/30 pt-2">
-                                <span>🎯 {salesData.unprocessedLeads} do obróbki • {salesData.offersWaiting + salesData.negotiationStale} follow-up • {salesData.hotLeadNames.length} gorących</span>
-                                <button onClick={() => { setAiInsight(''); refresh(); }} className="hover:text-slate-600">🔄 Odśwież</button>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100 pt-2">
+                                <span>{salesData.unprocessedLeads} do obróbki • {salesData.offersWaiting + salesData.negotiationStale} follow-up • {salesData.hotLeadNames.length} gorących</span>
+                                <button onClick={() => { setAiInsight(''); refresh(); }} className="flex items-center gap-1 hover:text-slate-600">
+                                    <RefreshCw className="w-3 h-3" /> Odśwież
+                                </button>
                             </div>
                         </>
                     )}
 
                     {/* ══════════ AI COACH — Claude Powered ══════════ */}
                     {aiInsight ? (
-                        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200/50 rounded-xl p-3 space-y-2">
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm">🤖</span>
-                                    <span className="text-xs font-semibold text-blue-700">{isAdmin ? 'AI Business Coach' : 'AI Coach'}</span>
-                                    <span className="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-bold">Claude</span>
+                                    <Bot className="w-4 h-4 text-indigo-600" />
+                                    <span className="text-xs font-semibold text-slate-700">{isAdmin ? 'AI Business Coach' : 'AI Coach'}</span>
+                                    <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-semibold">Claude</span>
                                 </div>
-                                <button onClick={() => setAiInsight('')} className="text-[10px] text-slate-400 hover:text-slate-600">✕ Zamknij</button>
+                                <button onClick={() => setAiInsight('')} className="text-slate-400 hover:text-slate-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
                             </div>
                             <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{aiInsight}</p>
                             
                             {/* ── EXTRACTED TASKS ── */}
                             {extractedTasks.length > 0 && (
-                                <div className="bg-white/80 border border-indigo-200 rounded-lg p-3 space-y-2">
+                                <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold text-indigo-700">📋 Wyodrębnione zadania ({extractedTasks.filter(t => !t.created).length} do utworzenia)</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <ListChecks className="w-3.5 h-3.5 text-indigo-600" />
+                                            <span className="text-xs font-semibold text-slate-700">Wyodrębnione zadania ({extractedTasks.filter(t => !t.created).length})</span>
+                                        </div>
                                         <div className="flex gap-1.5">
-                                            <button onClick={createAllTasksFromAI} disabled={extractedTasks.every(t => t.created)} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-40 transition-colors">✅ Utwórz wszystkie</button>
-                                            <button onClick={() => setExtractedTasks([])} className="text-[10px] text-slate-400 hover:text-slate-600 px-1">✕</button>
+                                            <button onClick={createAllTasksFromAI} disabled={extractedTasks.every(t => t.created)} className="text-[10px] bg-slate-800 text-white px-2 py-1 rounded-lg hover:bg-slate-700 font-medium disabled:opacity-40 transition-colors"><Check className="w-3 h-3 inline mr-0.5" />Utwórz wszystkie</button>
+                                            <button onClick={() => setExtractedTasks([])} className="text-slate-400 hover:text-slate-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
@@ -592,14 +601,14 @@ export const MorningCoffeeAI: React.FC = () => {
                                                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-amber-400' : 'bg-blue-400'}`} />
                                                 <span className={`text-[11px] flex-1 ${task.created ? 'text-emerald-700 line-through' : 'text-slate-700'}`}>{task.title}</span>
                                                 {task.created ? (
-                                                    <span className="text-[9px] text-emerald-600 font-bold">✓ Utworzone</span>
+                                                <span className="text-[9px] text-emerald-600 font-semibold"><Check className="w-3 h-3 inline" /> Utworzone</span>
                                                 ) : (
                                                     <button
                                                         onClick={() => createTaskFromAI(i)}
                                                         disabled={creatingTask === i}
-                                                        className="text-[10px] bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded hover:bg-indigo-100 font-medium disabled:opacity-50 flex-shrink-0 transition-colors"
+                                                        className="text-[10px] bg-slate-50 border border-slate-200 text-slate-700 px-2 py-0.5 rounded hover:bg-slate-100 font-medium disabled:opacity-50 flex-shrink-0 transition-colors"
                                                     >
-                                                        {creatingTask === i ? '⏳...' : '➕ Utwórz'}
+                                                        {creatingTask === i ? <Loader2 className="w-3 h-3 animate-spin inline" /> : <><Plus className="w-3 h-3 inline" /> Utwórz</>}
                                                     </button>
                                                 )}
                                             </div>
@@ -609,41 +618,41 @@ export const MorningCoffeeAI: React.FC = () => {
                             )}
 
                             {isAdmin && (
-                                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-blue-100">
-                                    <button onClick={() => { setExtractedTasks([]); extractTasksFromAI(aiInsight); }} className="text-[10px] bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3 py-1 rounded-lg hover:from-indigo-700 hover:to-purple-700 font-semibold shadow-sm transition-all">📋 Wyodrębnij zadania</button>
-                                    <button onClick={() => runClaudeAnalysis('daily_briefing')} disabled={loadingAI} className="text-[10px] bg-white border border-blue-200 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 font-medium disabled:opacity-50">☕ Nowy briefing</button>
-                                    <button onClick={() => runClaudeAnalysis('market_analysis')} disabled={loadingAI} className="text-[10px] bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded-lg hover:bg-purple-50 font-medium disabled:opacity-50">🌍 Rynek</button>
-                                    <button onClick={() => runClaudeAnalysis('team_coaching')} disabled={loadingAI} className="text-[10px] bg-white border border-emerald-200 text-emerald-700 px-2 py-1 rounded-lg hover:bg-emerald-50 font-medium disabled:opacity-50">👥 Zespół</button>
-                                    <button onClick={() => runClaudeAnalysis('growth_strategy')} disabled={loadingAI} className="text-[10px] bg-white border border-amber-200 text-amber-700 px-2 py-1 rounded-lg hover:bg-amber-50 font-medium disabled:opacity-50">🚀 Strategia</button>
+                                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
+                                    <button onClick={() => { setExtractedTasks([]); extractTasksFromAI(aiInsight); }} className="text-[10px] bg-slate-800 text-white px-3 py-1 rounded-lg hover:bg-slate-700 font-medium transition-colors flex items-center gap-1"><ClipboardList className="w-3 h-3" /> Wyodrębnij zadania</button>
+                                    <button onClick={() => runClaudeAnalysis('daily_briefing')} disabled={loadingAI} className="text-[10px] bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-50 flex items-center gap-1"><Coffee className="w-3 h-3" /> Briefing</button>
+                                    <button onClick={() => runClaudeAnalysis('market_analysis')} disabled={loadingAI} className="text-[10px] bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-50 flex items-center gap-1"><Globe className="w-3 h-3" /> Rynek</button>
+                                    <button onClick={() => runClaudeAnalysis('team_coaching')} disabled={loadingAI} className="text-[10px] bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-50 flex items-center gap-1"><Users className="w-3 h-3" /> Zespół</button>
+                                    <button onClick={() => runClaudeAnalysis('growth_strategy')} disabled={loadingAI} className="text-[10px] bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-50 flex items-center gap-1"><Rocket className="w-3 h-3" /> Strategia</button>
                                 </div>
                             )}
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {isAdmin ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                                    <button onClick={() => runClaudeAnalysis('daily_briefing')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                        {loadingAI && aiInsightType === 'daily_briefing' ? '⏳...' : '☕ Poranna Kawa'}
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                                    <button onClick={() => runClaudeAnalysis('daily_briefing')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                        {loadingAI && aiInsightType === 'daily_briefing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Coffee className="w-3.5 h-3.5" />} Poranna Kawa
                                     </button>
-                                    <button onClick={() => runClaudeAnalysis('market_analysis')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                        {loadingAI && aiInsightType === 'market_analysis' ? '⏳...' : '🌍 Analiza Rynku'}
+                                    <button onClick={() => runClaudeAnalysis('market_analysis')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                        {loadingAI && aiInsightType === 'market_analysis' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />} Rynek
                                     </button>
-                                    <button onClick={() => runClaudeAnalysis('team_coaching')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                        {loadingAI && aiInsightType === 'team_coaching' ? '⏳...' : '👥 Coaching Zespołu'}
+                                    <button onClick={() => runClaudeAnalysis('team_coaching')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                        {loadingAI && aiInsightType === 'team_coaching' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />} Zespół
                                     </button>
-                                    <button onClick={() => runClaudeAnalysis('growth_strategy')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                        {loadingAI && aiInsightType === 'growth_strategy' ? '⏳...' : '🚀 Plan Rozwoju'}
+                                    <button onClick={() => runClaudeAnalysis('growth_strategy')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                        {loadingAI && aiInsightType === 'growth_strategy' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Rocket className="w-3.5 h-3.5" />} Rozwój
                                     </button>
-                                    <button onClick={() => runClaudeAnalysis('logistics_briefing')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-xl text-[11px] font-semibold shadow-sm transition-all disabled:opacity-50">
-                                        {loadingAI && aiInsightType === 'logistics_briefing' ? '⏳...' : '📦 Plan Logistyki'}
+                                    <button onClick={() => runClaudeAnalysis('logistics_briefing')} disabled={loadingAI} className="flex items-center justify-center gap-1.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50">
+                                        {loadingAI && aiInsightType === 'logistics_briefing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />} Logistyka
                                     </button>
                                 </div>
                             ) : (
-                                <button onClick={generateSalesInsight} disabled={loadingAI} className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all disabled:opacity-50">
+                                <button onClick={generateSalesInsight} disabled={loadingAI} className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                                     {loadingAI ? (
-                                        <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> Generuję...</>
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> Generuję...</>
                                     ) : (
-                                        <>🤖 AI Coach — co zrobić żeby sprzedać?</>
+                                        <><Bot className="w-4 h-4" /> AI Coach — co zrobić żeby sprzedać?</>
                                     )}
                                 </button>
                             )}

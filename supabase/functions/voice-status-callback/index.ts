@@ -47,21 +47,32 @@ function normalizePhone(phone: string): string {
 async function findContactByPhone(supabase: any, phone: string): Promise<{ type: 'lead' | 'customer' | null; id: string | null; name: string | null }> {
     const normalized = normalizePhone(phone);
 
+    // Guard: skip lookup for empty/short phone numbers
+    if (!normalized || normalized.length < 7) {
+        return { type: null, id: null, name: null };
+    }
+
     // Search leads by customer_data->phone (JSONB field)
     try {
         const { data: leads } = await supabase
             .from('leads')
             .select('id, customer_data')
             .or(`customer_data->>phone.eq.${normalized},customer_data->>phone.eq.${phone}`)
+            .neq('customer_data->>phone', '')
+            .not('customer_data->>phone', 'is', null)
             .limit(1);
 
         if (leads && leads.length > 0) {
-            const cd = leads[0].customer_data || {};
-            return {
-                type: 'lead',
-                id: leads[0].id,
-                name: `${cd.firstName || ''} ${cd.lastName || ''}`.trim() || 'Lead'
-            };
+            // Double-check: verify the matched lead actually has a non-empty phone
+            const leadPhone = leads[0].customer_data?.phone || '';
+            if (leadPhone.length >= 7) {
+                const cd = leads[0].customer_data || {};
+                return {
+                    type: 'lead',
+                    id: leads[0].id,
+                    name: `${cd.firstName || ''} ${cd.lastName || ''}`.trim() || 'Lead'
+                };
+            }
         }
     } catch (e) {
         console.warn('[status-cb] Lead search error:', e);
@@ -73,14 +84,20 @@ async function findContactByPhone(supabase: any, phone: string): Promise<{ type:
             .from('customers')
             .select('id, first_name, last_name, phone')
             .or(`phone.eq.${normalized},phone.eq.${phone}`)
+            .neq('phone', '')
+            .not('phone', 'is', null)
             .limit(1);
 
         if (customers && customers.length > 0) {
-            return {
-                type: 'customer',
-                id: customers[0].id,
-                name: `${customers[0].first_name} ${customers[0].last_name}`.trim()
-            };
+            // Double-check: verify matched customer has a real phone number
+            const custPhone = customers[0].phone || '';
+            if (custPhone.length >= 7) {
+                return {
+                    type: 'customer',
+                    id: customers[0].id,
+                    name: `${customers[0].first_name} ${customers[0].last_name}`.trim()
+                };
+            }
         }
     } catch (e) {
         console.warn('[status-cb] Customer search error:', e);
@@ -92,12 +109,14 @@ async function findContactByPhone(supabase: any, phone: string): Promise<{ type:
 /**
  * Upsert a call log entry — prevents duplicates by matching on twilio_call_sid.
  * If a record already exists, it merges the new data (recording, status, duration).
+ * IMPORTANT: Never overwrites from_number/to_number on existing records to preserve
+ * the original caller/callee identity set by voice-incoming.
  */
 async function upsertCallLog(supabase: any, callSid: string, newData: Record<string, any>): Promise<string | null> {
     // 1. Try to find existing record
     const { data: existing } = await supabase
         .from('call_logs')
-        .select('id, status, recording_url, metadata, duration_seconds')
+        .select('id, status, recording_url, metadata, duration_seconds, from_number, to_number')
         .eq('twilio_call_sid', callSid)
         .limit(1);
 
@@ -181,6 +200,7 @@ Deno.serve(async (req) => {
     try {
         const params = await parseTwilioParams(req);
         const callSid = params['CallSid'] || '';
+        const parentCallSid = params['ParentCallSid'] || '';
         const callStatus = params['CallStatus'] || params['DialCallStatus'] || '';
         const from = params['From'] || '';
         const to = params['To'] || '';
@@ -190,10 +210,54 @@ Deno.serve(async (req) => {
         const recordingDuration = params['RecordingDuration'] || '';
         const recordingStatus = params['RecordingStatus'] || '';
 
-        console.log(`[status-cb] CallSid=${callSid}, Status=${callStatus}, RecordingUrl=${recordingUrl ? 'YES' : 'NO'}`);
+        // Detect child-leg callbacks: when Twilio dials agents, From is the company's
+        // Twilio number and To is the agent's number/client. These should NOT create
+        // separate call_log entries — they'd show the company number as the "caller".
+        const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER') || '';
+        const isChildLeg = !!parentCallSid || (twilioPhoneNumber && normalizePhone(from) === normalizePhone(twilioPhoneNumber));
+
+        console.log(`[status-cb] CallSid=${callSid}, ParentCallSid=${parentCallSid || 'none'}, Status=${callStatus}, From=${from}, To=${to}, isChildLeg=${isChildLeg}, RecordingUrl=${recordingUrl ? 'YES' : 'NO'}`);
 
         if (!callSid) {
             console.warn('[status-cb] No CallSid, ignoring');
+            return new Response(emptyTwiml, { status: 200, headers: { 'Content-Type': 'application/xml' } });
+        }
+
+        // For child-leg callbacks (agent ring attempts), try to update the parent call
+        // log instead of creating a new one. Skip if no parent call found.
+        if (isChildLeg && !recordingUrl) {
+            console.log(`[status-cb] Child-leg callback (From=${from}, To=${to}), looking for parent call...`);
+            const supabase = getSupabaseClient();
+            const lookupSid = parentCallSid || callSid;
+            
+            // Try to find the parent call log
+            const { data: parentLog } = await supabase
+                .from('call_logs')
+                .select('id, status')
+                .eq('twilio_call_sid', parentCallSid || '')
+                .limit(1);
+
+            if (parentLog && parentLog.length > 0) {
+                // Update parent log status if this child-leg completed (means agent answered)
+                if (callStatus === 'completed') {
+                    const statusPriority: Record<string, number> = {
+                        'initiated': 1, 'ringing': 2, 'in-progress': 3,
+                        'completed': 10, 'no-answer': 10, 'busy': 10, 'failed': 10, 'canceled': 10, 'missed': 10, 'voicemail': 10,
+                    };
+                    const existingPrio = statusPriority[parentLog[0].status] || 0;
+                    if (existingPrio < 10) {
+                        await supabase.from('call_logs').update({
+                            status: 'completed',
+                            duration_seconds: duration ? parseInt(duration) : null,
+                            ended_at: new Date().toISOString(),
+                        }).eq('id', parentLog[0].id);
+                        console.log(`[status-cb] Updated parent log ${parentLog[0].id} to completed via child-leg`);
+                    }
+                }
+                console.log(`[status-cb] Child-leg handled via parent — skipping new entry`);
+            } else {
+                console.log(`[status-cb] Child-leg with no parent found — skipping (From=${from} is company number)`);
+            }
             return new Response(emptyTwiml, { status: 200, headers: { 'Content-Type': 'application/xml' } });
         }
 
@@ -209,7 +273,61 @@ Deno.serve(async (req) => {
             userId = from.replace('client:', '');
         }
 
-        // ── RECORDING COMPLETED ──
+        // ── VOICEMAIL RECORDING ──
+        const urlObj = new URL(req.url);
+        const isVoicemail = urlObj.searchParams.get('voicemail') === 'true';
+
+        if (isVoicemail && recordingUrl && (recordingStatus === 'completed' || recordingSid)) {
+            console.log(`[status-cb] 📬 VOICEMAIL recording from ${from}: ${recordingUrl}`);
+
+            const fullRecordingUrl = recordingUrl.endsWith('.mp3')
+                ? recordingUrl
+                : `${recordingUrl}.mp3`;
+
+            // 1. Update call_log status to 'voicemail'
+            const logId = await upsertCallLog(supabase, callSid, {
+                direction: 'inbound',
+                from_number: from,
+                to_number: to,
+                status: 'voicemail',
+                recording_url: fullRecordingUrl,
+                recording_duration: recordingDuration ? parseInt(recordingDuration) : null,
+                duration_seconds: duration ? parseInt(duration) : null,
+                lead_id: contact.type === 'lead' ? contact.id : null,
+                customer_id: contact.type === 'customer' ? contact.id : null,
+                ended_at: new Date().toISOString(),
+                metadata: {
+                    recording_sid: recordingSid,
+                    is_voicemail: true,
+                    contact_name: contact.name,
+                }
+            });
+
+            // 2. Save to voicemails table
+            try {
+                const { error: vmError } = await supabase
+                    .from('voicemails')
+                    .insert({
+                        call_log_id: logId,
+                        recording_url: fullRecordingUrl,
+                        duration_seconds: recordingDuration ? parseInt(recordingDuration) : null,
+                        is_listened: false,
+                        created_at: new Date().toISOString(),
+                    });
+
+                if (vmError) {
+                    console.error('[status-cb] Voicemail insert error:', vmError);
+                } else {
+                    console.log(`[status-cb] ✅ Voicemail saved for call ${callSid} (${contact.name || from})`);
+                }
+            } catch (vmErr) {
+                console.error('[status-cb] Voicemail save failed:', vmErr);
+            }
+
+            return new Response(emptyTwiml, { status: 200, headers: { 'Content-Type': 'application/xml' } });
+        }
+
+        // ── REGULAR RECORDING COMPLETED ──
         if (recordingUrl && (recordingStatus === 'completed' || recordingSid)) {
             console.log(`[status-cb] Recording completed: ${recordingUrl}`);
 
@@ -263,7 +381,9 @@ Deno.serve(async (req) => {
             console.log(`[status-cb] Call ${callSid} ended with status: ${callStatus}`);
 
             // Map Twilio statuses to our simplified model
-            const mappedStatus = callStatus === 'no-answer' && direction === 'inbound' ? 'missed' : callStatus;
+            let mappedStatus = callStatus;
+            if (callStatus === 'no-answer' && direction === 'inbound') mappedStatus = 'missed';
+            if (callStatus === 'canceled') mappedStatus = 'failed'; // 'canceled' not in DB check constraint
 
             await upsertCallLog(supabase, callSid, {
                 direction,

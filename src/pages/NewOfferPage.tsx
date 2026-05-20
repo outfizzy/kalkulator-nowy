@@ -8,6 +8,7 @@ import { PricingService } from '../services/pricing.service';
 import { CustomerForm } from '../components/CustomerForm';
 import { ProductConfigurator } from '../components/ProductConfigurator';
 import { ManualOfferConfigurator } from '../components/ManualOfferConfigurator';
+import { OcrOfferConfigurator } from '../components/OcrOfferConfigurator';
 import { MarginControl } from '../components/MarginControl';
 import { OfferSummary } from '../components/OfferSummary';
 import { ConfiguratorService, type LeadConfiguration } from '../services/database/configurator.service';
@@ -38,7 +39,7 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
     const [snowZone, setSnowZone] = useState<SnowZoneInfo | null>(null);
     const [product, setProduct] = useState<ProductConfig | null>(null);
     const [offer, setOffer] = useState<Offer | null>(null);
-    const [isManualMode, setIsManualMode] = useState(false);
+    const [configMode, setConfigMode] = useState<'standard' | 'manual' | 'ocr'>('standard');
     const [leadConfig, setLeadConfig] = useState<LeadConfiguration | null>(null);
     const [contextOpen, setContextOpen] = useState(true);
 
@@ -175,7 +176,7 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
         setProduct(null);
         setOffer(null);
         setMargin(mode === 'partner' ? (currentUser?.partnerMargin ?? 0.25) : 0.40);
-        setIsManualMode(false);
+        setConfigMode('standard');
     };
 
     const handleManualProductComplete = async (config: ProductConfig) => {
@@ -199,9 +200,6 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
                 // Manual Pricing Logic
                 const sellingPriceNet = config.manualPrice || 0;
                 const sellingPriceGross = sellingPriceNet * 1.19; // VAT estimation or exact? German VAT is 19%
-                // For manual offers, we assume purchase price is 0 or user doesn't care about margin calculation for now
-                // Or we could ask for Purchase Price too? Plan said "Price: Netto input" which usually implies selling price
-                // Let's assume margin is 0 or strictly unknown for now.
 
                 const pricing = {
                     basePrice: sellingPriceNet,
@@ -221,8 +219,8 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
                     customer,
                     snowZone,
                     product: config,
-                    pricing: pricing as any, // Cast because we might miss some calculated fields
-                    commission: 0, // No auto-commission for manual? or calculate based on price?
+                    pricing: pricing as any, 
+                    commission: 0, 
                     leadId,
                 };
 
@@ -234,6 +232,77 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
             } catch (error) {
                 console.error('Error creating manual offer:', error);
                 toast.error('Błąd podczas tworzenia oferty ręcznej');
+            }
+        }
+    };
+
+    const handleOcrProductComplete = async (config: ProductConfig) => {
+        try {
+            const imageUrl = await PricingService.getProductImage(config.modelId, {
+                roofType: config.roofType,
+                snowZone: snowZone?.id || '1'
+            });
+            if (imageUrl) {
+                config.imageUrl = imageUrl;
+            }
+        } catch (e) {
+            console.error('Failed to fetch product image', e);
+        }
+
+        setProduct(config);
+
+        if (customer && snowZone && currentUser) {
+            try {
+                // OCR Pricing Logic
+                const sellingPriceNet = config.manualPrice || 0; // manualPrice has sellingPriceNet
+                const sellingPriceGross = sellingPriceNet * 1.19;
+                
+                // For UI to work properly in margin control, we should pass the OCR data if possible
+                // Set totalCost to ocrBasePrice so MarginControl displays it correctly
+                const pricing = {
+                    basePrice: config.ocrBasePrice || 0,
+                    addonsPrice: 0,
+                    totalCost: config.ocrBasePrice || 0,
+                    marginPercentage: config.ocrMargin || 0,
+                    marginValue: sellingPriceNet - (config.ocrBasePrice || 0) - (config.ocrInstallationFee || 0),
+                    sellingPriceNet,
+                    sellingPriceGross,
+                    installationCosts: {
+                        days: 1,
+                        dailyBreakdown: [{ day: 1, cost: config.ocrInstallationFee || 0 }],
+                        dailyTotal: config.ocrInstallationFee || 0,
+                        travelDistance: 0,
+                        travelCost: 0,
+                        totalInstallation: config.ocrInstallationFee || 0
+                    },
+                    paymentMethod: 'transfer' as const,
+                };
+
+                const newOffer: Omit<Offer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
+                    offerNumber: `OFF/${new Date().getFullYear()}/${Math.floor(Math.random() * 10000)}`,
+                    status: 'draft',
+                    customer,
+                    snowZone,
+                    product: config,
+                    pricing: pricing as any,
+                    commission: 0, // Should commission be calculated for OCR? Yes
+                    leadId,
+                };
+
+                // Commission calculation
+                const soldOffersCount = mode === 'partner' ? 0 : await DatabaseService.getSoldOffersCount(currentUser.id);
+                const userCommissionRate = currentUser.commissionRate ?? 0.05;
+                const userCommissionConfig = currentUser.commissionConfig ?? { enableMarginBonus: false, enableVolumeBonus: false };
+                newOffer.commission = calculateCommission(sellingPriceNet, pricing.marginPercentage, soldOffersCount, userCommissionRate, userCommissionConfig);
+
+                const savedOffer = await DatabaseService.createOffer(newOffer);
+                toast.success('Oferta z pliku (OCR) utworzona!');
+                setOffer(savedOffer);
+                setStep('summary');
+
+            } catch (error) {
+                console.error('Error creating OCR offer:', error);
+                toast.error('Błąd podczas tworzenia oferty z OCR');
             }
         }
     };
@@ -406,19 +475,28 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
 
                         {/* Mode Toggle */}
                         <div className="flex justify-center mb-6">
-                            <div className="bg-slate-100 p-1 rounded-xl flex gap-1 shadow-inner">
+                            <div className="bg-slate-100 p-1 rounded-xl flex gap-1 shadow-inner overflow-x-auto">
                                 <button
-                                    onClick={() => setIsManualMode(false)}
-                                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isManualMode
+                                    onClick={() => setConfigMode('standard')}
+                                    className={`px-6 py-2 whitespace-nowrap rounded-lg text-sm font-bold transition-all ${configMode === 'standard'
                                         ? 'bg-white text-slate-800 shadow-sm'
                                         : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
-                                    ⚡️ Konfigurator (Standard)
+                                    ⚡️ Konfigurator
                                 </button>
                                 <button
-                                    onClick={() => setIsManualMode(true)}
-                                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isManualMode
+                                    onClick={() => setConfigMode('ocr')}
+                                    className={`px-6 py-2 whitespace-nowrap rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${configMode === 'ocr'
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    📄 Z pliku (OCR)
+                                </button>
+                                <button
+                                    onClick={() => setConfigMode('manual')}
+                                    className={`px-6 py-2 whitespace-nowrap rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${configMode === 'manual'
                                         ? 'bg-accent text-white shadow-md'
                                         : 'text-slate-500 hover:text-slate-700'
                                         }`}
@@ -428,9 +506,13 @@ export function NewOfferPage({ mode = 'standard' }: NewOfferPageProps) {
                             </div>
                         </div>
 
-                        {isManualMode ? (
+                        {configMode === 'manual' && (
                             <ManualOfferConfigurator onComplete={handleManualProductComplete} initialData={product || undefined} />
-                        ) : (
+                        )}
+                        {configMode === 'ocr' && (
+                            <OcrOfferConfigurator onComplete={handleOcrProductComplete} initialData={product || undefined} />
+                        )}
+                        {configMode === 'standard' && (
                             <ProductConfigurator onComplete={handleProductComplete} initialData={product || undefined} />
                         )}
                     </div>

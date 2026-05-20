@@ -13,6 +13,7 @@ interface AddTransactionModalProps {
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen, onClose, onSuccess, initialType = 'income' }) => {
     const [type, setType] = useState<'income' | 'expense'>(initialType);
     const [amount, setAmount] = useState('');
+    const [loading, setLoading] = useState(false);
     const [currency, setCurrency] = useState<'EUR' | 'PLN'>('EUR');
     const [category, setCategory] = useState('');
     const [description, setDescription] = useState('');
@@ -61,8 +62,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!amount || isNaN(Number(amount))) {
-            toast.error('Podaj poprawną kwotę');
+        if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+            toast.error('Podaj poprawną kwotę (większą od 0)');
             return;
         }
 
@@ -90,6 +91,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
         }
 
         try {
+            setLoading(true);
             const transactionData = {
                 type,
                 amount: Number(amount),
@@ -119,6 +121,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
             // Show more specific error message
             const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
             toast.error(`Błąd podczas dodawania transakcji: ${errorMessage}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -354,12 +358,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                         </button>
                         <button
                             type="submit"
-                            className={`flex-1 py-3 px-4 text-white font-medium rounded-xl transition-colors shadow-lg shadow-indigo-500/20 ${type === 'income'
+                            disabled={loading}
+                            className={`flex-1 py-3 px-4 text-white font-medium rounded-xl transition-colors shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed ${type === 'income'
                                 ? 'bg-emerald-600 hover:bg-emerald-700'
                                 : 'bg-red-600 hover:bg-red-700'
                                 }`}
                         >
-                            Zapisz {type === 'income' ? 'Wpłatę' : 'Wydatek'}
+                            {loading ? 'Zapisywanie...' : `Zapisz ${type === 'income' ? 'Wpłatę' : 'Wydatek'}`}
                         </button>
                     </div>
                 </form>

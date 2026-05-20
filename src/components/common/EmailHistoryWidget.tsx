@@ -38,9 +38,11 @@ interface Props {
     customerEmail: string;
     maxItems?: number;
     compact?: boolean;
+    /** When provided, search ALL team mailboxes (not just current user's) for customer correspondence */
+    allTeamMailboxes?: MailboxConfig[];
 }
 
-export const EmailHistoryWidget: React.FC<Props> = ({ customerEmail, maxItems = 20, compact = false }) => {
+export const EmailHistoryWidget: React.FC<Props> = ({ customerEmail, maxItems = 20, compact = false, allTeamMailboxes }) => {
     const { currentUser } = useAuth();
     const [emails, setEmails] = useState<EmailItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -92,14 +94,16 @@ export const EmailHistoryWidget: React.FC<Props> = ({ customerEmail, maxItems = 
 
         const allEmails: EmailItem[] = [];
 
-        // User mailboxes
-        const mailboxes: MailboxConfig[] = currentUser?.mailboxes || [];
+        // Use ALL team mailboxes if provided (lead context), otherwise just user's own
+        const mailboxes: MailboxConfig[] = allTeamMailboxes && allTeamMailboxes.length > 0
+            ? allTeamMailboxes
+            : (currentUser?.mailboxes || []);
         const promises = mailboxes
             .filter(mb => mb.imapHost && mb.imapUser && mb.imapPassword)
             .map(mb => fetchEmailsForConfig(mb, mb.name));
 
-        // Buero config
-        if (bueroConfig?.imapHost) {
+        // Buero config (only add if not already in allTeamMailboxes)
+        if (bueroConfig?.imapHost && (!allTeamMailboxes || allTeamMailboxes.length === 0)) {
             promises.push(fetchEmailsForConfig(bueroConfig, 'Biuro'));
         }
 
@@ -122,7 +126,7 @@ export const EmailHistoryWidget: React.FC<Props> = ({ customerEmail, maxItems = 
 
         setEmails(unique);
         setLoading(false);
-    }, [customerEmail, currentUser?.mailboxes, bueroConfig, fetchEmailsForConfig, maxItems]);
+    }, [customerEmail, currentUser?.mailboxes, bueroConfig, fetchEmailsForConfig, maxItems, allTeamMailboxes]);
 
     useEffect(() => {
         loadEmails();
@@ -257,8 +261,13 @@ export const EmailHistoryWidget: React.FC<Props> = ({ customerEmail, maxItems = 
                                             <span className="text-slate-400 shrink-0" title="Zawiera załączniki">📎</span>
                                         )}
                                     </div>
-                                    <div className="text-xs text-slate-500 truncate mt-0.5">
+                                    <div className="text-xs text-slate-500 truncate mt-0.5 flex items-center gap-1">
                                         {email.box === 'inbox' ? email.from : email.to}
+                                        {email.mailboxName && allTeamMailboxes && (
+                                            <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium shrink-0">
+                                                📬 {email.mailboxName}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 

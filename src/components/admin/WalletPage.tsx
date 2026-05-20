@@ -4,8 +4,10 @@ import type { WalletTransaction, WalletStats } from '../../types';
 import { AddTransactionModal } from './AddTransactionModal';
 import { ExchangeRateModal } from './ExchangeRateModal';
 import { DeleteTransactionModal } from './DeleteTransactionModal';
+import { DepositToBankModal } from './DepositToBankModal';
 import { BalanceExchangeModal } from './BalanceExchangeModal';
 import { CashFlowChart } from './CashFlowChart';
+import { toast } from 'react-hot-toast';
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subMonths } from 'date-fns';
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'custom';
@@ -39,6 +41,13 @@ export const WalletPage: React.FC = () => {
 
     // Kantor Modal State
     const [showKantorModal, setShowKantorModal] = useState(false);
+
+    // Deposit to Bank Modal State
+    const [showDepositModal, setShowDepositModal] = useState(false);
+    const [depositTransaction, setDepositTransaction] = useState<WalletTransaction | null>(null);
+
+    // Bulk selection for bank deposit
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         loadData();
@@ -123,6 +132,48 @@ export const WalletPage: React.FC = () => {
         setShowDeleteModal(true);
     };
 
+    const openDepositModal = (transaction: WalletTransaction) => {
+        setDepositTransaction(transaction);
+        setShowDepositModal(true);
+    };
+
+    const handleDeposit = async (amount: number) => {
+        if (!depositTransaction) return;
+        await DatabaseService.depositToBank(depositTransaction.id, amount);
+        await loadData();
+        setDepositTransaction(null);
+        setShowDepositModal(false);
+    };
+
+    const [bulkLoading, setBulkLoading] = useState(false);
+
+    const handleBulkDeposit = async () => {
+        if (selectedIds.size === 0) return;
+        const confirmed = window.confirm(`Czy na pewno chcesz wpłacić ${selectedIds.size} transakcji na konto bankowe?`);
+        if (!confirmed) return;
+        try {
+            setBulkLoading(true);
+            await DatabaseService.depositToBankBulk(Array.from(selectedIds));
+            await loadData();
+            setSelectedIds(new Set());
+            toast.success(`Wpłacono ${selectedIds.size} transakcji na konto`);
+        } catch (error) {
+            console.error('Error bulk depositing:', error);
+            toast.error('Błąd podczas wpłaty na konto');
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+
     const loadDeletedTransactions = async () => {
         try {
             const deleted = await DatabaseService.getDeletedWalletTransactions();
@@ -142,6 +193,23 @@ export const WalletPage: React.FC = () => {
         if (filterType === 'all') return true;
         return t.type === filterType;
     });
+
+    // Only income transactions that haven't been fully deposited are selectable
+    const selectableTransactions = filteredTransactions.filter(
+        tx => tx.type === 'income' && (tx.depositedAmount || 0) < tx.amount
+    );
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === selectableTransactions.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(selectableTransactions.map(tx => tx.id)));
+        }
+    };
+
+    const selectedTotal = filteredTransactions
+        .filter(tx => selectedIds.has(tx.id))
+        .reduce((sum, tx) => sum + (tx.amount - (tx.depositedAmount || 0)), 0);
 
     const formatCurrency = (amount: number, currency: 'EUR' | 'PLN' = 'EUR') => {
         return new Intl.NumberFormat('pl-PL', {
@@ -211,16 +279,26 @@ export const WalletPage: React.FC = () => {
             </div>
 
             {/* Stats Cards */}
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <p className="text-slate-500 text-sm font-medium mb-2">Aktualne Saldo</p>
+                    <p className="text-slate-500 text-sm font-medium mb-2">💰 Gotówka w kasie</p>
                     <div className="space-y-1">
                         <h3 className={`text-2xl font-bold ${stats && stats.pln.currentBalance >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
                             {stats ? formatCurrency(stats.pln.currentBalance, 'PLN') : '0,00 zł'}
                         </h3>
                         <h3 className={`text-xl font-semibold ${stats && stats.eur.currentBalance >= 0 ? 'text-slate-600' : 'text-red-500'}`}>
                             {stats ? formatCurrency(stats.eur.currentBalance, 'EUR') : '0,00 €'}
+                        </h3>
+                    </div>
+                </div>
+                <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 shadow-sm">
+                    <p className="text-blue-600 text-sm font-medium mb-2">🏦 Wpłacono na konto</p>
+                    <div className="space-y-1">
+                        <h3 className="text-2xl font-bold text-blue-700">
+                            {stats ? formatCurrency(stats.pln.totalDeposited, 'PLN') : '0,00 zł'}
+                        </h3>
+                        <h3 className="text-xl font-semibold text-blue-600/80">
+                            {stats ? formatCurrency(stats.eur.totalDeposited, 'EUR') : '0,00 €'}
                         </h3>
                     </div>
                 </div>
@@ -384,9 +462,38 @@ export const WalletPage: React.FC = () => {
 
                 <div className="overflow-x-auto">
                     {!showDeleted ? (
+                        <>
+                        {/* Bulk action bar */}
+                        {selectedIds.size > 0 && (
+                            <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-medium text-blue-800">
+                                        Zaznaczono {selectedIds.size} transakcji
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={handleBulkDeposit}
+                                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                    </svg>
+                                    Wpłać zaznaczone na konto
+                                </button>
+                            </div>
+                        )}
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
                                 <tr>
+                                    <th className="px-3 py-4 w-10">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectableTransactions.length > 0 && selectedIds.size === selectableTransactions.length}
+                                            onChange={toggleSelectAll}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                            title="Zaznacz wszystkie wpływy"
+                                        />
+                                    </th>
                                     <th className="px-6 py-4">Data</th>
                                     <th className="px-6 py-4">Typ / Kategoria</th>
                                     <th className="px-6 py-4">Opis / Klient</th>
@@ -398,21 +505,59 @@ export const WalletPage: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                                             Ładowanie transakcji...
                                         </td>
                                     </tr>
                                 ) : filteredTransactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                                             Brak transakcji w historii
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredTransactions.map((tx) => (
-                                        <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                                        <tr key={tx.id} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(tx.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <td className="px-3 py-4 w-10">
+                                                {tx.type === 'income' && (tx.depositedAmount || 0) < tx.amount ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.has(tx.id)}
+                                                        onChange={() => toggleSelect(tx.id)}
+                                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                    />
+                                                ) : null}
+                                            </td>
                                             <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                                                {formatDate(tx.date)}
+                                                <div>{formatDate(tx.date)}</div>
+                                                {/* Deposit status badge for income */}
+                                                {tx.type === 'income' && (() => {
+                                                    const deposited = tx.depositedAmount || 0;
+                                                    const total = tx.amount;
+                                                    const remaining = total - deposited;
+                                                    const fmt = (v: number) => formatCurrency(v, tx.currency);
+                                                    if (deposited >= total) {
+                                                        return (
+                                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                                Na koncie
+                                                            </span>
+                                                        );
+                                                    } else if (deposited > 0) {
+                                                        return (
+                                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                                Częściowo ({fmt(remaining)} gotówka)
+                                                            </span>
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-slate-100 text-slate-500 text-xs font-medium rounded-full">
+                                                                Gotówka ({fmt(total)})
+                                                            </span>
+                                                        );
+                                                    }
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
@@ -471,21 +616,36 @@ export const WalletPage: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => openDeleteModal(tx)}
-                                                    className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                                                    title="Usuń transakcję"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {/* Deposit to Bank button — only for income with remaining cash */}
+                                                    {tx.type === 'income' && (tx.depositedAmount || 0) < tx.amount && (
+                                                        <button
+                                                            onClick={() => openDepositModal(tx)}
+                                                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-lg transition-colors"
+                                                            title="Wpłać na konto bankowe"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => openDeleteModal(tx)}
+                                                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                                                        title="Usuń transakcję"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
                                 )}
                             </tbody>
                         </table>
+                        </>
                     ) : (
                         <table className="w-full text-left">
                             <thead className="bg-red-50 text-red-900 text-xs uppercase font-semibold">
@@ -584,6 +744,13 @@ export const WalletPage: React.FC = () => {
                 onClose={() => setShowDeleteModal(false)}
                 onDelete={handleDelete}
                 transaction={deleteTransaction}
+            />
+
+            <DepositToBankModal
+                isOpen={showDepositModal}
+                onClose={() => setShowDepositModal(false)}
+                onDeposit={handleDeposit}
+                transaction={depositTransaction}
             />
 
             <BalanceExchangeModal

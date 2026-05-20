@@ -716,6 +716,8 @@ export const OfferService = {
                 clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined,
                 settings: row.settings_data,
                 publicToken: row.public_token,
+                attachments: row.attachments || [],
+                variants: row.variants || [],
                 creator: creator // Populated from Profile
             };
         }
@@ -750,7 +752,9 @@ export const OfferService = {
             leadId: row.lead_id,
             clientWillContactAt: row.client_will_contact_at ? new Date(row.client_will_contact_at) : undefined,
             settings: row.settings_data,
-            publicToken: row.public_token
+            publicToken: row.public_token,
+            attachments: row.attachments || [],
+            variants: row.variants || []
         };
     },
 
@@ -975,5 +979,100 @@ export const OfferService = {
         });
 
         return activityMap;
+    },
+
+    // ═══════ ATTACHMENTS ═══════
+
+    async uploadAttachment(
+        offerId: string,
+        file: File,
+        type: 'visualization' | 'technical_drawing'
+    ): Promise<{ id: string; type: string; name: string; url: string; size: number; uploadedAt: string }> {
+        const ext = file.name.split('.').pop() || 'pdf';
+        const id = crypto.randomUUID();
+        const path = `${offerId}/${type}_${Date.now()}.${ext}`;
+
+        // 1. Upload to storage
+        const { error: uploadError } = await supabase.storage
+            .from('offer-attachments')
+            .upload(path, file, { contentType: file.type, upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        // 2. Get public URL
+        const { data: urlData } = supabase.storage
+            .from('offer-attachments')
+            .getPublicUrl(path);
+
+        const attachment = {
+            id,
+            type,
+            name: file.name,
+            url: urlData.publicUrl,
+            path, // for deletion
+            size: file.size,
+            uploadedAt: new Date().toISOString()
+        };
+
+        // 3. Read current attachments, append, and save
+        const { data: offer, error: fetchError } = await supabase
+            .from('offers')
+            .select('attachments')
+            .eq('id', offerId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const existing = (offer?.attachments as any[]) || [];
+        // Remove any previous attachment of same type (replace)
+        const filtered = existing.filter((a: any) => a.type !== type);
+        filtered.push(attachment);
+
+        const { error: updateError } = await supabase
+            .from('offers')
+            .update({ attachments: filtered })
+            .eq('id', offerId);
+
+        if (updateError) throw updateError;
+
+        return attachment;
+    },
+
+    async removeAttachment(offerId: string, attachmentId: string): Promise<void> {
+        const { data: offer, error: fetchError } = await supabase
+            .from('offers')
+            .select('attachments')
+            .eq('id', offerId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const existing = (offer?.attachments as any[]) || [];
+        const target = existing.find((a: any) => a.id === attachmentId);
+
+        // Delete from storage if path exists
+        if (target?.path) {
+            await supabase.storage.from('offer-attachments').remove([target.path]);
+        }
+
+        const filtered = existing.filter((a: any) => a.id !== attachmentId);
+
+        const { error: updateError } = await supabase
+            .from('offers')
+            .update({ attachments: filtered })
+            .eq('id', offerId);
+
+        if (updateError) throw updateError;
+    },
+
+    async getAttachments(offerId: string): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('offers')
+            .select('attachments')
+            .eq('id', offerId)
+            .single();
+
+        if (error) return [];
+        return (data?.attachments as any[]) || [];
     }
 };

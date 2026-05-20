@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 
 import { NotificationRulesService } from '../../services/database/notificationRules.service';
 import type { NotificationRule } from '../../services/database/notificationRules.service';
 import { PermissionsService, AVAILABLE_MODULES } from '../../services/database/permissions.service';
 import type { ModulePermission } from '../../services/database/permissions.service';
 import type { UserRole } from '../../types';
+import {
+    ShieldCheck, Bell, LayoutGrid, Search, RefreshCw, AlertTriangle,
+    ToggleLeft, ToggleRight, ChevronDown, ChevronRight
+} from 'lucide-react';
 
 export const SystemPermissionsPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'modules' | 'notifications'>('modules');
@@ -17,21 +22,27 @@ export const SystemPermissionsPage: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
-    const roles: { key: UserRole; label: string }[] = [
-        { key: 'admin', label: 'Administrator' },
-        { key: 'manager', label: 'Manager' },
-        { key: 'sales_rep', label: 'Przedstawiciel DE' },
-        { key: 'sales_rep_pl', label: 'Przedstawiciel PL' },
-        { key: 'partner', label: 'Partner' },
-        { key: 'installer', label: 'Montażysta' }
+    const roles: { key: UserRole; label: string; shortLabel: string; color: string }[] = [
+        { key: 'admin', label: 'Administrator', shortLabel: 'Admin', color: 'text-red-600 bg-red-50 border-red-200' },
+        { key: 'manager', label: 'Manager', shortLabel: 'Mgr', color: 'text-violet-600 bg-violet-50 border-violet-200' },
+        { key: 'sales_rep', label: 'Handlowiec DE', shortLabel: 'DE', color: 'text-blue-600 bg-blue-50 border-blue-200' },
+        { key: 'sales_rep_pl', label: 'Handlowiec PL', shortLabel: 'PL', color: 'text-rose-600 bg-rose-50 border-rose-200' },
+        { key: 'installer', label: 'Montażysta', shortLabel: 'Mont', color: 'text-orange-600 bg-orange-50 border-orange-200' },
+        { key: 'partner', label: 'Partner B2B', shortLabel: 'B2B', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
     ];
 
     const notificationEvents = [
-        { key: 'contract_signed', label: 'Podpisanie Umowy' },
-        { key: 'installation_scheduled', label: 'Zaplanowanie Montażu' },
-        { key: 'complaint_created', label: 'Zgłoszenie Reklamacji' },
-        { key: 'lead_assigned', label: 'nowy Lead (Przypisanie)' }
+        { key: 'offer_viewed', label: 'Oferta wyświetlona', description: 'Klient otworzył link do oferty', icon: '👁️' },
+        { key: 'contract_signed', label: 'Podpisanie Umowy', description: 'Nowa umowa zarejestrowana w systemie', icon: '📝' },
+        { key: 'lead_assigned', label: 'Nowy Lead (przypisanie)', description: 'Lead przypisany do handlowca', icon: '🎯' },
+        { key: 'installation_scheduled', label: 'Zaplanowanie Montażu', description: 'Termin montażu ustalony', icon: '📅' },
+        { key: 'installation_completed', label: 'Montaż zakończony', description: 'Montaż zrealizowany', icon: '✅' },
+        { key: 'installation_issue', label: 'Problem na montażu', description: 'Zgłoszenie problemu z montażem', icon: '⚠️' },
+        { key: 'complaint_created', label: 'Zgłoszenie Reklamacji', description: 'Nowe zgłoszenie serwisowe', icon: '🔧' },
+        { key: 'stock_low', label: 'Niski stan magazynowy', description: 'Produkt poniżej minimalnego stanu', icon: '📦' },
     ];
 
     useEffect(() => {
@@ -41,6 +52,7 @@ export const SystemPermissionsPage: React.FC = () => {
     const loadData = async () => {
         try {
             setLoading(true);
+            setError(null);
             const [rules, permissions] = await Promise.all([
                 NotificationRulesService.getRules(),
                 PermissionsService.getAllPermissions()
@@ -49,7 +61,7 @@ export const SystemPermissionsPage: React.FC = () => {
             setModulePermissions(permissions);
         } catch (err: any) {
             console.error('Error loading permissions:', err);
-            setError('Nie udało się pobrać konfiguracji.');
+            setError('Nie udało się pobrać konfiguracji uprawnień.');
         } finally {
             setLoading(false);
         }
@@ -57,29 +69,60 @@ export const SystemPermissionsPage: React.FC = () => {
 
     const handleToggleNotification = async (ruleId: string, currentState: boolean) => {
         try {
-            // Optimistic update
             setNotificationRules(prev => prev.map(r => r.id === ruleId ? { ...r, isEnabled: !currentState } : r));
             await NotificationRulesService.updateRule(ruleId, !currentState);
+            toast.success('Powiadomienie zaktualizowane', { duration: 1200 });
         } catch (err) {
             console.error('Failed to update rule', err);
-            // Revert
             setNotificationRules(prev => prev.map(r => r.id === ruleId ? { ...r, isEnabled: currentState } : r));
+            toast.error('Błąd aktualizacji');
         }
     };
 
     const handleToggleModule = async (permId: string, currentState: boolean) => {
         try {
-            // Optimistic update
             setModulePermissions(prev => prev.map(p => p.id === permId ? { ...p, isEnabled: !currentState } : p));
             await PermissionsService.updatePermission(permId, !currentState);
+            toast.success('Uprawnienie zaktualizowane', { duration: 1200 });
         } catch (err) {
             console.error('Failed to update permission', err);
-            // Revert
             setModulePermissions(prev => prev.map(p => p.id === permId ? { ...p, isEnabled: currentState } : p));
+            toast.error('Błąd aktualizacji');
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-slate-400">Ładowanie konfiguracji systemowej...</div>;
+    const handleToggleRole = async (roleKey: UserRole, targetState: boolean) => {
+        try {
+            const permissionsToUpdate = modulePermissions.filter(p => p.role === roleKey && p.isEnabled !== targetState);
+            const ids = permissionsToUpdate.map(p => p.id);
+            if (ids.length === 0) return;
+
+            setModulePermissions(prev => prev.map(p =>
+                p.role === roleKey ? { ...p, isEnabled: targetState } : p
+            ));
+
+            await Promise.all(ids.map(id => PermissionsService.updatePermission(id, targetState)));
+            toast.success(`Uprawnienia ${targetState ? 'włączone' : 'wyłączone'} dla ${roles.find(r => r.key === roleKey)?.label}`, { duration: 2000 });
+        } catch (err) {
+            console.error('Failed to bulk update', err);
+            toast.error('Błąd masowej aktualizacji');
+            loadData();
+        }
+    };
+
+    const isRoleFullyEnabled = (roleKey: UserRole) => {
+        const rolePermissions = modulePermissions.filter(p => p.role === roleKey);
+        return rolePermissions.length > 0 && rolePermissions.every(p => p.isEnabled);
+    };
+
+    const toggleCategory = (cat: string) => {
+        setCollapsedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(cat)) next.delete(cat);
+            else next.add(cat);
+            return next;
+        });
+    };
 
     // Group modules by category
     const groupedModules = AVAILABLE_MODULES.reduce((acc, module) => {
@@ -88,150 +131,191 @@ export const SystemPermissionsPage: React.FC = () => {
         return acc;
     }, {} as Record<string, typeof AVAILABLE_MODULES[number][]>);
 
-    const handleToggleRole = async (roleKey: UserRole, targetState: boolean) => {
-        try {
-            // Find all permissions for this role that need updating
-            const permissionsToUpdate = modulePermissions.filter(p => p.role === roleKey && p.isEnabled !== targetState);
-            const ids = permissionsToUpdate.map(p => p.id);
-
-            if (ids.length === 0) return;
-
-            // Optimistic Update
-            setModulePermissions(prev => prev.map(p =>
-                p.role === roleKey ? { ...p, isEnabled: targetState } : p
-            ));
-
-            // Parallel requests (or bulk endpoint if available, but parallel is fine for <50 items)
-            // Ideally we'd have a bulk update endpoint, but for now loop is acceptable for this scale
-            await Promise.all(ids.map(id => PermissionsService.updatePermission(id, targetState)));
-
-        } catch (err) {
-            console.error('Failed to bulk update', err);
-            // Revert is complex here, simpler to reload
-            loadData();
+    // Search filter
+    const filteredGroupedModules = Object.entries(groupedModules).reduce((acc, [cat, modules]) => {
+        if (!searchQuery.trim()) {
+            acc[cat] = modules;
+            return acc;
         }
-    };
+        const q = searchQuery.toLowerCase();
+        const filtered = modules.filter(m =>
+            m.label.toLowerCase().includes(q) || m.description.toLowerCase().includes(q) || m.key.toLowerCase().includes(q)
+        );
+        if (filtered.length > 0) acc[cat] = filtered;
+        return acc;
+    }, {} as Record<string, typeof AVAILABLE_MODULES[number][]>);
 
-    // Helper to check if all modules for a role are enabled (for header checkbox)
-    const isRoleFullyEnabled = (roleKey: UserRole) => {
-        const rolePermissions = modulePermissions.filter(p => p.role === roleKey);
-        return rolePermissions.length > 0 && rolePermissions.every(p => p.isEnabled);
-    };
+    // Stats
+    const totalModules = AVAILABLE_MODULES.length;
+    const totalEnabled = modulePermissions.filter(p => p.isEnabled).length;
+    const totalPossible = totalModules * roles.length;
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-background text-slate-100 p-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-5 pb-20 max-w-[1600px] mx-auto">
+            {/* ═══ Header ═══ */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <ShieldCheck className="w-5 h-5 text-white" />
+                    </div>
                     <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                            Centrum Uprawnień
-                        </h1>
-                        <p className="text-slate-400 mt-1">
-                            Pełna kontrola nad dostępem do systemu i przepływem informacji.
-                        </p>
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Centrum Uprawnień</h1>
+                        <p className="text-sm text-slate-500 mt-0.5">Pełna kontrola nad dostępem do systemu i powiadomieniami</p>
                     </div>
                 </div>
+                <button
+                    onClick={loadData}
+                    className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
+                    title="Odśwież"
+                >
+                    <RefreshCw className="w-4 h-4" />
+                </button>
+            </div>
 
-                {error && (
-                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                        {error}
-                    </div>
-                )}
-
-                {/* TABS HEADER */}
-                <div className="flex gap-1 p-1 bg-slate-900/50 rounded-xl border border-slate-800 w-fit">
-                    <button
-                        onClick={() => setActiveTab('modules')}
-                        className={`px-6 py-2.5 text-sm font-medium transition-all rounded-lg flex items-center gap-2 ${activeTab === 'modules'
-                            ? 'bg-accent/10 text-accent shadow-sm ring-1 ring-accent/20'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                            }`}
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                        Dostęp do Modułów
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('notifications')}
-                        className={`px-6 py-2.5 text-sm font-medium transition-all rounded-lg flex items-center gap-2 ${activeTab === 'notifications'
-                            ? 'bg-accent/10 text-accent shadow-sm ring-1 ring-accent/20'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                            }`}
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                        Powiadomienia
-                    </button>
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-2 text-sm">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                    {error}
                 </div>
+            )}
 
-                {/* CONTENT AREA */}
-                <div className="bg-surface border border-slate-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+            {/* ═══ KPI Cards ═══ */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-4 text-white shadow-sm">
+                    <p className="text-white/80 text-[10px] font-medium uppercase tracking-wider">Moduły</p>
+                    <h3 className="text-2xl font-bold mt-0.5">{totalModules}</h3>
+                    <p className="text-white/60 text-[10px]">Zdefiniowane w systemie</p>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 text-white shadow-sm">
+                    <p className="text-white/80 text-[10px] font-medium uppercase tracking-wider">Aktywne uprawnienia</p>
+                    <h3 className="text-2xl font-bold mt-0.5">{totalEnabled}</h3>
+                    <p className="text-white/60 text-[10px]">z {totalPossible} możliwych</p>
+                </div>
+                <div className="bg-gradient-to-br from-violet-500 to-violet-600 rounded-2xl p-4 text-white shadow-sm">
+                    <p className="text-white/80 text-[10px] font-medium uppercase tracking-wider">Role</p>
+                    <h3 className="text-2xl font-bold mt-0.5">{roles.length}</h3>
+                    <p className="text-white/60 text-[10px]">Poziomy dostępu</p>
+                </div>
+                <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-4 text-white shadow-sm">
+                    <p className="text-white/80 text-[10px] font-medium uppercase tracking-wider">Powiadomienia</p>
+                    <h3 className="text-2xl font-bold mt-0.5">{notificationEvents.length}</h3>
+                    <p className="text-white/60 text-[10px]">Typy zdarzeń</p>
+                </div>
+            </div>
 
+            {/* ═══ Tabs + Search ═══ */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <button
+                            onClick={() => setActiveTab('modules')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'modules' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                            Dostęp do Modułów
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('notifications')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'notifications' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Bell className="w-4 h-4" />
+                            Powiadomienia
+                        </button>
+                    </div>
                     {activeTab === 'modules' && (
-                        <div className="relative overflow-x-auto max-h-[70vh] custom-scrollbar">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 z-20 bg-slate-900 border-b border-slate-700 shadow-md">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Szukaj modułu..."
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ═══ MODULES TAB ═══ */}
+            {activeTab === 'modules' && (
+                <>
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-slate-50 border-b border-slate-200">
                                     <tr>
-                                        <th className="p-4 font-semibold text-slate-300 w-1/3 bg-slate-900">
+                                        <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-1/3">
                                             Moduł Systemowy
-                                            <div className="text-[10px] font-normal text-slate-500 uppercase tracking-widest mt-1">Funkcja / Obszar</div>
                                         </th>
                                         {roles.map(role => {
                                             const allEnabled = isRoleFullyEnabled(role.key);
                                             return (
-                                                <th key={role.key} className="p-4 font-semibold text-slate-300 text-center border-l border-slate-800 min-w-[120px] bg-slate-900 group cursor-pointer hover:bg-slate-800/50 transition-colors" onClick={() => handleToggleRole(role.key, !allEnabled)}>
-                                                    <div className="flex flex-col items-center gap-2">
+                                                <th key={role.key} className="px-3 py-3.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider border-l border-slate-200 min-w-[110px]">
+                                                    <button
+                                                        onClick={() => handleToggleRole(role.key, !allEnabled)}
+                                                        className="group flex flex-col items-center gap-1 w-full hover:opacity-80 transition-opacity"
+                                                    >
                                                         <span>{role.label}</span>
-                                                        <span className="text-[10px] font-normal text-accent/50 group-hover:text-accent transition-colors">
-                                                            {allEnabled ? 'Odznacz wszystko' : 'Zaznacz wszystko'}
+                                                        <span className={`text-[9px] font-normal transition-colors ${allEnabled ? 'text-emerald-500' : 'text-slate-400 group-hover:text-indigo-500'}`}>
+                                                            {allEnabled ? '✓ Wszystko ON' : 'Zaznacz wszystko'}
                                                         </span>
-                                                    </div>
+                                                    </button>
                                                 </th>
                                             );
                                         })}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-800/50">
-                                    {Object.entries(groupedModules).map(([category, modules]) => (
+                                <tbody className="divide-y divide-slate-100">
+                                    {Object.entries(filteredGroupedModules).map(([category, modules]) => (
                                         <React.Fragment key={category}>
-                                            <tr className="bg-slate-900/30">
-                                                <td colSpan={roles.length + 1} className="p-3 pl-4 text-xs font-bold text-accent uppercase tracking-wider border-y border-slate-800/50">
-                                                    {category}
+                                            {/* Category header */}
+                                            <tr
+                                                className="bg-slate-50/80 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                                onClick={() => toggleCategory(category)}
+                                            >
+                                                <td colSpan={roles.length + 1} className="px-5 py-2.5">
+                                                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-wider">
+                                                        {collapsedCategories.has(category) ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                        {category}
+                                                        <span className="text-slate-400 font-normal normal-case">({modules.length})</span>
+                                                    </div>
                                                 </td>
                                             </tr>
-                                            {modules.map((moduleDef) => (
-                                                <tr key={moduleDef.key} className="group hover:bg-white/[0.02] transition-colors">
-                                                    <td className="p-4 border-r border-slate-800/50 group-hover:border-slate-800 transition-colors">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium text-slate-200 group-hover:text-white transition-colors">{moduleDef.label}</span>
-                                                            <span className="text-sm text-slate-500 mt-0.5">{moduleDef.description}</span>
-                                                        </div>
+                                            {/* Module rows */}
+                                            {!collapsedCategories.has(category) && modules.map((moduleDef) => (
+                                                <tr key={moduleDef.key} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-5 py-3.5">
+                                                        <div className="font-medium text-sm text-slate-800 group-hover:text-slate-900 transition-colors">{moduleDef.label}</div>
+                                                        <div className="text-xs text-slate-400 mt-0.5">{moduleDef.description}</div>
                                                     </td>
                                                     {roles.map(role => {
                                                         const perm = modulePermissions.find(p => p.moduleKey === moduleDef.key && p.role === role.key);
                                                         const isEnabled = perm?.isEnabled || false;
 
                                                         return (
-                                                            <td key={role.key} className="p-4 text-center border-l border-slate-800/50 relative">
-                                                                <label className="relative inline-flex items-center cursor-pointer justify-center w-full h-full group/toggle">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="sr-only peer"
-                                                                        checked={isEnabled}
-                                                                        onChange={() => perm && handleToggleModule(perm.id, isEnabled)}
-                                                                        disabled={!perm}
-                                                                    />
-                                                                    <div className={`
-                                                                        w-9 h-5 rounded-full peer-focus:outline-none transition-all duration-300
-                                                                        ${isEnabled
-                                                                            ? 'bg-accent shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-                                                                            : 'bg-slate-700/50 border border-slate-600 group-hover/toggle:border-slate-500'
-                                                                        }
-                                                                        peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] 
-                                                                        after:absolute after:top-[2px] after:left-[calc(50%-16px)] after:bg-white after:border-gray-300 
-                                                                        after:border after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-sm
-                                                                    `}></div>
-                                                                </label>
+                                                            <td key={role.key} className="px-3 py-3.5 text-center border-l border-slate-100">
+                                                                <button
+                                                                    onClick={() => perm && handleToggleModule(perm.id, isEnabled)}
+                                                                    disabled={!perm}
+                                                                    className={`inline-flex items-center justify-center transition-all ${!perm ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:scale-110'}`}
+                                                                    title={`${moduleDef.label} → ${role.label}: ${isEnabled ? 'ON' : 'OFF'}`}
+                                                                >
+                                                                    {isEnabled ? (
+                                                                        <ToggleRight className="w-8 h-8 text-emerald-500" />
+                                                                    ) : (
+                                                                        <ToggleLeft className="w-8 h-8 text-slate-300 hover:text-slate-400" />
+                                                                    )}
+                                                                </button>
                                                             </td>
                                                         );
                                                     })}
@@ -242,59 +326,120 @@ export const SystemPermissionsPage: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                    )}
+                    </div>
 
-                    {activeTab === 'notifications' && (
-                        <div className="p-4 flex flex-col items-center justify-center min-h-[50vh] text-slate-400">
-                            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 max-w-2xl w-full">
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="p-3 bg-accent/10 rounded-lg text-accent">
-                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    {/* Mobile Cards */}
+                    <div className="lg:hidden space-y-3">
+                        {Object.entries(filteredGroupedModules).map(([category, modules]) => (
+                            <div key={category} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <button
+                                    onClick={() => toggleCategory(category)}
+                                    className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200"
+                                >
+                                    <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-2">
+                                        {collapsedCategories.has(category) ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                        {category}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">{modules.length} modułów</span>
+                                </button>
+                                {!collapsedCategories.has(category) && (
+                                    <div className="divide-y divide-slate-100">
+                                        {modules.map(moduleDef => (
+                                            <div key={moduleDef.key} className="p-4">
+                                                <div className="font-medium text-sm text-slate-800 mb-1">{moduleDef.label}</div>
+                                                <div className="text-xs text-slate-400 mb-3">{moduleDef.description}</div>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {roles.map(role => {
+                                                        const perm = modulePermissions.find(p => p.moduleKey === moduleDef.key && p.role === role.key);
+                                                        const isEnabled = perm?.isEnabled || false;
+                                                        return (
+                                                            <button
+                                                                key={role.key}
+                                                                onClick={() => perm && handleToggleModule(perm.id, isEnabled)}
+                                                                disabled={!perm}
+                                                                className={`px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all ${
+                                                                    isEnabled
+                                                                        ? role.color
+                                                                        : 'bg-slate-100 border-slate-200 text-slate-400'
+                                                                } ${!perm ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            >
+                                                                {role.shortLabel} {isEnabled ? '✓' : '✗'}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white">Matryca Powiadomień</h2>
-                                        <p className="text-sm text-slate-500">Kto i kiedy otrzymuje alerty systemowe.</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* ═══ NOTIFICATIONS TAB ═══ */}
+            {activeTab === 'notifications' && (
+                <div className="space-y-3">
+                    {/* Role legend */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                        <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Legenda ról</p>
+                        <div className="flex flex-wrap gap-2">
+                            {roles.map(role => (
+                                <span key={role.key} className={`px-2.5 py-1 text-[11px] font-semibold rounded-full border ${role.color}`}>
+                                    {role.label}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Event cards */}
+                    {notificationEvents.map((event) => {
+                        const eventRules = notificationRules.filter(r => r.eventType === event.key);
+                        const activeCount = eventRules.filter(r => r.isEnabled).length;
+
+                        return (
+                            <div key={event.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 transition-all hover:shadow-md">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-2xl">{event.icon}</span>
+                                        <div>
+                                            <h3 className="font-semibold text-slate-800 text-sm">{event.label}</h3>
+                                            <p className="text-xs text-slate-400 mt-0.5">{event.description}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeCount > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            {activeCount}/{roles.length}
+                                        </span>
                                     </div>
                                 </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {roles.map(role => {
+                                        const rule = notificationRules.find(r => r.eventType === event.key && r.role === role.key);
+                                        const isEnabled = rule?.isEnabled || false;
 
-                                <div className="space-y-4">
-                                    {notificationEvents.map((event) => (
-                                        <div key={event.key} className="bg-slate-900 border border-slate-800 rounded-lg p-4 transition-all hover:border-slate-700">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="font-semibold text-slate-200">{event.label}</h3>
-                                                <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded">{event.key}</span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {roles.map(role => {
-                                                    const rule = notificationRules.find(r => r.eventType === event.key && r.role === role.key);
-                                                    const isEnabled = rule?.isEnabled || false;
-
-                                                    return (
-                                                        <button
-                                                            key={role.key}
-                                                            onClick={() => rule && handleToggleNotification(rule.id, isEnabled)}
-                                                            className={`
-                                                                px-3 py-1.5 text-xs font-medium rounded-full transition-all border
-                                                                ${isEnabled
-                                                                    ? 'bg-accent/10 border-accent/20 text-accent hover:bg-accent/20'
-                                                                    : 'bg-slate-800 border-slate-700 text-slate-500 hover:bg-slate-700 hover:text-slate-300'
-                                                                }
-                                                            `}
-                                                        >
-                                                            {role.label}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        return (
+                                            <button
+                                                key={role.key}
+                                                onClick={() => rule && handleToggleNotification(rule.id, isEnabled)}
+                                                disabled={!rule}
+                                                className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                                                    isEnabled
+                                                        ? role.color + ' shadow-sm'
+                                                        : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                                                } ${!rule ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
+                                            >
+                                                {role.label}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
-                        </div>
-                    )}
-
+                        );
+                    })}
                 </div>
-            </div>
+            )}
         </div>
     );
 };

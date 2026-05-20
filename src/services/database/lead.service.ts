@@ -59,8 +59,8 @@ export const LeadService = {
                     email: lead.customerData.email || '',
                     country: 'Deutschland',
                     // [Fix 2026-01-13] Pass Representative ID to bypass RLS and ensure ownership
-                // Admins/managers should not become the customer's representative
-                representative_id: lead.assignedTo || (isAdminOrManager ? null : user.id),
+                // Never auto-assign creator as representative — leave for explicit assignment or auto-assign service
+                representative_id: lead.assignedTo || null,
                     source: lead.source || 'targi'
                 };
 
@@ -93,9 +93,9 @@ export const LeadService = {
                 source: lead.source,
                 customer_data: lead.customerData,
                 customer_id: customerId,
-                // Admin/manager creating leads should NOT be auto-assigned as owner
-                // Only sales_rep gets auto-assigned when status isn't 'new'
-                assigned_to: lead.assignedTo || (lead.status === 'new' || isAdminOrManager ? null : user.id),
+                // Never auto-assign creator as owner — let LeadAutoAssignService handle it
+                assigned_to: lead.assignedTo || null,
+                additional_assignees: lead.additionalAssignees || [],
                 email_message_id: lead.emailMessageId,
                 notes: lead.notes,
                 last_contact_date: lead.lastContactDate ? lead.lastContactDate.toISOString() : null,
@@ -111,15 +111,11 @@ export const LeadService = {
 
         if (error) throw error;
 
-        // Auto-assign if lead has no owner — but NOT when admin/manager creates it manually
-        // Admin explicitly wants leads they create to remain unassigned
-        if (!data.assigned_to && !isAdminOrManager) {
-            try {
-                await LeadAutoAssignService.autoAssignLead(data.id);
-            } catch (assignErr) {
-                console.warn('[LeadService] Auto-assign failed (non-critical):', assignErr);
-            }
-        }
+        // [2026-05-06] Auto-assign DISABLED — new leads should always remain without opiekun.
+        // Use admin panel "Auto-Assign" or manual assignment instead.
+        // if (!data.assigned_to) {
+        //     await LeadAutoAssignService.autoAssignLead(data.id);
+        // }
 
         return {
             ...lead,
@@ -158,6 +154,10 @@ export const LeadService = {
         if (updates.wonReason !== undefined) dbUpdates.won_reason = updates.wonReason;
         if (updates.wonValue !== undefined) dbUpdates.won_value = updates.wonValue;
         if (updates.wonAt !== undefined) dbUpdates.won_at = updates.wonAt instanceof Date ? updates.wonAt.toISOString() : updates.wonAt;
+        if (updates.technicalPdfUrl !== undefined) dbUpdates.technical_pdf_url = updates.technicalPdfUrl || null;
+        if (updates.visualizationPdfUrl !== undefined) dbUpdates.visualization_pdf_url = updates.visualizationPdfUrl || null;
+        // Multi-assignee support
+        if (updates.additionalAssignees !== undefined) dbUpdates.additional_assignees = updates.additionalAssignees;
 
         // --- Auto-Assignment: When moving out of 'new' with no owner, assign current user ---
         // But NOT for admins/managers — they shouldn't be auto-assigned
@@ -182,16 +182,8 @@ export const LeadService = {
 
         // --- Assignment Protection Logic ---
         if (updates.assignedTo !== undefined) {
-            // Check if current user is admin — admins can always change assignments
-            const { data: { user: authUser } } = await supabase.auth.getUser();
-            const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', authUser?.id || '').single();
-            const userIsAdmin = userProfile?.role === 'admin';
-
-            if (userIsAdmin) {
-                // Admin can set any value, including null (unassign)
-                dbUpdates.assigned_to = updates.assignedTo;
-            } else if (updates.assignedTo === null) {
-                // Non-admin: Only allow clearing assignment when moving to 'new' status
+            if (updates.assignedTo === null) {
+                // Only allow clearing assignment when moving to 'new' status or if lead was unassigned
                 if (updates.status === 'new') {
                     dbUpdates.assigned_to = null;
                 } else {
@@ -444,13 +436,16 @@ export const LeadService = {
             throw error;
         }
 
-        // Manually fetch assignees and lost_by profiles
+        // Manually fetch assignees, additional assignees, and lost_by profiles
         const allUserIds = new Set<string>();
         (data || []).forEach(l => {
             if (l.assigned_to) allUserIds.add(l.assigned_to);
             if (l.lost_by) allUserIds.add(l.lost_by);
+            if (l.additional_assignees && Array.isArray(l.additional_assignees)) {
+                l.additional_assignees.forEach((uid: string) => allUserIds.add(uid));
+            }
         });
-        const assigneeMap = new Map<string, { first_name?: string; last_name?: string; full_name?: string }>();
+        const assigneeMap = new Map<string, { id: string; first_name?: string; last_name?: string; full_name?: string }>();
 
         if (allUserIds.size > 0) {
             const { data: profiles } = await supabase
@@ -460,6 +455,7 @@ export const LeadService = {
 
             if (profiles) {
                 profiles.forEach(p => assigneeMap.set(p.id, {
+                    id: p.id,
                     first_name: (p.full_name || '').split(' ')[0],
                     last_name: (p.full_name || '').split(' ').slice(1).join(' '),
                     full_name: p.full_name || ''
@@ -470,10 +466,16 @@ export const LeadService = {
         return (data || []).map((lead) => {
             const assigneeProfile = lead.assigned_to ? assigneeMap.get(lead.assigned_to) : null;
             const lostByProfile = lead.lost_by ? assigneeMap.get(lead.lost_by) : null;
+            const additionalProfiles = (lead.additional_assignees || []).map((uid: string) => {
+                const p = assigneeMap.get(uid);
+                return p ? { id: p.id, firstName: p.first_name || '', lastName: p.last_name || '' } : null;
+            }).filter(Boolean);
             return {
                 ...lead,
                 id: lead.id,
                 assignedTo: lead.assigned_to,
+                additionalAssignees: lead.additional_assignees || [],
+                additionalAssigneesProfiles: additionalProfiles,
                 status: lead.status as LeadStatus,
                 source: lead.source as LeadSource,
                 createdAt: new Date(lead.created_at),
@@ -561,10 +563,13 @@ export const LeadService = {
 
         if (error) return null;
 
-        // Fetch assignee and lost_by profiles
+        // Fetch assignee, additional assignees, and lost_by profiles
         const userIds = new Set<string>();
         if (data.assigned_to) userIds.add(data.assigned_to);
         if (data.lost_by) userIds.add(data.lost_by);
+        if (data.additional_assignees && Array.isArray(data.additional_assignees)) {
+            data.additional_assignees.forEach((uid: string) => userIds.add(uid));
+        }
 
         const profileMap = new Map<string, string>();
         if (userIds.size > 0) {
@@ -579,11 +584,17 @@ export const LeadService = {
 
         const assigneeName = data.assigned_to ? profileMap.get(data.assigned_to) : null;
         const lostByName = data.lost_by ? profileMap.get(data.lost_by) : null;
+        const additionalProfiles = (data.additional_assignees || []).map((uid: string) => {
+            const name = profileMap.get(uid) || '';
+            return { id: uid, firstName: name.split(' ')[0] || '', lastName: name.split(' ').slice(1).join(' ') || '' };
+        });
 
         return {
             ...data,
             id: data.id,
             assignedTo: data.assigned_to,
+            additionalAssignees: data.additional_assignees || [],
+            additionalAssigneesProfiles: additionalProfiles,
             customerId: data.customer_id,
             status: data.status as LeadStatus,
             source: data.source as LeadSource,
@@ -606,6 +617,9 @@ export const LeadService = {
             aiSummary: data.ai_summary,
             // Attachments
             attachments: data.attachments || [],
+            // Technical PDFs
+            technicalPdfUrl: data.technical_pdf_url || undefined,
+            visualizationPdfUrl: data.visualization_pdf_url || undefined,
             salesRep: undefined,
             assignee: assigneeName ? {
                 firstName: assigneeName.split(' ')[0] || '',

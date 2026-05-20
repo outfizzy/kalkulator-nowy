@@ -25,9 +25,11 @@ interface QueuedCall {
 export const SoftphoneWidget: React.FC = () => {
     const deviceRef = useRef<Device | null>(null);
     const tokenRefreshRef = useRef<NodeJS.Timeout | null>(null);
+    const configErrorRef = useRef<boolean>(false); // Persistent config error — stop auto-activate spam
     const [state, setState] = useState<SoftphoneState>('idle');
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
     const [connectionError, setConnectionError] = useState<string | null>(null);
+    const [errorCode, setErrorCode] = useState<string | null>(null);
     const [activeCall, setActiveCall] = useState<Call | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const [dialNumber, setDialNumber] = useState('');
@@ -36,6 +38,7 @@ export const SoftphoneWidget: React.FC = () => {
     const [isMinimized, setIsMinimized] = useState(true);
     const [postCallNotes, setPostCallNotes] = useState('');
     const [lastCallId, setLastCallId] = useState<string | null>(null);
+    const lastCallIdRef = useRef<string | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // ─── CALL QUEUE for multiple simultaneous incoming calls ───
@@ -59,6 +62,8 @@ export const SoftphoneWidget: React.FC = () => {
 
         setConnectionStatus('connecting');
         setConnectionError(null);
+        setErrorCode(null);
+        configErrorRef.current = false;
 
         try {
             const { token } = await TelephonyService.getTwilioToken();
@@ -70,10 +75,17 @@ export const SoftphoneWidget: React.FC = () => {
                 allowIncomingWhileBusy: true,
             });
 
-            device.on('registered', () => {
+            device.on('registered', async () => {
                 setConnectionStatus('connected');
                 setConnectionError(null);
                 toast.success('Telefon aktywny — gotowy do odbierania', { duration: 3000, icon: '☎️' });
+                // Sync availability to DB so TeamPhoneStatus widget updates in real-time
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user?.id) {
+                        await supabase.from('profiles').update({ availability_status: 'available' }).eq('id', session.user.id);
+                    }
+                } catch { /* silent */ }
             });
 
             device.on('unregistered', () => {
@@ -175,13 +187,25 @@ export const SoftphoneWidget: React.FC = () => {
 
         } catch (err: any) {
             console.error('☎️ Activation failed:', err);
+            const errMsg = err?.message || 'Nie udało się połączyć z Twilio';
+            const errCode = err?.code || null;
             setConnectionStatus('error');
-            setConnectionError(err?.message || 'Nie udało się połączyć z Twilio');
-            toast.error('Nie udało się aktywować telefonu');
+            setConnectionError(errMsg);
+            setErrorCode(errCode);
+
+            // Mark config errors to prevent auto-activate loops
+            if (errCode === 'TWILIO_CONFIG_MISSING' || errCode === 'TWILIO_CONFIG_INVALID') {
+                configErrorRef.current = true;
+                toast.error('Twilio nie skonfigurowane — skontaktuj się z administratorem', { duration: 8000 });
+            } else if (errCode === 'AUTH_FAILED') {
+                toast.error('Sesja wygasła — zaloguj się ponownie');
+            } else {
+                toast.error(errMsg, { duration: 5000 });
+            }
         }
     }, [state]);
 
-    const deactivate = useCallback(() => {
+    const deactivate = useCallback(async () => {
         if (deviceRef.current) {
             deviceRef.current.unregister();
             deviceRef.current.destroy();
@@ -196,7 +220,73 @@ export const SoftphoneWidget: React.FC = () => {
         setState('idle');
         setCallQueue([]);
         toast('Telefon wyłączony', { icon: '📴', duration: 2000 });
+        // Sync availability to DB so TeamPhoneStatus widget updates in real-time
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+                await supabase.from('profiles').update({ availability_status: 'offline' }).eq('id', session.user.id);
+            }
+        } catch { /* silent */ }
     }, []);
+
+    // ─── AUTO-ACTIVATE based on availability_status ───
+    useEffect(() => {
+        const autoActivate = async () => {
+            // Don't auto-activate if there's a persistent config error
+            if (configErrorRef.current) {
+                console.log('☎️ Skipping auto-activate — Twilio config error');
+                return;
+            }
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user?.id) return;
+
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('availability_status')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profile?.availability_status === 'available' && connectionStatus === 'disconnected') {
+                    console.log('☎️ Auto-activating softphone (status: available)');
+                    activate();
+                }
+            } catch (e) {
+                // Silently fail — not critical
+            }
+        };
+        autoActivate();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Listen for availability changes from dashboard toggle
+    useEffect(() => {
+        const channel = supabase.channel('softphone-availability');
+        const setupListener = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user?.id) return;
+
+            channel
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `id=eq.${session.user.id}`,
+                }, (payload: any) => {
+                    const newStatus = payload.new?.availability_status;
+                    if (newStatus === 'available' && connectionStatus !== 'connected' && !configErrorRef.current) {
+                        console.log('☎️ Status changed to available — auto-activating');
+                        activate();
+                    } else if (newStatus === 'offline' && connectionStatus === 'connected') {
+                        console.log('☎️ Status changed to offline — deactivating');
+                        deactivate();
+                    }
+                })
+                .subscribe();
+        };
+        setupListener();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [connectionStatus, activate, deactivate]);
 
     // Clean up on unmount
     useEffect(() => {
@@ -281,7 +371,19 @@ export const SoftphoneWidget: React.FC = () => {
 
             setActiveCall(call);
 
-            call.on('accept', () => setState('active'));
+            call.on('accept', () => {
+                setState('active');
+                // Extract CallSid from Twilio Call object and update our log
+                // so voice-status-callback can match it for recording/transcription
+                const callSid = (call as any).parameters?.CallSid || (call as any)._mediaHandler?.callSid || null;
+                if (callSid && lastCallIdRef.current) {
+                    supabase.from('call_logs')
+                        .update({ twilio_call_sid: callSid })
+                        .eq('id', lastCallIdRef.current)
+                        .then(() => console.log(`☎️ Linked CallSid ${callSid} to log ${lastCallIdRef.current}`))
+                        .catch(e => console.warn('☎️ CallSid link failed:', e));
+                }
+            });
             call.on('disconnect', () => handleCallEnd());
             call.on('reject', () => {
                 setState('idle');
@@ -314,7 +416,10 @@ export const SoftphoneWidget: React.FC = () => {
                 .select()
                 .single();
 
-            if (callLog) setLastCallId(callLog.id);
+            if (callLog) {
+                setLastCallId(callLog.id);
+                lastCallIdRef.current = callLog.id;
+            }
 
         } catch (err) {
             console.error('Dial error:', err);
@@ -653,7 +758,18 @@ export const SoftphoneWidget: React.FC = () => {
                     </div>
 
                     {connectionError && (
-                        <p className="text-xs text-red-500 mb-3 bg-red-50 px-3 py-2 rounded-lg">{connectionError}</p>
+                        <div className="mb-3 bg-red-50 px-3 py-2 rounded-lg">
+                            <p className="text-xs text-red-500 font-medium">{connectionError}</p>
+                            {errorCode === 'TWILIO_CONFIG_MISSING' && (
+                                <p className="text-[10px] text-red-400 mt-1">Skontaktuj się z administratorem aby skonfigurować Twilio</p>
+                            )}
+                            {errorCode === 'TWILIO_CONFIG_INVALID' && (
+                                <p className="text-[10px] text-red-400 mt-1">Klucze Twilio mają nieprawidłowy format</p>
+                            )}
+                            {errorCode === 'AUTH_FAILED' && (
+                                <p className="text-[10px] text-red-400 mt-1">Odśwież stronę i zaloguj się ponownie</p>
+                            )}
+                        </div>
                     )}
 
                     <p className="text-sm text-slate-500 mb-4">

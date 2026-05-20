@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ProductConfig } from '../../types';
 import { getModelDisplayName, getModelImage } from '../../config/modelImages';
 
@@ -133,6 +133,144 @@ const IconArrow = () => (
         <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 );
+
+const IconChevron = ({ open }: { open: boolean }) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+        className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+        <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
+// Maps raw OCR component text to customer-friendly German labels
+const COMPONENT_LABELS: Array<{ match: RegExp | string; label: string }> = [
+    { match: /VSG.*klar/i,           label: 'Verbundsicherheitsglas (VSG) – klar' },
+    { match: /VSG.*matt/i,           label: 'Verbundsicherheitsglas (VSG) – mattiert' },
+    { match: /VSG.*stopsol/i,        label: 'Sonnenschutzglas VSG StopSol' },
+    { match: /VSG.*IR/i,             label: 'Hitzeschutzglas VSG IR Gold' },
+    { match: /VSG/i,                 label: 'Verbundsicherheitsglas (VSG)' },
+    { match: /ESG.*klar/i,           label: 'Einscheiben-Sicherheitsglas (ESG)' },
+    { match: /ESG/i,                 label: 'Einscheiben-Sicherheitsglas (ESG)' },
+    { match: /Polycarbonat/i,        label: 'Polycarbonat-Eindeckung 16 mm' },
+    { match: /XL-Sparren/i,          label: 'Verstärkte XL-Sparren' },
+    { match: /Sparren/i,             label: 'Dachsparren' },
+    { match: /Silikon/i,             label: 'Silikon-Dichtstoff (transparent)' },
+    { match: /Koppelprofiel|Koppelprofil/i, label: 'Führungsschienenprofil' },
+    { match: /Bovenrail/i,           label: 'Obere Laufschiene' },
+    { match: /Onderrail/i,           label: 'Untere Laufschiene' },
+    { match: /Seitenführung/i,       label: 'Seitenführung' },
+    { match: /Bürstenprofiel|Bürstenprofil/i, label: 'Bürstendichtung' },
+    { match: /Türgriff/i,            label: 'Türgriff' },
+    { match: /Distanzprofile/i,      label: 'Distanzprofile-Set' },
+    { match: /Pfosten.*Stütze|Stütze.*Pfosten/i, label: 'Verlängerte Stützpfosten' },
+    { match: /Pfosten|Ständer/i,     label: 'Stützpfosten' },
+    { match: /Stahlverstärkung/i,    label: 'Stahlverstärkung (Konstruktionspfosten)' },
+    { match: /Zierleiste/i,          label: 'Abdeckleiste / Zierleiste' },
+    { match: /Schraubenset/i,        label: 'Schraubenset' },
+    { match: /Lochbohrer/i,          label: 'Montagewerkzeug (Lochbohrer)' },
+    { match: /Bogen 90/i,            label: 'Verbindungsbogen 90°' },
+    { match: /Befestigungs Winkel|Befestigungswinkel/i, label: 'Befestigungswinkel-Set' },
+    { match: /Somfy|Motor/i,         label: 'Somfy-Motor mit Fernbedienung' },
+    { match: /LED/i,                 label: 'LED-Beleuchtung' },
+    { match: /Heizstrahler/i,        label: 'Infrarot-Heizstrahler' },
+    { match: /Iso.*Glas.*33.*23/i,    label: 'Isolierglas 33.1-10-33.1 (23 mm)' },
+    { match: /Iso.*Glas/i,            label: 'Isolierglas' },
+    { match: /Keilfenster/i,         label: 'Keilfenster (Giebelscheibe)' },
+    { match: /Verstärkung.*rinne/i,  label: 'Verstärkung Dachrinne' },
+    { match: /Schuifdeuren|Schiebetür/i, label: 'Schiebetüren-Element' },
+    { match: /Tuchfarbe|ACRYL/i,     label: 'Tuchfarbe (Markise)' },
+    { match: /Fensterbock/i,         label: 'Fensterbock' },
+];
+
+function resolveComponentLabel(raw: string): string {
+    const trimmed = raw.trim();
+    for (const { match, label } of COMPONENT_LABELS) {
+        if (typeof match === 'string') {
+            if (trimmed.toLowerCase().includes(match.toLowerCase())) return label;
+        } else {
+            if (match.test(trimmed)) return label;
+        }
+    }
+    // Strip trailing price like "€ 93,02" or dimension like "4450mm"
+    return trimmed.replace(/€\s*[\d.,]+/g, '').replace(/\d{3,5}\s*mm/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function parseComponents(description: string): string[] {
+    if (!description || description === 'Manuelle Angebotsposition' || description === 'Manuelle Position') return [];
+    // Split by pipe separator
+    const parts = description.split('|').map(p => p.trim()).filter(p => p.length > 2);
+    // Filter out packaging entries
+    const filtered = parts.filter(p => !/verpackung|versand|transport|pallette|palette|kist/i.test(p));
+    // Map to customer-friendly labels and deduplicate
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const part of filtered) {
+        const label = resolveComponentLabel(part);
+        if (label && !seen.has(label)) {
+            seen.add(label);
+            result.push(label);
+        }
+    }
+    return result;
+}
+
+// Expandable item row for manual/OCR items
+const ExpandableItemRow = ({ item, idx }: { item: any; idx: number }) => {
+    const [open, setOpen] = useState(false);
+    const components = parseComponents(item.description || '');
+    const hasComponents = components.length > 0;
+
+    return (
+        <div className="border-b border-slate-100 last:border-0">
+            {/* Main row */}
+            <div className="flex items-center gap-3 py-3 px-1">
+                <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-50 text-[11px] font-bold text-slate-400 shrink-0">
+                    {idx + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 text-sm leading-snug">{item.name}</p>
+                    {item.quantity > 1 && (
+                        <p className="text-xs text-blue-600 font-semibold mt-0.5">Menge: {item.quantity} Stk.</p>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="flex items-center gap-1 text-emerald-600">
+                        <IconCheck className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase">Inkl.</span>
+                    </span>
+                    {hasComponents && (
+                        <button
+                            onClick={() => setOpen(o => !o)}
+                            className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors ml-1 px-1.5 py-1 rounded hover:bg-slate-50"
+                            title={open ? 'Zusammenklappen' : 'Details anzeigen'}
+                        >
+                            <span className="text-[10px] text-slate-400 hidden sm:inline">
+                                {open ? 'Details' : 'Details'}
+                            </span>
+                            <IconChevron open={open} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Expandable components */}
+            {hasComponents && open && (
+                <div className="ml-9 mb-3 px-3 py-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        Im Lieferumfang enthalten:
+                    </p>
+                    <ul className="space-y-1.5">
+                        {components.map((comp, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                <span className="text-xs text-slate-600">{comp}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const IconInfo = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-[18px] h-[18px]">
@@ -559,7 +697,7 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
                         </>
                     )}
 
-                    {hasDescription && (
+                    {hasDescription && !hasCustomItems && (
                         <>
                             <SectionHeader title="Beschreibung" iconKey="package" />
                             <div className="whitespace-pre-wrap text-slate-600 text-sm leading-relaxed py-2">
@@ -571,26 +709,11 @@ export const OfferSpecification: React.FC<OfferSpecificationProps> = ({ product,
                     {hasCustomItems && (
                         <>
                             <SectionHeader title="Leistungsumfang" iconKey="package" />
-                            {product.customItems!.map((item, idx) => (
-                                <div key={`m-${idx}`} className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
-                                    <div className="flex items-center gap-3">
-                                        <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-50 text-[11px] font-bold text-slate-400 shrink-0">{idx + 1}</span>
-                                        <div>
-                                            <span className="font-semibold text-slate-800 text-sm">{item.name}</span>
-                                            {item.description && item.description !== 'Manuelle Angebotsposition' && item.description !== 'Manuelle Position' && (
-                                                <div className="text-xs text-slate-400">{item.description}</div>
-                                            )}
-                                            {item.quantity > 1 && (
-                                                <div className="text-xs text-blue-600 font-semibold">Menge: {item.quantity} Stk.</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <span className="flex items-center gap-1 text-emerald-600 shrink-0">
-                                        <IconCheck className="w-3.5 h-3.5" />
-                                        <span className="text-[10px] font-bold uppercase">Inkl.</span>
-                                    </span>
-                                </div>
-                            ))}
+                            <div className="border border-slate-100 rounded-xl overflow-hidden">
+                                {product.customItems!.map((item, idx) => (
+                                    <ExpandableItemRow key={`m-${idx}`} item={item} idx={idx} />
+                                ))}
+                            </div>
                         </>
                     )}
                 </div>

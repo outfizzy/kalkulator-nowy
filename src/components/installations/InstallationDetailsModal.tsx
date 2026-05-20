@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Installation, InstallationTeam, InstallationStatus, User } from '../../types';
 import { SchedulerService, type ScheduleSuggestion } from '../../services/SchedulerService';
+import { LoadingListModal } from './LoadingListModal';
 
 interface InstallationDetailsModalProps {
     installation: Installation;
@@ -50,6 +51,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
     const [editCosts, setEditCosts] = useState({ hotelCost: 0, consumablesCost: 0, additionalCosts: 0 });
     const [savingCosts, setSavingCosts] = useState(false);
+    const [showLoadingList, setShowLoadingList] = useState(false);
     const canManageAssignments = !readOnly && (currentUser?.role === 'admin' || currentUser?.role === 'manager');
 
     // ---- Data Loading ----
@@ -271,6 +273,7 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
     ];
 
     return (
+        <>
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
             <div className="bg-white w-full h-full md:h-auto md:max-h-[92vh] md:max-w-4xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-in">
 
@@ -562,12 +565,41 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                                                 </div>
                                             )}
 
-                                            {/* Materials Checkbox */}
-                                            <label className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                                                <input type="checkbox" checked={formData.partsReady || false} onChange={e => handleChange('partsReady', e.target.checked)}
-                                                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500" />
-                                                <span className="text-sm font-medium text-slate-700">Materiały skompletowane ✅</span>
-                                            </label>
+                                            {/* Materials & Loading List */}
+                                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                                                <div className="flex items-center justify-between p-2.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm">📦</span>
+                                                        <span className="text-sm font-medium text-slate-700">Materiały</span>
+                                                        {(() => {
+                                                            const ps = formData.partsStatus || installation.partsStatus || 'none';
+                                                            const cfg: Record<string, { label: string; cls: string }> = {
+                                                                'none': { label: 'Brak', cls: 'bg-slate-100 text-slate-500' },
+                                                                'partial': { label: 'Częściowo', cls: 'bg-amber-100 text-amber-700' },
+                                                                'all_delivered': { label: 'Dostarczone', cls: 'bg-emerald-100 text-emerald-700' },
+                                                                'ready': { label: 'Skompletowane', cls: 'bg-blue-100 text-blue-700' },
+                                                                'loaded': { label: 'Załadowane', cls: 'bg-indigo-100 text-indigo-700' },
+                                                                'on_site': { label: 'Na miejscu', cls: 'bg-green-100 text-green-700' },
+                                                            };
+                                                            const c = cfg[ps] || cfg['none'];
+                                                            return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.cls}`}>{c.label}</span>;
+                                                        })()}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setShowLoadingList(true)}
+                                                        className="px-3 py-1.5 text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors flex items-center gap-1.5"
+                                                    >
+                                                        📋 Lista załadunkowa
+                                                    </button>
+                                                </div>
+                                                {(installation as any).installation_data?.loadingConfirmedAt && (
+                                                    <div className="px-2.5 pb-2 flex items-center gap-2 text-[10px] text-emerald-600">
+                                                        <span>✓ Załadowano: {new Date((installation as any).installation_data.loadingConfirmedAt).toLocaleString('pl-PL')}</span>
+                                                        <span className="text-slate-300">•</span>
+                                                        <span>{(installation as any).installation_data.loadingConfirmedBy}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1472,5 +1504,14 @@ export const InstallationDetailsModal: React.FC<InstallationDetailsModalProps> =
                 </div>
             </div>
         </div>
+
+        {/* Loading List Modal */}
+        <LoadingListModal
+            installation={installation}
+            isOpen={showLoadingList}
+            onClose={() => setShowLoadingList(false)}
+            onUpdate={onUpdate}
+        />
+        </>
     );
 };

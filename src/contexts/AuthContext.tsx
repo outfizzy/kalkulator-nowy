@@ -87,12 +87,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, []);
 
     const fetchPermissions = async (role: string) => {
-        // Basic role-based permissions (no DB dependency for now)
+        // Admin gets everything
+        if (role === 'admin') {
+            setPermissions(new Set(['*']));
+            return;
+        }
+
+        // Try loading from DB first (module_permissions table)
+        try {
+            const { data, error } = await supabase
+                .from('module_permissions')
+                .select('module_key')
+                .eq('role', role)
+                .eq('is_enabled', true);
+
+            if (!error && data && data.length > 0) {
+                const dbPermissions = new Set<string>(data.map((row: any) => row.module_key));
+                setPermissions(dbPermissions);
+                return;
+            }
+        } catch (err) {
+            console.warn('Failed to load permissions from DB, using defaults:', err);
+        }
+
+        // Fallback: hardcoded defaults if DB query fails
         const rolePermissions = new Set<string>();
 
-        if (role === 'admin') {
-            rolePermissions.add('*'); // Admin has all permissions
-        } else if (role === 'manager') {
+        if (role === 'manager') {
             rolePermissions.add('dashboard');
             rolePermissions.add('offers_list');
             rolePermissions.add('offers_create');
@@ -103,6 +124,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('contracts_list');
             rolePermissions.add('service_module');
             rolePermissions.add('team_management');
+            rolePermissions.add('logistics');
+            rolePermissions.add('deliveries');
         } else if (role === 'sales_rep') {
             rolePermissions.add('dashboard');
             rolePermissions.add('offers_list');
@@ -111,6 +134,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('crm_clients');
             rolePermissions.add('contracts_list');
             rolePermissions.add('service_module');
+            rolePermissions.add('logistics');
+            rolePermissions.add('deliveries');
         } else if (role === 'sales_rep_pl') {
             rolePermissions.add('dashboard');
             rolePermissions.add('offers_list');
@@ -122,6 +147,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             rolePermissions.add('installations_calendar');
             rolePermissions.add('measurement_reports');
             rolePermissions.add('blog_pl');
+            rolePermissions.add('logistics');
+            rolePermissions.add('deliveries');
         }
 
         setPermissions(rolePermissions);

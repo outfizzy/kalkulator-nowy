@@ -67,44 +67,63 @@ export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
     };
 
     return (
-        <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border border-indigo-100">
-            <h3 className="text-xl font-bold text-indigo-900 mb-2">🎁 Beliebte Erweiterungen</h3>
-            <p className="text-indigo-700 mb-6 text-sm">
-                Viele unserer Kunden entscheiden sich zusätzlich für diese Extras.
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 md:p-6">
+            <div className="flex items-center gap-2.5 mb-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 text-slate-400">
+                    <path d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-base font-bold text-slate-800">Optionale Erweiterungen</h3>
+            </div>
+            <p className="text-slate-400 text-xs mb-5 ml-[30px]">
+                Ergänzen Sie Ihre Konfiguration mit beliebten Extras.
             </p>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {upgrades.map((item) => (
-                    <div key={item.id} className="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden hover:shadow-md transition-shadow">
-                        <div className="h-32 bg-slate-200 relative">
-                            <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="p-4">
-                            <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-bold text-slate-800">{item.title}</h4>
-                                <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {upgrades.map((item) => {
+                    const isRequested = requested.has(item.id);
+                    const isRequesting = requesting === item.id;
+
+                    return (
+                        <div key={item.id} className="group rounded-lg border border-slate-200 overflow-hidden hover:border-slate-300 transition-all">
+                            <div className="h-28 bg-slate-100 relative overflow-hidden">
+                                <img
+                                    src={item.image}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                                <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded">
                                     {item.price}
                                 </span>
                             </div>
-                            <p className="text-xs text-slate-500 mb-4">{item.desc}</p>
-                            <button
-                                onClick={() => handleRequestUpgrade(item.id, item.title)}
-                                disabled={requesting === item.id || requested.has(item.id)}
-                                className={`w-full py-2 border rounded-lg text-sm font-bold transition-colors disabled:opacity-50 ${requested.has(item.id)
-                                        ? 'border-green-500 text-green-600 bg-green-50'
-                                        : 'border-indigo-600 text-indigo-600 hover:bg-indigo-50'
-                                    }`}
-                            >
-                                {requested.has(item.id)
-                                    ? '✓ Anfrage gesendet'
-                                    : requesting === item.id
-                                        ? 'Wird gesendet...'
-                                        : '+ Zur Anfrage hinzufügen'
-                                }
-                            </button>
+                            <div className="p-3.5">
+                                <h4 className="font-bold text-sm text-slate-800 mb-0.5">{item.title}</h4>
+                                <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">{item.desc}</p>
+                                <button
+                                    onClick={() => handleRequestUpgrade(item.id, item.title)}
+                                    disabled={isRequesting || isRequested}
+                                    className={`w-full py-2 rounded-lg text-xs font-bold transition-all disabled:cursor-default flex items-center justify-center gap-1.5 ${isRequested
+                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                            : 'bg-slate-800 text-white hover:bg-slate-700'
+                                        }`}
+                                >
+                                    {isRequested ? (
+                                        <>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Anfrage gesendet
+                                        </>
+                                    ) : isRequesting ? (
+                                        'Wird gesendet...'
+                                    ) : (
+                                        'Unverbindlich anfragen'
+                                    )}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

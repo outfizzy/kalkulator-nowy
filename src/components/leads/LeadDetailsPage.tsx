@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { normalizePhone, formatPhoneDisplay } from '../../utils/phone';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { LeadForm } from './LeadForm';
-import type { Lead, Communication, Offer } from '../../types';
+import type { Lead, Communication, Offer, MailboxConfig } from '../../types';
+import { supabase } from '../../lib/supabase';
 import { TelephonyService, type CallLog, type SMSLog } from '../../services/database/telephony.service';
 import { CommunicationTimeline } from '../crm/CommunicationTimeline';
 import { UnifiedTimeline, calculateEngagementScore } from '../crm/UnifiedTimeline';
@@ -14,9 +15,12 @@ import { TasksList } from '../tasks/TasksList';
 import { TaskModal } from '../tasks/TaskModal';
 import { NotesList } from '../common/NotesList';
 import { AssigneeSelector } from '../common/AssigneeSelector';
+import { MultiAssigneeSelector } from '../common/MultiAssigneeSelector';
 import { CustomerActivityTimeline } from '../common/CustomerActivityTimeline';
 import { EmailHistoryWidget } from '../common/EmailHistoryWidget';
 import { ScheduleMeasurementModal } from './ScheduleMeasurementModal';
+import { MeasurementSuggestionWidget } from './MeasurementSuggestionWidget';
+import { NearbyReferencesWidget } from './NearbyReferencesWidget';
 import { SnowZoneEmailModal } from './SnowZoneEmailModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,8 +29,10 @@ import { QuickSMSModal } from '../telephony/QuickSMSModal';
 import { ManualContractModal } from '../contracts/ManualContractModal';
 import { LostLeadModal } from './LostLeadModal';
 import { WonLeadModal } from './WonLeadModal';
+import { OfferMessagesWidget } from './OfferMessagesWidget';
 
 import { useAuth } from '../../contexts/AuthContext';
+import { StructuralZonesService } from '../../services/structural-zones.service';
 
 type Tab = 'overview' | 'communications' | 'offers' | 'form' | 'fair';
 
@@ -36,19 +42,23 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> =
     measurement_scheduled: { bg: 'bg-cyan-100', text: 'text-cyan-800', dot: 'bg-cyan-500' },
     measurement_completed: { bg: 'bg-teal-100', text: 'text-teal-800', dot: 'bg-teal-500' },
     offer_sent: { bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500' },
+    contact_after_offer: { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-500' },
     negotiation: { bg: 'bg-orange-100', text: 'text-orange-800', dot: 'bg-orange-500' },
     configuration_received: { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500' },
     won: { bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-500' },
     lost: { bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-500' },
     fair: { bg: 'bg-purple-100', text: 'text-purple-800', dot: 'bg-purple-500' },
+    formularz_sent: { bg: 'bg-sky-100', text: 'text-sky-800', dot: 'bg-sky-500' },
     formularz: { bg: 'bg-teal-100', text: 'text-teal-800', dot: 'bg-teal-500' },
 };
 
 const STATUS_LABELS: Record<string, string> = {
     new: 'Neu', contacted: 'Kontaktiert', measurement_scheduled: 'Aufmaß geplant',
     measurement_completed: 'Aufmaß erledigt', offer_sent: 'Angebot gesendet',
+    contact_after_offer: 'Kontakt nach Angebot',
     negotiation: 'Verhandlung', configuration_received: 'Konfiguration erhalten',
-    won: 'Gewonnen', lost: 'Verloren', fair: 'Messe', formularz: 'Formularz',
+    won: 'Gewonnen', lost: 'Verloren', fair: 'Messe',
+    formularz_sent: 'Formular gesendet', formularz: 'Formular ausgefüllt',
 };
 
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
@@ -102,6 +112,7 @@ export const LeadDetailsPage: React.FC = () => {
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
     const [isLostModalOpen, setIsLostModalOpen] = useState(false);
     const [isWonModalOpen, setIsWonModalOpen] = useState(false);
+    const [allTeamMailboxes, setAllTeamMailboxes] = useState<MailboxConfig[]>([]);
 
     useEffect(() => {
         const fetchLead = async () => {
@@ -192,6 +203,35 @@ export const LeadDetailsPage: React.FC = () => {
         fetchMessages();
     }, [id, lead?.customerData?.phone]);
 
+    // Load ALL team mailboxes so email history shows all correspondence regardless of who received it
+    useEffect(() => {
+        const loadTeamMailboxes = async () => {
+            try {
+                const { data } = await supabase
+                    .from('mailboxes')
+                    .select('*')
+                    .eq('is_active', true);
+                if (data && data.length > 0) {
+                    setAllTeamMailboxes(data.map((mb: any) => ({
+                        name: mb.name,
+                        color: mb.color,
+                        smtpHost: mb.smtp_host,
+                        smtpPort: mb.smtp_port,
+                        smtpUser: mb.smtp_user,
+                        smtpPassword: mb.smtp_password,
+                        imapHost: mb.imap_host,
+                        imapPort: mb.imap_port,
+                        imapUser: mb.imap_user,
+                        imapPassword: mb.imap_password,
+                        signature: mb.signature || '',
+                    })));
+                }
+            } catch (e) {
+                console.warn('Failed to load team mailboxes:', e);
+            }
+        };
+        loadTeamMailboxes();
+    }, []);
     const handleConvert = () => {
         if (!lead) return;
 
@@ -259,27 +299,27 @@ export const LeadDetailsPage: React.FC = () => {
 
     return (<>
         <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
-            {/* Header Row 1: Identity + Quick Info */}
+            {/* Header */}
             <div className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm shrink-0">
-                <div className="px-4 sm:px-6 lg:px-8 py-3">
-                    {/* Top: Back + Name + Status */}
-                    <div className="flex items-center gap-3 mb-2">
+                <div className="px-4 sm:px-6 lg:px-8 py-2.5">
+                    {/* Identity Row */}
+                    <div className="flex items-center gap-3">
                         <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 shrink-0">
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                             </svg>
                         </button>
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">
                             {lead.customerData.firstName?.[0]}{lead.customerData.lastName?.[0]}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                            <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">
                                 {lead.customerData.firstName} {lead.customerData.lastName}
                                 {lead.customerData.companyName && (
                                     <span className="text-sm font-normal text-slate-400 ml-2 hidden sm:inline">({lead.customerData.companyName})</span>
                                 )}
                             </h1>
-                            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 flex-wrap">
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
                                 {(() => {
                                     const sc = STATUS_COLORS[lead.status] || STATUS_COLORS.new;
                                     return (
@@ -297,100 +337,59 @@ export const LeadDetailsPage: React.FC = () => {
                                     <>
                                         <span className="text-slate-300 hidden sm:inline">•</span>
                                         <span className="hidden sm:inline flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> {lead.assignee.firstName} {lead.assignee.lastName}</span>
+                                        {(lead.additionalAssigneesProfiles?.length || 0) > 0 && (
+                                            <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden sm:inline">+{lead.additionalAssigneesProfiles!.length}</span>
+                                        )}
                                     </>
                                 )}
                             </div>
                         </div>
-
-                        {/* Primary Action - always visible */}
-                        <button
-                            onClick={handleConvert}
-                            className="px-3 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg font-medium transition-colors flex items-center gap-1.5 text-sm shadow-sm shrink-0"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            <span className="hidden sm:inline">Neue Offerte</span>
-                        </button>
                     </div>
 
-                    {/* Action Bar — wraps on mobile */}
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        {lead.status === 'new' && (
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const updates: Partial<Lead> = { status: 'contacted' };
-                                        let msg = 'Jako skontaktowano';
-                                        if (currentUser && !lead.assignedTo) {
-                                            updates.assignedTo = currentUser.id;
-                                            msg += ' + opiekun';
-                                        }
-                                        await DatabaseService.updateLead(lead.id, updates);
-                                        setLead(prev => prev ? { ...prev, status: 'contacted', assignedTo: currentUser?.id || prev.assignedTo } : null);
-                                        toast.success(msg);
-                                    } catch (e) { console.error(e); toast.error('Błąd'); }
-                                }}
-                                className="px-2.5 py-1.5 border border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 rounded-lg font-medium transition-colors flex items-center gap-1.5 text-xs"
-                            ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> Kontaktiert</button>
+                    {/* Unified Toolbar */}
+                    <div className="flex items-center gap-0.5 mt-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                        <button onClick={handleConvert}
+                            className="px-2.5 py-1 bg-accent hover:bg-accent-dark text-white rounded-md font-semibold transition-colors flex items-center gap-1 text-xs shadow-sm shrink-0 mr-1"
+                        ><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Offerte</button>
+                        {lead.customerData?.phone && (
+                            <button onClick={() => { window.dispatchEvent(new CustomEvent('softphone-dial', { detail: { number: normalizePhone(lead.customerData.phone), name: `${lead.customerData.firstName} ${lead.customerData.lastName}` } })); }}
+                                className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-medium transition-colors flex items-center gap-1 text-xs shrink-0 shadow-sm"
+                            ><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> Zadzwoń</button>
                         )}
                         {lead.customerData?.phone && (
-                            <a
-                                href={`https://wa.me/${normalizePhone(lead.customerData.phone).replace('+', '')}`}
-                                target="_blank" rel="noreferrer"
-                                className="px-2.5 py-1.5 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg font-medium transition-colors flex items-center gap-1.5 text-xs"
-                            ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> WhatsApp</a>
+                            <a href={`https://wa.me/${normalizePhone(lead.customerData.phone).replace('+', '')}`} target="_blank" rel="noreferrer"
+                                className="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded-md font-medium transition-colors flex items-center gap-1 text-xs shrink-0"
+                            ><svg className="w-3.5 h-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg><span className="hidden md:inline">WhatsApp</span></a>
                         )}
                         {lead.customerData?.phone && (
-                            <a href={`tel:${normalizePhone(lead.customerData.phone)}`}
-                                className="px-2.5 py-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                            ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> Anrufen</a>
-                        )}
-                        {lead.customerData?.phone && (
-                            <button
-                                onClick={() => {
-                                    window.dispatchEvent(new CustomEvent('softphone-dial', {
-                                        detail: { number: normalizePhone(lead.customerData.phone), name: `${lead.customerData.firstName} ${lead.customerData.lastName}` }
-                                    }));
-                                }}
-                                className="px-2.5 py-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                            ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> Zadzwoń</button>
-                        )}
-                        {lead.customerData?.phone && (
-                            <button
-                                onClick={() => setIsSMSModalOpen(true)}
-                                className="px-2.5 py-1.5 border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                            ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg> SMS</button>
+                            <button onClick={() => setIsSMSModalOpen(true)}
+                                className="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded-md font-medium transition-colors flex items-center gap-1 text-xs shrink-0"
+                            ><svg className="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg> SMS</button>
                         )}
                         <button onClick={() => setIsEmailModalOpen(true)}
-                            className="px-2.5 py-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                        ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> E-Mail</button>
-                        <button onClick={() => setIsSnowZoneModalOpen(true)}
-                            className="px-2.5 py-1.5 border border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                        ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> Mail powitalny</button>
-                        <button onClick={() => setIsMeasurementModalOpen(true)}
-                            className="px-2.5 py-1.5 border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                        ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> Ustal termin</button>
-                        <button
-                                onClick={() => setIsContractModalOpen(true)}
-                                className="px-2.5 py-1.5 border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                            ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Utwórz umowę</button>
+                            className="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded-md font-medium transition-colors flex items-center gap-1 text-xs shrink-0"
+                        ><svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> E-Mail</button>
+                        <div className="w-px h-4 bg-slate-200 mx-1 shrink-0" />
+                        {lead.status === 'new' && (
+                            <button onClick={async () => { try { const updates: Partial<Lead> = { status: 'contacted' }; let msg = 'Jako skontaktowano'; if (currentUser && !lead.assignedTo) { updates.assignedTo = currentUser.id; msg += ' + opiekun'; } await DatabaseService.updateLead(lead.id, updates); setLead(prev => prev ? { ...prev, status: 'contacted', assignedTo: currentUser?.id || prev.assignedTo } : null); toast.success(msg); } catch (e) { console.error(e); toast.error('Błąd'); } }}
+                                className="px-2 py-1 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-md font-medium transition-colors flex items-center gap-1 text-xs shrink-0"
+                            ><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span className="hidden md:inline">Kontaktiert</span></button>
+                        )}
+                        <button onClick={() => setIsSnowZoneModalOpen(true)} className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span className="hidden lg:inline">Mail powitalny</span></button>
+                        <button onClick={() => setIsMeasurementModalOpen(true)} className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><span className="hidden lg:inline">Termin</span></button>
+                        <button onClick={() => setIsContractModalOpen(true)} className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg><span className="hidden lg:inline">Umowa</span></button>
+                        {lead.status !== 'won' && lead.status !== 'lost' && <div className="w-px h-4 bg-slate-200 mx-1 shrink-0" />}
                         {lead.status !== 'won' && lead.status !== 'lost' && (
                             <>
-                                <button
-                                    onClick={() => setIsWonModalOpen(true)}
-                                    className="px-2.5 py-1.5 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                                ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Wygrane</button>
-                                <button
-                                    onClick={() => setIsLostModalOpen(true)}
-                                    className="px-2.5 py-1.5 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-1 text-xs"
-                                ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Utracony</button>
+                                <button onClick={() => setIsWonModalOpen(true)} className="px-2 py-1 text-green-700 hover:bg-green-50 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="hidden md:inline">Wygrane</span></button>
+                                <button onClick={() => setIsLostModalOpen(true)} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="hidden md:inline">Utracony</span></button>
                             </>
                         )}
-                        <div className="flex-1 hidden sm:block" />
-                        <button onClick={() => setIsEditMode(true)}
-                            className="px-2.5 py-1.5 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-lg font-medium transition-colors text-xs flex items-center gap-1"
-                        ><svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg> Bearbeiten</button>
+                        <div className="flex-1" />
+                        <button onClick={() => navigate('/ai-assistant', { state: { leadContext: { id: lead.id, name: `${lead.customerData.firstName} ${lead.customerData.lastName}`, status: lead.status, city: lead.customerData.city, phone: lead.customerData.phone, email: lead.customerData.email, source: lead.source, product: lead.customerData.product, notes: lead.customerData.notes } } })}
+                            className="px-2 py-1 text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0 font-medium"
+                        ><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg><span className="hidden lg:inline">Zapytaj AI</span></button>
+                        <button onClick={() => setIsEditMode(true)} className="px-2 py-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg><span className="hidden sm:inline">Bearbeiten</span></button>
                     </div>
                 </div>
 
@@ -424,13 +423,13 @@ export const LeadDetailsPage: React.FC = () => {
             {/* Main Content — full width, no sidebar */}
             <div className="flex-1 overflow-auto">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                    {activeTab === 'overview' && (<>
+                    {activeTab === 'overview' && (<div className="space-y-4">
 
                         {/* ═══ 2. CONTACT + LEAD META (side-by-side) ═══ */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                             {/* Contact Card — 2 cols */}
-                            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                            <div className="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
                                     <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                     Kontaktdaten
                                 </h3>
@@ -485,23 +484,36 @@ export const LeadDetailsPage: React.FC = () => {
                                             ) : <span className="text-slate-300">—</span>}
                                         </div>
                                     </div>
-                                    {/* Snow Zone */}
-                                    {lead.customerData.snowZone && (
-                                        <div className="sm:col-span-2">
-                                            <label className="text-[10px] font-medium text-slate-400 uppercase flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg> Schneelastzone</label>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-sm">Zone {lead.customerData.snowZone}</span>
-                                                {lead.customerData.snowLoad && <span className="text-slate-600 text-sm font-medium">{lead.customerData.snowLoad} kN/m²</span>}
-                                                {lead.customerData.snowZonePostalCode && <span className="text-slate-400 text-xs">(PLZ {lead.customerData.snowZonePostalCode})</span>}
+                                    {/* Snow Zone — from stored data OR computed from PLZ */}
+                                    {(() => {
+                                        const stored = lead.customerData.snowZone;
+                                        const plz = lead.customerData.postalCode?.replace(/\s/g, '');
+                                        const computed = !stored && plz && plz.length === 5 ? StructuralZonesService.getZones(plz) : null;
+                                        const zone = stored || computed?.snow?.zone;
+                                        const load = lead.customerData.snowLoad || (computed ? `${computed.snow.loadKn.toFixed(2)}` : null);
+                                        const plzLabel = lead.customerData.snowZonePostalCode || plz;
+                                        if (!zone) return null;
+                                        return (
+                                            <div className="sm:col-span-2">
+                                                <label className="text-[10px] font-medium text-slate-400 uppercase flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg> Schneelastzone</label>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold text-xs">Zone {zone}</span>
+                                                    {load && <span className="text-slate-600 text-xs font-medium">{load} kN/m²</span>}
+                                                    {plzLabel && <span className="text-slate-400 text-[10px]">(PLZ {plzLabel})</span>}
+                                                    {computed && <span className="text-blue-400 text-[10px] italic">auto</span>}
+                                                </div>
+                                                {computed?.warningMessage && (
+                                                    <p className="text-amber-600 text-[10px] mt-1 leading-snug">{computed.warningMessage}</p>
+                                                )}
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
                             {/* Lead Meta Card — 1 col */}
-                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                            <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
                                     <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                                     Lead-Info
                                 </h3>
@@ -554,29 +566,45 @@ export const LeadDetailsPage: React.FC = () => {
                                     })()}
                                     <div className="border-t border-slate-100 pt-2 space-y-2 text-sm">
                                         <div className="flex justify-between"><span className="text-slate-500">Quelle</span><span className="font-medium text-slate-800 capitalize">{lead.source}</span></div>
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between items-start">
                                             <span className="text-slate-500">Betreuer</span>
-                                            <span className="font-medium text-slate-800 flex items-center gap-1">
-                                                {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '—'}
-                                                {!isAssigning && (currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
-                                                    <button onClick={() => setIsAssigning(true)} className="text-slate-400 hover:text-accent" title="Ändern">
-                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                                    </button>
-                                                )}
-                                            </span>
+                                            <div className="text-right">
+                                                <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                                                    {lead.assignee ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                                                            {lead.assignee.firstName} {lead.assignee.lastName}
+                                                        </span>
+                                                    ) : <span className="text-slate-400">—</span>}
+                                                    {(lead.additionalAssigneesProfiles || []).map(p => (
+                                                        <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
+                                                            {p.firstName} {p.lastName}
+                                                        </span>
+                                                    ))}
+                                                    {!isAssigning && (
+                                                        <button onClick={() => setIsAssigning(true)} className="text-slate-400 hover:text-accent p-0.5" title="Betreuer bearbeiten">
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                         {isAssigning && (
-                                            <AssigneeSelector
-                                                currentAssigneeId={lead.assignedTo}
+                                            <MultiAssigneeSelector
+                                                currentPrimaryId={lead.assignedTo}
+                                                currentAdditionalIds={lead.additionalAssignees || []}
                                                 onCancel={() => setIsAssigning(false)}
-                                                onAssign={async (newId) => {
+                                                onSave={async (primaryId, additionalIds) => {
                                                     try {
-                                                        await DatabaseService.updateLead(lead.id, { assignedTo: newId });
+                                                        await DatabaseService.updateLead(lead.id, {
+                                                            assignedTo: primaryId || undefined,
+                                                            additionalAssignees: additionalIds
+                                                        } as any);
                                                         const updatedLead = await DatabaseService.getLead(lead.id);
                                                         setLead(updatedLead);
                                                         setIsAssigning(false);
-                                                        toast.success('Betreuer geändert');
-                                                    } catch (e) { toast.error('Fehler'); }
+                                                        toast.success('Opiekunowie zaktualizowani');
+                                                    } catch (e) { toast.error('Błąd'); }
                                                 }}
                                             />
                                         )}
@@ -606,47 +634,10 @@ export const LeadDetailsPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* ═══ 3. PIPELINE TRACKER ═══ */}
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                            <div className="flex items-center justify-between">
-                                {(() => {
-                                    const steps = [
-                                        { key: 'new', label: 'Neu', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg> },
-                                        { key: 'contacted', label: 'Kontaktiert', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> },
-                                        { key: 'measurement_scheduled,measurement_completed', label: 'Aufmaß', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg> },
-                                        { key: 'offer_sent', label: 'Angebot', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
-                                        { key: 'negotiation', label: 'Verhandlung', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg> },
-                                        { key: 'won', label: 'Gewonnen', icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
-                                    ];
-                                    const statusOrder = ['new', 'contacted', 'configuration_received', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'negotiation', 'won'];
-                                    const currentIdx = statusOrder.indexOf(lead.status);
-                                    const isLost = lead.status === 'lost';
-                                    return steps.map((step, i) => {
-                                        const stepKeys = step.key.split(',');
-                                        const stepMaxIdx = Math.max(...stepKeys.map(k => statusOrder.indexOf(k)));
-                                        const isActive = stepKeys.includes(lead.status);
-                                        const isPast = !isLost && currentIdx > stepMaxIdx;
-                                        const isFuture = !isActive && !isPast;
-                                        return (
-                                            <React.Fragment key={step.key}>
-                                                {i > 0 && <div className={`flex-1 h-0.5 mx-1 rounded ${isPast || isActive ? 'bg-accent' : 'bg-slate-200'}`} />}
-                                                <div className={`flex flex-col items-center gap-1 ${isActive ? 'scale-110' : ''} transition-transform`}>
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm border-2 transition-colors ${isActive ? 'border-accent bg-accent text-white shadow-md' :
-                                                        isPast ? 'border-accent bg-accent/10 text-accent' : 'border-slate-200 bg-slate-50 text-slate-400'}`}>
-                                                        {isPast ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> : step.icon}
-                                                    </div>
-                                                    <span className={`text-[10px] font-medium ${isActive ? 'text-accent font-bold' : isFuture ? 'text-slate-400' : 'text-slate-600'}`}>{step.label}</span>
-                                                </div>
-                                            </React.Fragment>
-                                        );
-                                    });
-                                })()}
-                            </div>
-                        </div>
 
                         {/* Lost Reason */}
                         {lead.status === 'lost' && lead.lostReason && (
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3">
                                 <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 <div>
                                     <div className="font-bold text-red-800 text-sm">Verloren</div>
@@ -656,179 +647,164 @@ export const LeadDetailsPage: React.FC = () => {
                             </div>
                         )}
 
+                        {/* ═══ MEASUREMENT SUGGESTIONS + REFERENCE MAP ═══ */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            {/* Measurement proximity suggestions */}
+                            {lead.status !== 'won' && lead.status !== 'lost' && (
+                                <MeasurementSuggestionWidget
+                                    leadAddress={lead.customerData.address || (lead.customerData as any).street || ''}
+                                    leadCity={lead.customerData.city}
+                                    leadPostalCode={lead.customerData.postalCode}
+                                    assignedRepId={lead.assignedTo}
+                                    onSchedule={(date) => {
+                                        setIsMeasurementModalOpen(true);
+                                    }}
+                                />
+                            )}
+
+                            {/* Reference Map — nearby won contracts */}
+                            <NearbyReferencesWidget
+                                leadAddress={lead.customerData.address || (lead.customerData as any).street || ''}
+                                leadCity={lead.customerData.city}
+                                leadPostalCode={lead.customerData.postalCode}
+                                leadId={lead.id}
+                            />
+                        </div>
+
                         {/* ═══ 4. MAIN 2-COLUMN LAYOUT ═══ */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-                            {/* ── LEFT COLUMN: Tasks + Calls + Activity ── */}
-                            <div className="space-y-6">
-                                {/* Tasks */}
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2">
-                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                                            Aufgaben</h3>
-                                        <button onClick={() => setIsTaskModalOpen(true)} className="text-xs font-semibold text-accent hover:text-accent-dark bg-accent/10 hover:bg-accent/20 px-2 py-1 rounded transition-colors">+ Neu</button>
+                            {/* ── LEFT COLUMN: Email + Attachments + Notes + Calls ── */}
+                            <div className="space-y-4">
+                                {/* Email History */}
+                                {lead.customerData.email && (
+                                    <EmailHistoryWidget customerEmail={lead.customerData.email} maxItems={10} allTeamMailboxes={allTeamMailboxes} />
+                                )}
+
+                                {/* Email Origin */}
+                                {lead.emailMessageId && (
+                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-start gap-3">
+                                        <span className="text-blue-600">
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        </span>
+                                        <div>
+                                            <h4 className="text-blue-900 font-semibold text-xs">Lead aus E-Mail</h4>
+                                            <p className="text-blue-700 text-[10px] mt-0.5">ID: {lead.emailMessageId}</p>
+                                        </div>
                                     </div>
-                                    <TasksList leadId={lead.id} refreshTrigger={tasksRefreshTrigger} />
-                                </div>
+                                )}
 
-                                {/* Call History */}
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                        Anrufe {callLogs.length > 0 && <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold">{callLogs.length}</span>}
-                                    </h3>
-                                    {callsLoading ? (
-                                        <p className="text-slate-400 text-sm">Laden...</p>
-                                    ) : callLogs.length === 0 ? (
-                                        <p className="text-slate-400 text-sm">Keine Anrufe.</p>
-                                    ) : (
-                                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                                            {callLogs.map(call => {
-                                                const isExpanded = expandedCallId === call.id;
-                                                const dirIcon = call.direction === 'inbound'
-                                                    ? <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                                    : <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3h5m0 0v5m0-5l-6 6M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.516l2.257-1.13a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.28 3H5z" /></svg>;
-                                                const statusColors: Record<string, string> = {
-                                                    completed: 'bg-green-100 text-green-700', 'no-answer': 'bg-red-100 text-red-700',
-                                                    missed: 'bg-red-100 text-red-700', initiated: 'bg-yellow-100 text-yellow-700',
-                                                    ringing: 'bg-blue-100 text-blue-700', 'in-progress': 'bg-blue-100 text-blue-700',
-                                                    busy: 'bg-orange-100 text-orange-700', failed: 'bg-red-100 text-red-700',
-                                                };
-                                                const sentimentIcons: Record<string, React.ReactNode> = {
-                                                    positive: <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px]">+</span>,
-                                                    neutral: <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px]">=</span>,
-                                                    negative: <span className="w-4 h-4 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-[10px]">−</span>
-                                                };
-                                                const SUPABASE_URL_VAL = import.meta.env.VITE_SUPABASE_URL || 'https://whgjsppyuvglhbdgdark.supabase.co';
-                                                const getProxyUrl = (url: string) => {
-                                                    if (!url || !url.includes('twilio.com')) return url;
-                                                    return `${SUPABASE_URL_VAL}/functions/v1/recording-proxy?url=${encodeURIComponent(url)}`;
-                                                };
+                                {/* Attachments */}
+                                {lead.attachments && lead.attachments.length > 0 && (
+                                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                            Anhänge ({lead.attachments.length})
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {lead.attachments.map((att, idx) => {
+                                                const ext = att.name.split('.').pop()?.toLowerCase() || '';
+                                                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext) || att.type?.startsWith('image/');
+                                                const isPdf = ext === 'pdf' || att.type === 'application/pdf';
+                                                const canPreview = isImage || isPdf;
+                                                const sizeLabel = att.size > 1024 * 1024 ? `${(att.size / 1024 / 1024).toFixed(1)} MB` : `${(att.size / 1024).toFixed(1)} KB`;
                                                 return (
-                                                    <div key={call.id} className="border border-slate-200 rounded-lg overflow-hidden">
-                                                        <button onClick={() => setExpandedCallId(isExpanded ? null : call.id)} className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 transition-colors text-left">
-                                                            <span className="shrink-0">{dirIcon}</span>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="font-medium text-xs text-slate-800">{call.direction === 'inbound' ? call.from_number : call.to_number}</span>
-                                                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${statusColors[call.status] || 'bg-slate-100 text-slate-600'}`}>{call.status}</span>
-                                                                    {call.sentiment && sentimentIcons[call.sentiment] && <span className="inline-flex">{sentimentIcons[call.sentiment]}</span>}
-                                                                </div>
-                                                                <div className="text-[10px] text-slate-400 mt-0.5">
-                                                                    {new Date(call.started_at).toLocaleString()}
-                                                                    {call.duration_seconds > 0 && ` • ${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`}
-                                                                </div>
-                                                            </div>
-                                                            <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                                        </button>
-                                                        {isExpanded && (
-                                                            <div className="border-t border-slate-100 p-3 space-y-2 bg-slate-50">
-                                                                {call.recording_url && (
-                                                                    <div className="bg-white rounded-lg border border-slate-200 p-2">
-                                                                        <p className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> Aufnahme</p>
-                                                                        <audio controls src={getProxyUrl(call.recording_url)} className="w-full h-8" />
-                                                                    </div>
-                                                                )}
-                                                                {call.summary && (
-                                                                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100 p-2">
-                                                                        <span className="text-[10px] font-bold text-indigo-800 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> AI</span>
-                                                                        <p className="text-xs text-slate-700 mt-0.5">{call.summary}</p>
-                                                                    </div>
-                                                                )}
-                                                                {call.transcription && (
-                                                                    <div className="bg-white rounded-lg border border-slate-200 p-2">
-                                                                        <button onClick={() => setShowTranscription(showTranscription === call.id ? null : call.id)} className="text-[10px] font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1">
-                                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                                                            Transkription {showTranscription === call.id ? '▲' : '▼'}
-                                                                        </button>
-                                                                        {showTranscription === call.id && <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap max-h-32 overflow-auto">{call.transcription}</p>}
-                                                                    </div>
-                                                                )}
-                                                                {call.notes && (
-                                                                    <div className="bg-amber-50 rounded-lg border border-amber-100 p-2">
-                                                                        <p className="text-[10px] font-bold text-amber-700 mb-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> Notizen</p>
-                                                                        <p className="text-xs text-amber-900">{call.notes}</p>
-                                                                    </div>
-                                                                )}
+                                                    <div key={idx} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-sm transition-all group">
+                                                        {isImage ? (
+                                                            <img src={att.url} alt={att.name} className="w-10 h-10 rounded object-cover border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-400" onClick={() => setPreviewAttachment({ url: att.url, name: att.name, type: 'image' })} />
+                                                        ) : (
+                                                            <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-[10px] uppercase shrink-0 ${isPdf ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                                {isPdf ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> : ext}
                                                             </div>
                                                         )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium text-xs text-slate-900 truncate">{att.name}</div>
+                                                            <div className="text-[10px] text-slate-400">{sizeLabel}</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            {canPreview && (
+                                                                <button onClick={() => setPreviewAttachment({ url: att.url, name: att.name, type: isImage ? 'image' : 'pdf' })} className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors" title="Vorschau">
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                </button>
+                                                            )}
+                                                            <a href={att.url} target="_blank" rel="noreferrer" className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors" title="Download">
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                            </a>
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* Customer Activity */}
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                                        Aktivität
-                                    </h3>
-                                    <CustomerActivityTimeline leadId={lead.id} />
-                                </div>
-                            </div>
-
-                            {/* ── RIGHT COLUMN: AI + Configs + Notes + Email + Attachments ── */}
-                            <div className="space-y-6">
-                                {/* AI Insights (compact) */}
-                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 shadow-sm p-4">
-                                    <h3 className="text-sm font-bold text-indigo-800 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                                        <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                        AI-Analyse
-                                    </h3>
-                                    {lead.aiSummary && (
-                                        <div className="text-sm text-slate-700 leading-relaxed mb-2 bg-white/70 rounded-lg p-3 border border-indigo-100">
-                                            {lead.aiSummary}
-                                        </div>
-                                    )}
-                                    <div className="bg-white/70 rounded-lg p-3 border border-indigo-100">
-                                        <span className="text-[10px] font-bold text-indigo-800 uppercase">Empfohlene Aktion:</span>
-                                        {(() => {
-                                            const daysSinceCreated = (new Date().getTime() - new Date(lead.createdAt).getTime()) / (1000 * 3600 * 24);
-                                            const hasPhone = !!lead.customerData.phone;
-                                            const hasEmail = !!lead.customerData.email;
-                                            if (lead.status === 'new' && daysSinceCreated < 1) return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" /> Neuer Lead! Anrufen oder Begrüßung senden.</div>;
-                                            if (lead.status === 'new' && daysSinceCreated >= 1) return <div className="text-sm font-medium text-red-600 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 animate-pulse" /> Lead wartet über 24h. Dringend kontaktieren!</div>;
-                                            if (lead.status === 'offer_sent') return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> Angebot gesendet. Nachfassen!</div>;
-                                            if (!hasPhone && hasEmail) return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" /> Kein Telefon. Nummer per E-Mail anfragen.</div>;
-                                            if (lead.status === 'contacted') return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" /> Kontaktiert. Angebot vorbereiten.</div>;
-                                            return <div className="text-sm font-medium text-slate-600 mt-1">Status überwachen.</div>;
-                                        })()}
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Configurations */}
-                                {/* Configurations — compact summary, full details in Formularz tab */}
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                                            Konfigurationen
+                                {/* Technische Dokumente (from PDF Rebrand Tool) */}
+                                {(lead.technicalPdfUrl || lead.visualizationPdfUrl) && (
+                                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                            Technische Dokumente
                                         </h3>
-                                        <button onClick={() => setActiveTab('form')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors">Alle anzeigen →</button>
-                                    </div>
-                                    {configurations.length === 0 ? (
-                                        <p className="text-slate-400 text-xs mt-2">Keine Konfigurationen vorhanden.</p>
-                                    ) : (
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {configurations.map(cfg => (
-                                                <span key={cfg.id} className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                    cfg.status === 'viewed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                        'bg-slate-50 text-slate-600 border-slate-200'
-                                                    }`}>
-                                                    {cfg.status === 'completed' ? <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> : cfg.status === 'viewed' ? <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> : <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                                                    {cfg.status === 'completed' && cfg.modelDisplayName ? ` ${cfg.modelDisplayName}` : ` Konfig. #${configurations.indexOf(cfg) + 1}`}
-                                                </span>
-                                            ))}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {lead.technicalPdfUrl && (
+                                                <div className="flex items-center gap-3 p-3 rounded-lg border border-indigo-100 bg-indigo-50/50 group">
+                                                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
+                                                        <span className="text-lg">📐</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-semibold text-slate-800">Technische Zeichnung</p>
+                                                        <p className="text-[10px] text-slate-400">Polendach24 Rebranding</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <a href={lead.technicalPdfUrl} target="_blank" rel="noreferrer" className="p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded transition-colors" title="Öffnen">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                        </a>
+                                                        <button onClick={async () => {
+                                                            if (!confirm('Technische Zeichnung entfernen?')) return;
+                                                            try {
+                                                                await DatabaseService.updateLead(lead.id, { technicalPdfUrl: '' } as any);
+                                                                setLead(prev => prev ? { ...prev, technicalPdfUrl: undefined } : null);
+                                                                toast.success('Entfernt');
+                                                            } catch { toast.error('Fehler'); }
+                                                        }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Entfernen">
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {lead.visualizationPdfUrl && (
+                                                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-100 bg-emerald-50/50 group">
+                                                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
+                                                        <span className="text-lg">🏠</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-semibold text-slate-800">3D Visualisierung</p>
+                                                        <p className="text-[10px] text-slate-400">Polendach24 Rebranding</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <a href={lead.visualizationPdfUrl} target="_blank" rel="noreferrer" className="p-1.5 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-100 rounded transition-colors" title="Öffnen">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                        </a>
+                                                        <button onClick={async () => {
+                                                            if (!confirm('3D Visualisierung entfernen?')) return;
+                                                            try {
+                                                                await DatabaseService.updateLead(lead.id, { visualizationPdfUrl: '' } as any);
+                                                                setLead(prev => prev ? { ...prev, visualizationPdfUrl: undefined } : null);
+                                                                toast.success('Entfernt');
+                                                            } catch { toast.error('Fehler'); }
+                                                        }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Entfernen">
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
 
                                 {/* Notes */}
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                                    <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
                                         <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                         Notizen
                                     </h3>
@@ -922,73 +898,180 @@ export const LeadDetailsPage: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Email History */}
-                                {lead.customerData.email && (
-                                    <EmailHistoryWidget customerEmail={lead.customerData.email} maxItems={10} />
-                                )}
-
-                                {/* Email Origin */}
-                                {lead.emailMessageId && (
-                                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start gap-3">
-                                        <span className="text-blue-600">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                                        </span>
-                                        <div>
-                                            <h4 className="text-blue-900 font-semibold text-xs">Lead aus E-Mail</h4>
-                                            <p className="text-blue-700 text-[10px] mt-0.5">ID: {lead.emailMessageId}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Attachments */}
-                                {lead.attachments && lead.attachments.length > 0 && (
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                                            Anhänge ({lead.attachments.length})
-                                        </h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                            {lead.attachments.map((att, idx) => {
-                                                const ext = att.name.split('.').pop()?.toLowerCase() || '';
-                                                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext) || att.type?.startsWith('image/');
-                                                const isPdf = ext === 'pdf' || att.type === 'application/pdf';
-                                                const canPreview = isImage || isPdf;
-                                                const sizeLabel = att.size > 1024 * 1024 ? `${(att.size / 1024 / 1024).toFixed(1)} MB` : `${(att.size / 1024).toFixed(1)} KB`;
+                                {/* Call History */}
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                    <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                        Anrufe {callLogs.length > 0 && <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold">{callLogs.length}</span>}
+                                    </h3>
+                                    {callsLoading ? (
+                                        <p className="text-slate-400 text-sm">Laden...</p>
+                                    ) : callLogs.length === 0 ? (
+                                        <p className="text-slate-400 text-sm">Keine Anrufe.</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                                            {callLogs.map(call => {
+                                                const isExpanded = expandedCallId === call.id;
+                                                const dirIcon = call.direction === 'inbound'
+                                                    ? <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                                    : <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3h5m0 0v5m0-5l-6 6M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.516l2.257-1.13a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.28 3H5z" /></svg>;
+                                                const statusColors: Record<string, string> = {
+                                                    completed: 'bg-green-100 text-green-700', 'no-answer': 'bg-red-100 text-red-700',
+                                                    missed: 'bg-red-100 text-red-700', initiated: 'bg-yellow-100 text-yellow-700',
+                                                    ringing: 'bg-blue-100 text-blue-700', 'in-progress': 'bg-blue-100 text-blue-700',
+                                                    busy: 'bg-orange-100 text-orange-700', failed: 'bg-red-100 text-red-700',
+                                                };
+                                                const sentimentIcons: Record<string, React.ReactNode> = {
+                                                    positive: <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px]">+</span>,
+                                                    neutral: <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px]">=</span>,
+                                                    negative: <span className="w-4 h-4 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-[10px]">−</span>
+                                                };
+                                                const SUPABASE_URL_VAL = import.meta.env.VITE_SUPABASE_URL || 'https://whgjsppyuvglhbdgdark.supabase.co';
+                                                const getProxyUrl = (url: string) => {
+                                                    if (!url || !url.includes('twilio.com')) return url;
+                                                    return `${SUPABASE_URL_VAL}/functions/v1/recording-proxy?url=${encodeURIComponent(url)}`;
+                                                };
                                                 return (
-                                                    <div key={idx} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-sm transition-all group">
-                                                        {isImage ? (
-                                                            <img src={att.url} alt={att.name} className="w-10 h-10 rounded object-cover border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-400" onClick={() => setPreviewAttachment({ url: att.url, name: att.name, type: 'image' })} />
-                                                        ) : (
-                                                            <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-[10px] uppercase shrink-0 ${isPdf ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                                {isPdf ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> : ext}
+                                                    <div key={call.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                                                        <button onClick={() => setExpandedCallId(isExpanded ? null : call.id)} className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 transition-colors text-left">
+                                                            <span className="shrink-0">{dirIcon}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="font-medium text-xs text-slate-800">{call.direction === 'inbound' ? call.from_number : call.to_number}</span>
+                                                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${statusColors[call.status] || 'bg-slate-100 text-slate-600'}`}>{call.status}</span>
+                                                                    {call.sentiment && sentimentIcons[call.sentiment] && <span className="inline-flex">{sentimentIcons[call.sentiment]}</span>}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                                                    {new Date(call.started_at).toLocaleString()}
+                                                                    {call.duration_seconds > 0 && ` • ${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`}
+                                                                </div>
+                                                            </div>
+                                                            <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                                        </button>
+                                                        {isExpanded && (
+                                                            <div className="border-t border-slate-100 p-3 space-y-2 bg-slate-50">
+                                                                {call.recording_url && (
+                                                                    <div className="bg-white rounded-lg border border-slate-200 p-2">
+                                                                        <p className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> Aufnahme</p>
+                                                                        <audio controls src={getProxyUrl(call.recording_url)} className="w-full h-8" />
+                                                                    </div>
+                                                                )}
+                                                                {call.summary && (
+                                                                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100 p-2">
+                                                                        <span className="text-[10px] font-bold text-indigo-800 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> AI</span>
+                                                                        <p className="text-xs text-slate-700 mt-0.5">{call.summary}</p>
+                                                                    </div>
+                                                                )}
+                                                                {call.transcription && (
+                                                                    <div className="bg-white rounded-lg border border-slate-200 p-2">
+                                                                        <button onClick={() => setShowTranscription(showTranscription === call.id ? null : call.id)} className="text-[10px] font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1">
+                                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                                            Transkription {showTranscription === call.id ? '▲' : '▼'}
+                                                                        </button>
+                                                                        {showTranscription === call.id && <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap max-h-32 overflow-auto">{call.transcription}</p>}
+                                                                    </div>
+                                                                )}
+                                                                {call.notes && (
+                                                                    <div className="bg-amber-50 rounded-lg border border-amber-100 p-2">
+                                                                        <p className="text-[10px] font-bold text-amber-700 mb-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> Notizen</p>
+                                                                        <p className="text-xs text-amber-900">{call.notes}</p>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="font-medium text-xs text-slate-900 truncate">{att.name}</div>
-                                                            <div className="text-[10px] text-slate-400">{sizeLabel}</div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 shrink-0">
-                                                            {canPreview && (
-                                                                <button onClick={() => setPreviewAttachment({ url: att.url, name: att.name, type: isImage ? 'image' : 'pdf' })} className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors" title="Vorschau">
-                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                                                </button>
-                                                            )}
-                                                            <a href={att.url} target="_blank" rel="noreferrer" className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors" title="Download">
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                                            </a>
-                                                        </div>
                                                     </div>
                                                 );
                                             })}
                                         </div>
+                                    )}
+                                </div>
+
+                            </div>
+
+                            {/* ── RIGHT COLUMN: Tasks + AI + Configs + Activity ── */}
+                            <div className="space-y-4">
+                                {/* Tasks */}
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                                            Aufgaben</h3>
+                                        <button onClick={() => setIsTaskModalOpen(true)} className="text-xs font-semibold text-accent hover:text-accent-dark bg-accent/10 hover:bg-accent/20 px-2 py-1 rounded transition-colors">+ Neu</button>
                                     </div>
-                                )}
+                                    <TasksList leadId={lead.id} refreshTrigger={tasksRefreshTrigger} />
+                                </div>
+
+                                {/* Kundennachrichten (aus Interaktiver Offerte) */}
+                                <OfferMessagesWidget leadId={lead.id} />
+
+                                {/* AI Insights (compact) */}
+                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100 shadow-sm p-4">
+                                    <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                                        <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                        AI-Analyse
+                                    </h3>
+                                    {lead.aiSummary && (
+                                        <div className="text-sm text-slate-700 leading-relaxed mb-2 bg-white/70 rounded-lg p-3 border border-indigo-100">
+                                            {lead.aiSummary}
+                                        </div>
+                                    )}
+                                    <div className="bg-white/70 rounded-lg p-3 border border-indigo-100">
+                                        <span className="text-[10px] font-bold text-indigo-800 uppercase">Empfohlene Aktion:</span>
+                                        {(() => {
+                                            const daysSinceCreated = (new Date().getTime() - new Date(lead.createdAt).getTime()) / (1000 * 3600 * 24);
+                                            const hasPhone = !!lead.customerData.phone;
+                                            const hasEmail = !!lead.customerData.email;
+                                            if (lead.status === 'new' && daysSinceCreated < 1) return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" /> Neuer Lead! Anrufen oder Begrüßung senden.</div>;
+                                            if (lead.status === 'new' && daysSinceCreated >= 1) return <div className="text-sm font-medium text-red-600 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 animate-pulse" /> Lead wartet über 24h. Dringend kontaktieren!</div>;
+                                            if (lead.status === 'offer_sent') return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> Angebot gesendet. Nachfassen!</div>;
+                                            if (!hasPhone && hasEmail) return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" /> Kein Telefon. Nummer per E-Mail anfragen.</div>;
+                                            if (lead.status === 'contacted') return <div className="text-sm font-medium text-slate-800 mt-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" /> Kontaktiert. Angebot vorbereiten.</div>;
+                                            return <div className="text-sm font-medium text-slate-600 mt-1">Status überwachen.</div>;
+                                        })()}
+                                    </div>
+                                </div>
+
+                                {/* Configurations */}
+                                {/* Configurations — compact summary, full details in Formularz tab */}
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                            Konfigurationen
+                                        </h3>
+                                        <button onClick={() => setActiveTab('form')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors">Alle anzeigen →</button>
+                                    </div>
+                                    {configurations.length === 0 ? (
+                                        <p className="text-slate-400 text-xs mt-2">Keine Konfigurationen vorhanden.</p>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {configurations.map(cfg => (
+                                                <span key={cfg.id} className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                    cfg.status === 'viewed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                        'bg-slate-50 text-slate-600 border-slate-200'
+                                                    }`}>
+                                                    {cfg.status === 'completed' ? <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> : cfg.status === 'viewed' ? <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> : <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                                                    {cfg.status === 'completed' && cfg.modelDisplayName ? ` ${cfg.modelDisplayName}` : ` Konfig. #${configurations.indexOf(cfg) + 1}`}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Customer Activity */}
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                    <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                                        Aktivität
+                                    </h3>
+                                    <CustomerActivityTimeline leadId={lead.id} />
+                                </div>
                             </div>
                         </div>
 
                         {/* ═══ 5. FAIR DATA — compact indicator, full details in Fair tab ═══ */}
                         {(lead.source === 'targi' || lead.fairId) && (
-                            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200 p-4 flex items-center justify-between">
+                            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200 p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
                                         <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" /></svg>
@@ -1011,7 +1094,7 @@ export const LeadDetailsPage: React.FC = () => {
                                 <button onClick={() => setActiveTab('fair')} className="text-xs font-semibold text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-lg transition-colors">Szczegóły targowe →</button>
                             </div>
                         )}
-                    </>)}
+                    </div>)}
 
                     {activeTab === 'offers' && (
                         <div className="space-y-6">

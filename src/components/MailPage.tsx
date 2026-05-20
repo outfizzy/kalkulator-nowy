@@ -1176,7 +1176,8 @@ export const MailPage: React.FC = () => {
                         emailMessageId: emailDetail.id,
                         notes: `${extracted?.notes || ''}\n\n--- Pełna treść wiadomości ---\nOd: ${emailDetail.from}\nTemat: ${emailDetail.subject}\nData: ${new Date(emailDetail.date).toLocaleString()}\n\n${body || '(brak treści)'}`,
                         status: 'new',
-                        assignedTo: currentUser?.id,
+                        // [2026-05-06] No auto-assign — leads remain without opiekun
+                        assignedTo: null,
                     };
 
                     await LeadService.createLead(leadData);

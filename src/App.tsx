@@ -47,6 +47,7 @@ import { MeasurementDashboard } from './components/measurements/MeasurementDashb
 import { MeasurementReportsList } from './components/reports/MeasurementReportsList';
 import { ContractsList } from './components/contracts/ContractsList';
 import { ContractDetails } from './components/contracts/ContractDetails';
+import { BestellscheinPage } from './components/contracts/BestellscheinPage';
 import { AdvancePaymentsList } from './components/contracts/AdvancePaymentsList';
 import { DeliveryCalendar } from './components/delivery/DeliveryCalendar';
 import { LogisticsCalendar } from './components/logistics/LogisticsCalendar';
@@ -123,6 +124,7 @@ import FacebookAdsPage from './pages/admin/FacebookAdsPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
 import { DachrechnerPage } from './pages/DachrechnerPage';
+import { ToolsPage } from './pages/ToolsPage';
 
 import { BlogPLPage } from './pages/BlogPLPage';
 import AdsManagerPage from './pages/AdsManagerPage';
@@ -234,8 +236,10 @@ function App() {
               <Route path="/portfolio" element={<PortfolioDashboard />} />
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/:id" element={<ContractDetails />} />
+              <Route path="/contracts/:id/bestellschein" element={<BestellscheinPage />} />
               <Route path="/advance-payments" element={<AdvancePaymentsList />} />
               <Route path="/dachrechner" element={<DachrechnerPage />} />
+              <Route path="/tools" element={<ToolsPage />} />
 
               <Route path="/deliveries" element={<DeliveryCalendar />} />
               <Route path="/admin/fuel-logs" element={<FuelLogManager />} />

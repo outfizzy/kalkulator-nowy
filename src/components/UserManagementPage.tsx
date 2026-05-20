@@ -6,6 +6,12 @@ import type { User, CommissionConfig } from '../types';
 import { CommissionSettingsModal } from './admin/CommissionSettingsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { generateCredentialsPDF, monthlyToDailyRate } from '../utils/credentialsPDF';
+import {
+    FileDown, UserPlus, Users, Clock, CheckCircle2, Ban,
+    Search, RefreshCw, Key, ShieldCheck, Trash2, Check,
+    RotateCcw, Pencil
+} from 'lucide-react';
 
 const formatRelativeTime = (dateStr: string | null) => {
     if (!dateStr) return 'Nigdy';
@@ -53,7 +59,8 @@ export const UserManagementPage: React.FC = () => {
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [newUser, setNewUser] = useState({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer' as string, username: '' });
     const [creating, setCreating] = useState(false);
-    const [useLogin, setUseLogin] = useState(false); // true = username only (no email)
+    const [useLogin, setUseLogin] = useState(true); // default: login@polendach24.de
+    const [lastCreatedCredentials, setLastCreatedCredentials] = useState<{ login: string; email: string; password: string; firstName: string; lastName: string; role: string } | null>(null);
 
     const loadUsers = async () => {
         try {
@@ -215,6 +222,18 @@ export const UserManagementPage: React.FC = () => {
         return pwd;
     };
 
+    // Auto-generate login from first/last name
+    const autoGenerateLogin = (first: string, last: string) => {
+        const normalize = (s: string) => s.toLowerCase()
+            .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e')
+            .replace(/ł/g, 'l').replace(/ń/g, 'n').replace(/ó/g, 'o')
+            .replace(/ś/g, 's').replace(/ź|ż/g, 'z')
+            .replace(/[^a-z0-9]/g, '');
+        const f = normalize(first);
+        const l = normalize(last);
+        return l ? `${f}.${l}` : f;
+    };
+
     const handleCreateUser = async () => {
         const hasIdentity = useLogin ? !!newUser.username.trim() : !!newUser.email.trim();
         if (!hasIdentity || !newUser.password || !newUser.firstName) {
@@ -228,9 +247,10 @@ export const UserManagementPage: React.FC = () => {
         }
         setCreating(true);
         try {
-            // If using username-only, generate synthetic email
+            // Login mode: use @polendach24.de domain
+            const loginName = newUser.username.toLowerCase().trim();
             const email = useLogin
-                ? `${newUser.username.toLowerCase().trim()}@app.internal`
+                ? `${loginName}@polendach24.de`
                 : newUser.email;
 
             // Create auth user via signUp
@@ -245,7 +265,7 @@ export const UserManagementPage: React.FC = () => {
                         last_name: newUser.lastName || '',
                         phone: newUser.phone || '',
                         role: newUser.role || 'installer',
-                        username: newUser.username || '',
+                        username: loginName || '',
                     },
                     emailRedirectTo: undefined,
                 }
@@ -265,16 +285,49 @@ export const UserManagementPage: React.FC = () => {
                 status: 'active',
             }).eq('id', newUserId);
 
-            toast.success(`Konto dla ${newUser.firstName} ${newUser.lastName} zostało utworzone${useLogin ? ` (login: ${newUser.username})` : ''}`);
-            setIsAddUserOpen(false);
-            setNewUser({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer', username: '' });
-            setUseLogin(false);
+            // Save credentials for PDF download
+            setLastCreatedCredentials({
+                login: useLogin ? loginName : email,
+                email,
+                password: newUser.password,
+                firstName: newUser.firstName,
+                lastName: newUser.lastName,
+                role: newUser.role,
+            });
+
+            toast.success(
+                `Konto utworzone! Login: ${useLogin ? loginName : email}`,
+                { duration: 6000, icon: '✅' }
+            );
+            // Don't close modal yet — show PDF download option
             await loadUsers();
         } catch (error: any) {
             toast.error(error.message || 'Błąd tworzenia użytkownika');
         } finally {
             setCreating(false);
         }
+    };
+
+    const handleDownloadCredentialsPDF = () => {
+        if (!lastCreatedCredentials) return;
+        generateCredentialsPDF({
+            firstName: lastCreatedCredentials.firstName,
+            lastName: lastCreatedCredentials.lastName,
+            login: lastCreatedCredentials.login,
+            email: lastCreatedCredentials.email,
+            password: lastCreatedCredentials.password,
+            role: lastCreatedCredentials.role,
+            appUrl: 'https://polendach24.app',
+            createdAt: new Date().toLocaleDateString('pl-PL'),
+        });
+        toast.success('PDF z danymi logowania pobrany');
+    };
+
+    const handleCloseAddUserModal = () => {
+        setIsAddUserOpen(false);
+        setLastCreatedCredentials(null);
+        setNewUser({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer', username: '' });
+        setUseLogin(true);
     };
 
     const handleSetHourlyRate = async (user: User) => {
@@ -330,7 +383,12 @@ export const UserManagementPage: React.FC = () => {
         }
         try {
             await DatabaseService.updateBaseSalary(user.id, value, currency as 'PLN' | 'EUR');
-            toast.success(`Zaktualizowano podstawę: ${value} ${currency}`);
+            // Show daily rate info
+            const { dailyRate, hourlyRate, businessDays, monthName } = monthlyToDailyRate(value);
+            toast.success(
+                `Podstawa: ${value} ${currency}/mies.\n→ ${dailyRate} ${currency}/dzień (${businessDays} dni rob. w ${monthName})\n→ ${hourlyRate} ${currency}/h`,
+                { duration: 5000 }
+            );
             await loadUsers();
         } catch (error) {
             toast.error('Błąd aktualizacji podstawy');
@@ -424,17 +482,20 @@ export const UserManagementPage: React.FC = () => {
         <div className="space-y-5 pb-20 max-w-[1600px] mx-auto">
             {/* ═══ Header ═══ */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Zarządzanie Użytkownikami</h1>
-                    <p className="text-sm text-slate-500 mt-0.5">Zatwierdzaj, blokuj i zarządzaj kontami &mdash; {stats.total} użytkowników w systemie</p>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <Users className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Zarządzanie Użytkownikami</h1>
+                        <p className="text-sm text-slate-500 mt-0.5">Zespół &middot; {stats.total} użytkowników w systemie</p>
+                    </div>
                 </div>
                 <button
                     onClick={() => setIsAddUserOpen(true)}
                     className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors flex items-center gap-2 shadow-sm text-sm"
                 >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                    </svg>
+                    <UserPlus className="w-4 h-4" />
                     Dodaj Użytkownika
                 </button>
             </div>
@@ -442,26 +503,10 @@ export const UserManagementPage: React.FC = () => {
             {/* ═══ Stat Cards ═══ */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                    {
-                        label: 'Wszyscy', value: stats.total, sub: `Prac: ${stats.internal} | Part: ${stats.partners}`, icon: (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        ), color: 'from-violet-500 to-violet-600'
-                    },
-                    {
-                        label: 'Oczekujący', value: stats.pending, sub: stats.pending > 0 ? 'Wymaga zatwierdzenia' : 'Brak oczekujących', icon: (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        ), color: 'from-amber-500 to-amber-600'
-                    },
-                    {
-                        label: 'Aktywni', value: stats.active, sub: 'Pełny dostęp', icon: (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        ), color: 'from-emerald-500 to-emerald-600'
-                    },
-                    {
-                        label: 'Zablokowani', value: stats.blocked, sub: 'Ograniczony dostęp', icon: (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                        ), color: 'from-red-500 to-red-600'
-                    },
+                    { label: 'Wszyscy', value: stats.total, sub: `Prac: ${stats.internal} | Part: ${stats.partners}`, icon: <Users className="w-5 h-5" />, color: 'from-violet-500 to-violet-600' },
+                    { label: 'Oczekujący', value: stats.pending, sub: stats.pending > 0 ? 'Wymaga zatwierdzenia' : 'Brak oczekujących', icon: <Clock className="w-5 h-5" />, color: 'from-amber-500 to-amber-600' },
+                    { label: 'Aktywni', value: stats.active, sub: 'Pełny dostęp', icon: <CheckCircle2 className="w-5 h-5" />, color: 'from-emerald-500 to-emerald-600' },
+                    { label: 'Zablokowani', value: stats.blocked, sub: 'Ograniczony dostęp', icon: <Ban className="w-5 h-5" />, color: 'from-red-500 to-red-600' },
                 ].map((card, i) => (
                     <div key={i} className={`bg-gradient-to-br ${card.color} rounded-2xl p-4 sm:p-5 text-white shadow-sm relative overflow-hidden`}>
                         <div className="absolute top-3 right-3 bg-white/10 rounded-lg p-2">{card.icon}</div>
@@ -476,9 +521,7 @@ export const UserManagementPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="flex-1 relative">
-                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
                             value={searchQuery}
@@ -526,9 +569,7 @@ export const UserManagementPage: React.FC = () => {
                             </button>
                         </div>
                         <button onClick={loadUsers} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors" title="Odśwież">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
+                            <RefreshCw className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
@@ -575,7 +616,7 @@ export const UserManagementPage: React.FC = () => {
                                 <div className="text-slate-500">Podstawa:</div>
                                 <div className="text-right">
                                     <button onClick={() => handleSetBaseSalary(user)} className="text-blue-600 font-semibold">
-                                        {user.baseSalary ? `${user.baseSalary} ${user.baseSalaryCurrency || 'PLN'}` : 'Ustaw'}
+                                        {user.baseSalary ? (() => { const { dailyRate } = monthlyToDailyRate(user.baseSalary!); return `${user.baseSalary} ${user.baseSalaryCurrency || 'PLN'} (${dailyRate}/d)`; })() : 'Ustaw'}
                                     </button>
                                 </div>
                             </>}
@@ -595,26 +636,26 @@ export const UserManagementPage: React.FC = () => {
                             <div className="flex gap-1.5">
                                 {user.status === 'pending' && (
                                     <button onClick={() => handleApprove(user.id)} className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="Zatwierdź">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                        <Check className="w-4 h-4" />
                                     </button>
                                 )}
                                 <button onClick={() => handleResetPassword(user)} className="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors" title="Resetuj hasło">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                                    <Key className="w-4 h-4" />
                                 </button>
                                 <button onClick={() => navigate('/admin/notifications')} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors" title="Uprawnienia">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                    <ShieldCheck className="w-4 h-4" />
                                 </button>
                                 {user.status !== 'blocked' ? (
                                     <button onClick={() => handleBlock(user.id)} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors" title="Zablokuj">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                        <Ban className="w-4 h-4" />
                                     </button>
                                 ) : (
                                     <button onClick={() => handleApprove(user.id)} className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="Odblokuj">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        <RotateCcw className="w-4 h-4" />
                                     </button>
                                 )}
                                 <button onClick={() => handleDelete(user)} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors" title="Usuń">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" /></svg>
+                                    <Trash2 className="w-4 h-4" />
                                 </button>
                             </div>
                         </div>
@@ -697,18 +738,18 @@ export const UserManagementPage: React.FC = () => {
                                                     {(user.role === 'sales_rep' || user.role === 'sales_rep_pl') ? (
                                                         <button onClick={() => handleSetCommissionRate(user)} className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 transition-colors">
                                                             Prow: {user.commissionRate ? `${(user.commissionRate * 100).toFixed(1)}%` : '5.0%'}
-                                                            <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                            <Pencil className="w-3 h-3 opacity-50" />
                                                         </button>
                                                     ) : (
                                                         <span className="text-xs text-slate-300">—</span>
                                                     )}
                                                     <button onClick={() => handleSetHourlyRate(user)} className="text-xs text-slate-500 hover:text-blue-600 font-medium flex items-center gap-1 transition-colors">
                                                         {user.hourlyRate ? `${user.hourlyRate} ${user.hourlyRateCurrency || 'PLN'}/h` : 'Ustaw stawkę'}
-                                                        <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                        <Pencil className="w-3 h-3 opacity-50" />
                                                     </button>
                                                     <button onClick={() => handleSetBaseSalary(user)} className="text-xs text-purple-500 hover:text-purple-700 font-medium flex items-center gap-1 transition-colors">
-                                                        💰 {user.baseSalary ? `${user.baseSalary} ${user.baseSalaryCurrency || 'PLN'}/mies.` : 'Ustaw podstawę'}
-                                                        <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                        💰 {user.baseSalary ? (() => { const { dailyRate } = monthlyToDailyRate(user.baseSalary!); return `${user.baseSalary} ${user.baseSalaryCurrency || 'PLN'}/mies. → ${dailyRate}/dzień`; })() : 'Ustaw podstawę'}
+                                                        <Pencil className="w-3 h-3 opacity-50" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -718,7 +759,7 @@ export const UserManagementPage: React.FC = () => {
                                             <td className="px-5 py-3.5 whitespace-nowrap">
                                                 <button onClick={() => handleSetPartnerMargin(user)} className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 transition-colors">
                                                     {user.partnerMargin ? `${Math.round(user.partnerMargin * 100)}%` : '25%'}
-                                                    <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                    <Pencil className="w-3 h-3 opacity-50" />
                                                 </button>
                                             </td>
                                         )}
@@ -733,26 +774,26 @@ export const UserManagementPage: React.FC = () => {
                                             <div className="inline-flex items-center gap-1">
                                                 {user.status === 'pending' && (
                                                     <button onClick={() => handleApprove(user.id)} className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="Zatwierdź">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                        <Check className="w-4 h-4" />
                                                     </button>
                                                 )}
                                                 <button onClick={() => handleResetPassword(user)} className="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors" title="Resetuj hasło">
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                                                    <Key className="w-4 h-4" />
                                                 </button>
                                                 <button onClick={() => navigate('/admin/notifications')} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors" title="Uprawnienia">
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                                    <ShieldCheck className="w-4 h-4" />
                                                 </button>
                                                 {user.status !== 'blocked' ? (
                                                     <button onClick={() => handleBlock(user.id)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors" title="Zablokuj">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                        <Ban className="w-4 h-4" />
                                                     </button>
                                                 ) : (
                                                     <button onClick={() => handleApprove(user.id)} className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="Odblokuj">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                        <RotateCcw className="w-4 h-4" />
                                                     </button>
                                                 )}
                                                 <button onClick={() => handleDelete(user)} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors" title="Usuń">
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" /></svg>
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </td>
@@ -779,7 +820,28 @@ export const UserManagementPage: React.FC = () => {
             {/* ═══ Add User Modal ═══ */}
             {isAddUserOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+                        {lastCreatedCredentials ? (
+                            <div className="text-center space-y-5">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                    <Check className="w-8 h-8 text-green-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900">Konto utworzone!</h3>
+                                    <p className="text-sm text-slate-500 mt-1">{lastCreatedCredentials.firstName} {lastCreatedCredentials.lastName}</p>
+                                </div>
+                                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-left space-y-2">
+                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Login:</span><span className="font-mono font-semibold text-slate-900">{lastCreatedCredentials.login}</span></div>
+                                    <div className="flex justify-between text-sm"><span className="text-slate-500">E-mail:</span><span className="font-mono text-blue-600 text-xs">{lastCreatedCredentials.email}</span></div>
+                                    <div className="flex justify-between text-sm"><span className="text-slate-500">Hasło:</span><span className="font-mono font-semibold text-slate-900">{lastCreatedCredentials.password}</span></div>
+                                </div>
+                                <button onClick={handleDownloadCredentialsPDF} className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold transition-colors shadow-sm">
+                                    <FileDown className="w-5 h-5" /> Pobierz PDF z danymi logowania
+                                </button>
+                                <p className="text-xs text-slate-400">Wydrukuj lub wyślij PDF pracownikowi.</p>
+                                <button onClick={handleCloseAddUserModal} className="w-full px-4 py-2 text-slate-600 font-medium border border-slate-200 rounded-xl hover:bg-slate-50">Zamknij</button>
+                            </div>
+                        ) : (<>
                         <h3 className="text-xl font-bold text-slate-900 mb-1">Dodaj Użytkownika</h3>
                         <p className="text-sm text-slate-500 mb-6">
                             {currentUser?.role === 'manager' ? 'Utwórz konto dla montażysty' : 'Utwórz nowe konto pracownika'}
@@ -788,39 +850,28 @@ export const UserManagementPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-slate-600 mb-1">Imię *</label>
-                                    <input type="text" value={newUser.firstName} onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Jan" />
+                                    <input type="text" value={newUser.firstName} onChange={(e) => { const val = e.target.value; const auto = useLogin ? autoGenerateLogin(val, newUser.lastName) : ''; setNewUser({ ...newUser, firstName: val, username: auto || newUser.username }); }} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Jan" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-slate-600 mb-1">Nazwisko</label>
-                                    <input type="text" value={newUser.lastName} onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="(opcjonalne)" />
+                                    <input type="text" value={newUser.lastName} onChange={(e) => { const val = e.target.value; const auto = useLogin ? autoGenerateLogin(newUser.firstName, val) : ''; setNewUser({ ...newUser, lastName: val, username: auto || newUser.username }); }} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Kowalski" />
                                 </div>
                             </div>
 
-                            {/* Toggle: Email or Username */}
+                            {/* Toggle: Login@polendach24.de or Custom Email */}
                             <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <button
-                                    type="button"
-                                    onClick={() => setUseLogin(false)}
-                                    className={`flex-1 text-center px-3 py-1.5 rounded-md text-xs font-medium transition-all ${!useLogin ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
-                                        }`}
-                                >
-                                    ✉️ Email
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setUseLogin(true)}
-                                    className={`flex-1 text-center px-3 py-1.5 rounded-md text-xs font-medium transition-all ${useLogin ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
-                                        }`}
-                                >
-                                    👤 Tylko Login
-                                </button>
+                                <button type="button" onClick={() => setUseLogin(true)} className={`flex-1 text-center px-3 py-1.5 rounded-md text-xs font-medium transition-all ${useLogin ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>👤 Login @polendach24.de</button>
+                                <button type="button" onClick={() => setUseLogin(false)} className={`flex-1 text-center px-3 py-1.5 rounded-md text-xs font-medium transition-all ${!useLogin ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>✉️ Własny Email</button>
                             </div>
 
                             {useLogin ? (
                                 <div>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Login (nazwa użytkownika) *</label>
-                                    <input type="text" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="jan.kowalski" />
-                                    <p className="text-[10px] text-slate-400 mt-1">Użytkownik loguje się tym loginem + hasłem (bez emaila)</p>
+                                    <label className="block text-xs font-medium text-slate-600 mb-1">Login *</label>
+                                    <div className="flex">
+                                        <input type="text" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })} className="flex-1 border border-slate-200 rounded-l-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono" placeholder="jan.kowalski" />
+                                        <span className="inline-flex items-center px-3 py-2 bg-slate-100 border border-l-0 border-slate-200 rounded-r-lg text-xs text-slate-500 font-mono">@polendach24.de</span>
+                                    </div>
+                                    {newUser.username && <p className="text-[10px] text-blue-500 mt-1 font-mono">E-mail: {newUser.username}@polendach24.de</p>}
                                 </div>
                             ) : (
                                 <div>
@@ -857,13 +908,10 @@ export const UserManagementPage: React.FC = () => {
                             )}
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
-                            <button onClick={() => { setIsAddUserOpen(false); setNewUser({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'installer', username: '' }); setUseLogin(false); }} className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium transition-colors">
-                                Anuluj
-                            </button>
-                            <button onClick={handleCreateUser} disabled={creating || !(useLogin ? newUser.username : newUser.email) || !newUser.password || !newUser.firstName} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors">
-                                {creating ? 'Tworzenie...' : 'Utwórz Konto'}
-                            </button>
+                            <button onClick={handleCloseAddUserModal} className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium transition-colors">Anuluj</button>
+                            <button onClick={handleCreateUser} disabled={creating || !(useLogin ? newUser.username : newUser.email) || !newUser.password || !newUser.firstName} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors">{creating ? 'Tworzenie...' : 'Utwórz Konto'}</button>
                         </div>
+                        </>)}
                     </div>
                 </div>
             )}

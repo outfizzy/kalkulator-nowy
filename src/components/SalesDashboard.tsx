@@ -502,6 +502,21 @@ export const SalesDashboard: React.FC = () => {
                         <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Rejestruj pobrane paliwo</p>
                     </div>
                 </Link>
+
+                {/* Narzędzia */}
+                <Link
+                    to="/tools"
+                    className="group bg-gradient-to-br from-slate-600 to-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] text-white overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+                    <div className="relative z-10">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-white/30 transition-colors">
+                            <span className="text-2xl">🛠️</span>
+                        </div>
+                        <h3 className="text-sm sm:text-xl font-bold mb-1 sm:mb-2">Narzędzia</h3>
+                        <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Kalkulator, ChatGPT, PDF</p>
+                    </div>
+                </Link>
             </div>
 
             {/* Tasks, Stale Leads & Ringostat Section */}

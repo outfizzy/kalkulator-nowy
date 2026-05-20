@@ -23,7 +23,7 @@ export const LeadAutoAssignService = {
                 '4e151d84-8cae-4ec8-90c4-a3bd46365b40', // Oliwia Duz
                 '0375aad6-5e1b-43c1-82c1-640f8cb7feb9', // Mike Ledwin
                 '15fb3c80-269f-42eb-8dcd-be11ed8153b1', // Hubert Kosciow
-                'ef37f787-e9e9-4fbb-9f3f-9ef653e3c91c', // Artur Nagorny
+                '43906829-cdf7-419a-aac5-00f339219f90', // Alicja Marcinak
             ];
             const { data: reps } = await supabase
                 .from('profiles')

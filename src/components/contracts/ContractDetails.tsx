@@ -371,6 +371,8 @@ export const ContractDetails: React.FC = () => {
                     )}
                 </div>
                 <div className="flex gap-2 flex-wrap flex-shrink-0">
+                    {/* Bestellschein PDF */}
+                    <BestellscheinButton contract={contract} />
                     {/* Protocol PDF dropdown */}
                     <ProtocolPDFButton contract={contract} />
                     {isEditing ? (
@@ -1478,5 +1480,19 @@ const ProtocolPDFButton: React.FC<{ contract: Contract }> = ({ contract }) => {
                 </div>
             )}
         </div>
+    );
+};
+
+// ── Bestellschein Button — navigates to interactive form ──
+const BestellscheinButton: React.FC<{ contract: Contract }> = ({ contract }) => {
+    const navigate = useNavigate();
+
+    return (
+        <button
+            onClick={() => navigate(`/contracts/${contract.id}/bestellschein`)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 shadow-sm"
+        >
+            📄 Bestellschein
+        </button>
     );
 };

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import type { Contract, OrderedItem } from '../../types';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { StorageService } from '../../services/database/storage.service';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { PackageCheck, ClipboardCheck, Camera, MessageSquare, User, CalendarCheck, X, Truck, AlertTriangle } from 'lucide-react';
 
 interface Props {
     contract: Contract;
@@ -70,7 +72,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 };
 
 export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEditing }) => {
-    const { isAdmin } = useAuth();
+    const { currentUser } = useAuth();
+
     const [customItem, setCustomItem] = useState('');
     const [customCategory, setCustomCategory] = useState<OrderedItem['category']>('Other');
     const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
@@ -87,6 +90,11 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
     const [batchOrderRef, setBatchOrderRef] = useState('');
     const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
 
+    // ── Goods Receipt State ──
+    const [receiptItemId, setReceiptItemId] = useState<string | null>(null);
+    const [receiptNotes, setReceiptNotes] = useState('');
+    const [receiptSaving, setReceiptSaving] = useState(false);
+
     const items = contract.orderedItems || [];
 
     // ── Progress Stats ──
@@ -99,6 +107,7 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
     const doneCount = deliveredCount + shippedCount;
     const progressPercent = totalItems > 0 ? Math.round((doneCount / totalItems) * 100) : 0;
     const totalPurchaseCost = items.reduce((sum, item) => sum + ((item.purchaseCost || 0) * (item.quantity || 1)), 0);
+    const sellingPrice = (contract as any).pricing?.finalPriceNet || (contract as any).pricing?.sellingPriceNet || 0;
 
     // ── Grouped items ──
     const groupedItems = items.reduce<Record<string, typeof items>>((acc, item) => {
@@ -147,7 +156,52 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
         toast.success('Dodano element');
     };
 
+    // ── Auto-sync installation parts_status ──
+    const syncPartsStatus = async (updatedItems: OrderedItem[]) => {
+        try {
+            // Find installation linked to this contract
+            const { data: installations } = await supabase
+                .from('installations')
+                .select('id')
+                .eq('source_type', 'contract')
+                .eq('source_id', contract.id);
+
+            if (!installations?.length) return;
+
+            const total = updatedItems.length;
+            const deliveredCount = updatedItems.filter(i => i.status === 'delivered').length;
+
+            let newPartsStatus: string;
+            let partsReady = false;
+
+            if (deliveredCount === 0) {
+                newPartsStatus = 'none';
+            } else if (deliveredCount < total) {
+                newPartsStatus = 'partial';
+            } else {
+                newPartsStatus = 'all_delivered';
+                partsReady = true;
+            }
+
+            // Update all linked installations
+            for (const inst of installations) {
+                await supabase.from('installations')
+                    .update({ parts_status: newPartsStatus, parts_ready: partsReady })
+                    .eq('id', inst.id);
+            }
+        } catch (err) {
+            console.error('Failed to sync parts status:', err);
+        }
+    };
+
     const handleQuickStatusChange = async (itemId: string, newStatus: OrderedItem['status']) => {
+        // ── Intercept "delivered" → open receipt modal ──
+        if (newStatus === 'delivered') {
+            setReceiptItemId(itemId);
+            setReceiptNotes('');
+            return;
+        }
+
         const now = new Date().toISOString();
         const newItems = items.map(item =>
             item.id === itemId
@@ -162,8 +216,41 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
         try {
             await DatabaseService.updateContract(contract.id, { ...contract, orderedItems: newItems } as any);
             toast.success(`Status → ${STATUS_CONFIG[newStatus]?.label || newStatus}`);
+            await syncPartsStatus(newItems);
         } catch {
             toast.error('Błąd zapisu');
+        }
+    };
+
+    // ── Confirm Goods Receipt ──
+    const handleConfirmReceipt = async () => {
+        if (!receiptItemId) return;
+        setReceiptSaving(true);
+        const now = new Date().toISOString();
+        const userName = currentUser ? `${(currentUser as any).firstName || ''} ${(currentUser as any).lastName || ''}`.trim() || currentUser.email : 'System';
+
+        const newItems = items.map(item =>
+            item.id === receiptItemId
+                ? {
+                    ...item,
+                    status: 'delivered' as const,
+                    receivedAt: now,
+                    receivedBy: userName,
+                    receivedNotes: receiptNotes || undefined,
+                }
+                : item
+        );
+        onUpdate(newItems);
+        try {
+            await DatabaseService.updateContract(contract.id, { ...contract, orderedItems: newItems } as any);
+            toast.success('Towar przyjęty — status zaktualizowany');
+            await syncPartsStatus(newItems);
+        } catch {
+            toast.error('Błąd zapisu');
+        } finally {
+            setReceiptItemId(null);
+            setReceiptNotes('');
+            setReceiptSaving(false);
         }
     };
 
@@ -184,11 +271,14 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
         });
     };
 
+    const [batchPriceMode, setBatchPriceMode] = useState<'total' | 'per-item'>('total');
+
     const handleBatchOrder = async () => {
         if (selectedIds.size === 0) return;
         const now = new Date().toISOString();
         const groupId = crypto.randomUUID().slice(0, 8);
-        const pricePerItem = batchPrice ? parseFloat(batchPrice) / selectedIds.size : undefined;
+        const totalPrice = batchPrice ? parseFloat(batchPrice) : undefined;
+        const pricePerItem = totalPrice && batchPriceMode === 'total' ? totalPrice / selectedIds.size : (batchPriceMode === 'per-item' && totalPrice ? totalPrice : undefined);
 
         const newItems = items.map(item => {
             if (!selectedIds.has(item.id)) return item;
@@ -202,7 +292,7 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                 deliveryWeek: batchDeliveryWeek || item.deliveryWeek,
                 orderReference: batchOrderRef || item.orderReference,
                 orderGroupId: groupId,
-                orderGroupTotal: batchPrice ? parseFloat(batchPrice) : undefined,
+                orderGroupTotal: totalPrice,
             };
         });
         onUpdate(newItems);
@@ -212,7 +302,34 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
         } catch {
             toast.error('Błąd zapisu');
         }
-        // Reset
+        resetBatch();
+    };
+
+    const handleBatchSetPrice = async () => {
+        if (selectedIds.size === 0 || !batchPrice) return;
+        const totalPrice = parseFloat(batchPrice);
+        const pricePerItem = batchPriceMode === 'total' ? totalPrice / selectedIds.size : totalPrice;
+
+        const newItems = items.map(item => {
+            if (!selectedIds.has(item.id)) return item;
+            return {
+                ...item,
+                purchaseCost: pricePerItem,
+                supplier: batchSupplier || item.supplier,
+                orderReference: batchOrderRef || item.orderReference,
+            };
+        });
+        onUpdate(newItems);
+        try {
+            await DatabaseService.updateContract(contract.id, { ...contract, orderedItems: newItems } as any);
+            toast.success(`Cena ustawiona dla ${selectedIds.size} pozycji`);
+        } catch {
+            toast.error('Błąd zapisu');
+        }
+        resetBatch();
+    };
+
+    const resetBatch = () => {
         setSelectionMode(false);
         setSelectedIds(new Set());
         setBatchSupplier('');
@@ -305,6 +422,12 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                             <div className="text-[10px] text-slate-400 mt-0.5 truncate max-w-md">{item.details}</div>
                         )}
                     </div>
+                    {/* Inline purchase cost */}
+                    {item.purchaseCost && item.purchaseCost > 0 && (
+                        <span className="hidden sm:inline text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200" title="Cena zakupu netto">
+                            {(item.purchaseCost * (item.quantity || 1)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € netto
+                        </span>
+                    )}
 
                     {/* Quick Status Actions */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -396,13 +519,19 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tydzień Dostawy (KW)</label>
                                 <input value={item.deliveryWeek || ''} onChange={e => handleUpdateItem(item.id, { deliveryWeek: e.target.value })} className="w-full p-1.5 border rounded-lg text-sm" placeholder="np. KW 15" />
                             </div>
-                            {/* Purchase Cost (admin only) — ALWAYS EDITABLE */}
-                            {isAdmin() && (
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Koszt Zakupu (EUR)</label>
-                                    <input type="number" step="0.01" value={item.purchaseCost || ''} onChange={e => handleUpdateItem(item.id, { purchaseCost: parseFloat(e.target.value) || 0 })} className="w-full p-1.5 border rounded-lg text-sm text-right" placeholder="0.00" />
+                            {/* Purchase Cost — ALWAYS EDITABLE for everyone */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-emerald-600 uppercase mb-1">💰 Cena Zakupu Netto (EUR)</label>
+                                <div className="relative">
+                                    <input type="number" step="0.01" value={item.purchaseCost || ''} onChange={e => handleUpdateItem(item.id, { purchaseCost: parseFloat(e.target.value) || 0 })} className="w-full p-1.5 border border-emerald-300 rounded-lg text-sm text-right bg-emerald-50/50 font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" placeholder="0.00" />
+                                    <span className="absolute left-2 top-1.5 text-[10px] text-emerald-400 font-bold">EUR</span>
                                 </div>
-                            )}
+                                {(item.quantity || 1) > 1 && item.purchaseCost && (
+                                    <div className="text-[10px] text-emerald-600 mt-0.5 text-right">
+                                        Razem: {(item.purchaseCost * (item.quantity || 1)).toLocaleString('de-DE', { minimumFractionDigits: 2 })} € × {item.quantity} szt.
+                                    </div>
+                                )}
+                            </div>
                             {/* Status — ALWAYS EDITABLE */}
                             <div>
                                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Status</label>
@@ -427,6 +556,26 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                                 {item.orderedAt && <span>📦 Zamówiono: {new Date(item.orderedAt).toLocaleDateString('de-DE')}</span>}
                                 {item.plannedDeliveryDate && <span>📅 Planowana dostawa: {new Date(item.plannedDeliveryDate).toLocaleDateString('de-DE')}</span>}
                                 {item.deliveryWeek && <span>🗓️ {item.deliveryWeek}</span>}
+                            </div>
+                        )}
+
+                        {/* ── Goods Receipt Info ── */}
+                        {item.receivedAt && (
+                            <div className="mt-3 pt-2 border-t border-emerald-100 bg-emerald-50/50 -mx-4 px-4 pb-2 rounded-b-lg">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <PackageCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span className="text-[10px] font-bold text-emerald-700 uppercase">Przyjęcie towaru</span>
+                                </div>
+                                <div className="flex gap-4 flex-wrap text-[10px] text-emerald-600">
+                                    <span className="flex items-center gap-1"><User className="w-3 h-3" /> {item.receivedBy || 'Nieznany'}</span>
+                                    <span className="flex items-center gap-1"><CalendarCheck className="w-3 h-3" /> {new Date(item.receivedAt).toLocaleString('pl-PL')}</span>
+                                </div>
+                                {item.receivedNotes && (
+                                    <div className="mt-1 text-[10px] text-emerald-700 bg-emerald-100/50 rounded-lg px-2 py-1 flex items-start gap-1">
+                                        <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                        {item.receivedNotes}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -502,9 +651,14 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                    {isAdmin() && totalPurchaseCost > 0 && (
-                        <div className="text-xs bg-red-50 text-red-700 px-3 py-1.5 rounded-full font-bold border border-red-200">
-                            Koszt: {totalPurchaseCost.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                    {totalPurchaseCost > 0 && (
+                        <div className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full font-bold border border-emerald-200" title="Suma kosztów zakupu netto">
+                            💰 Zakup: {totalPurchaseCost.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} netto
+                            {sellingPrice > 0 && (
+                                <span className={`ml-1.5 ${sellingPrice - totalPurchaseCost >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    ({sellingPrice > 0 ? ((1 - totalPurchaseCost / sellingPrice) * 100).toFixed(1) : '0'}% marża)
+                                </span>
+                            )}
                         </div>
                     )}
                     {totalItems > 0 && (
@@ -520,7 +674,7 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                             onClick={() => { setSelectionMode(!selectionMode); setSelectedIds(new Set()); }}
                             className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-colors ${selectionMode ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}
                         >
-                            {selectionMode ? '✕ Anuluj' : '☑ Zamów Grupowo'}
+                            {selectionMode ? '✕ Anuluj' : '☑ Zaznacz Grupowo'}
                         </button>
                     )}
                     <button
@@ -536,7 +690,7 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
             {selectionMode && selectedIds.size > 0 && (
                 <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-5 animate-in fade-in slide-in-from-top-2">
                     <h4 className="text-xs font-bold text-indigo-800 mb-3 flex items-center gap-2">
-                        ☑ Zamówienie Grupowe — <span className="text-indigo-500">{selectedIds.size} pozycji zaznaczonych</span>
+                        ☑ Akcja Grupowa — <span className="text-indigo-500">{selectedIds.size} pozycji zaznaczonych</span>
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                         <div>
@@ -547,8 +701,14 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Kwota razem (EUR)</label>
-                            <input type="number" step="0.01" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} className="w-full p-1.5 border border-indigo-300 rounded-lg text-sm" placeholder="np. 4500.00" />
+                            <div className="flex items-center gap-2 mb-1">
+                                <label className="block text-[10px] font-bold text-indigo-400 uppercase">Kwota netto (EUR)</label>
+                                <div className="flex bg-indigo-100 rounded-lg overflow-hidden border border-indigo-200">
+                                    <button onClick={() => setBatchPriceMode('total')} className={`px-2 py-0.5 text-[9px] font-bold transition-colors ${batchPriceMode === 'total' ? 'bg-indigo-600 text-white' : 'text-indigo-500 hover:bg-indigo-200'}`}>Razem</button>
+                                    <button onClick={() => setBatchPriceMode('per-item')} className={`px-2 py-0.5 text-[9px] font-bold transition-colors ${batchPriceMode === 'per-item' ? 'bg-indigo-600 text-white' : 'text-indigo-500 hover:bg-indigo-200'}`}>Per szt.</button>
+                                </div>
+                            </div>
+                            <input type="number" step="0.01" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} className="w-full p-1.5 border border-indigo-300 rounded-lg text-sm" placeholder={batchPriceMode === 'total' ? 'np. 4500.00 razem' : 'np. 150.00 / szt.'} />
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Termin Dostawy</label>
@@ -566,15 +726,25 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-indigo-200">
                         <div className="text-[10px] text-indigo-500">
                             {batchPrice && selectedIds.size > 0 && (
-                                <span>≈ {(parseFloat(batchPrice) / selectedIds.size).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} / pozycję</span>
+                                <span>
+                                    {batchPriceMode === 'total'
+                                        ? `≈ ${(parseFloat(batchPrice) / selectedIds.size).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} netto / pozycję`
+                                        : `${parseFloat(batchPrice).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} netto × ${selectedIds.size} = ${(parseFloat(batchPrice) * selectedIds.size).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} razem`
+                                    }
+                                </span>
                             )}
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800">
                                 Anuluj
                             </button>
+                            {batchPrice && (
+                                <button onClick={handleBatchSetPrice} className="px-4 py-1.5 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+                                    💰 Ustaw Cenę ({selectedIds.size})
+                                </button>
+                            )}
                             <button onClick={handleBatchOrder} className="px-4 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                                📦 Zamów {selectedIds.size} Pozycji Razem
+                                📦 Zamów + Cena ({selectedIds.size})
                             </button>
                         </div>
                     </div>
@@ -718,6 +888,83 @@ export const OrderedItemsModule: React.FC<Props> = ({ contract, onUpdate, isEdit
                     <p className="text-xs mt-1">Kliknij „+ Dodaj Elementy" aby dodać pozycje</p>
                 </div>
             )}
+
+            {/* ── Goods Receipt Modal ── */}
+            {receiptItemId && (() => {
+                const receiptItem = items.find(i => i.id === receiptItemId);
+                if (!receiptItem) return null;
+                return (
+                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setReceiptItemId(null)}>
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+                            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-5 rounded-t-2xl flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white/20 rounded-xl"><PackageCheck className="w-5 h-5" /></div>
+                                    <div>
+                                        <h3 className="font-bold text-lg">Przyjęcie towaru</h3>
+                                        <p className="text-emerald-100 text-xs">Potwierdź odbiór dostawy</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setReceiptItemId(null)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+                            </div>
+
+                            <div className="p-5 space-y-4">
+                                {/* Item info */}
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                    <div className="font-semibold text-sm text-slate-800">{receiptItem.name}</div>
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                        {receiptItem.supplier && <span className="flex items-center gap-1"><Truck className="w-3 h-3" />{receiptItem.supplier}</span>}
+                                        {receiptItem.quantity && <span>Ilość: {receiptItem.quantity}</span>}
+                                        {receiptItem.technicalSpec && <span className="font-mono">{receiptItem.technicalSpec}</span>}
+                                    </div>
+                                </div>
+
+                                {/* Who received */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><User className="w-3 h-3" /> Przyjął</label>
+                                    <input value={currentUser ? `${(currentUser as any).firstName || ''} ${(currentUser as any).lastName || ''}`.trim() || currentUser.email || '' : ''} readOnly
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-600" />
+                                </div>
+
+                                {/* Receipt date */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><CalendarCheck className="w-3 h-3" /> Data przyjęcia</label>
+                                    <input value={new Date().toLocaleString('pl-PL')} readOnly
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-600" />
+                                </div>
+
+                                {/* Notes */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><MessageSquare className="w-3 h-3" /> Uwagi przy odbiorze</label>
+                                    <textarea value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} rows={3} placeholder="Np. uszkodzone opakowanie, brak 1 profilu, stan OK..."
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+                                </div>
+
+                                {/* Warning about missing items */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <p className="text-xs text-amber-700">
+                                        Po potwierdzeniu odbioru status zmieni się na <span className="font-bold">Dostarczone</span>. 
+                                        {items.filter(i => i.status !== 'delivered' && i.id !== receiptItemId).length === 0 
+                                            ? ' Wszystkie elementy będą dostarczone — montaż zostanie oznaczony jako gotowy.'
+                                            : ` Pozostało jeszcze ${items.filter(i => i.status !== 'delivered' && i.id !== receiptItemId).length} pozycji do dostawy.`
+                                        }
+                                    </p>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex justify-end gap-3 pt-2">
+                                    <button onClick={() => setReceiptItemId(null)} className="px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 rounded-xl border border-slate-200">Anuluj</button>
+                                    <button onClick={handleConfirmReceipt} disabled={receiptSaving}
+                                        className="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl disabled:opacity-50 transition-colors flex items-center gap-2">
+                                        <ClipboardCheck className="w-4 h-4" />
+                                        {receiptSaving ? 'Zapisywanie...' : 'Potwierdź odbiór'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 };

@@ -33,9 +33,9 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         const won = filteredLeads.filter(l => l.status === 'won').length;
         const lost = filteredLeads.filter(l => l.status === 'lost').length;
         const active = total - won - lost;
-        const newClients = filteredLeads.filter(l => ['new', 'formularz'].includes(l.status)).length;
+        const newClients = filteredLeads.filter(l => ['new', 'formularz_sent', 'formularz'].includes(l.status)).length;
         const contacted = filteredLeads.filter(l => l.status === 'contacted').length;
-        const inOffer = filteredLeads.filter(l => ['offer_sent', 'negotiation'].includes(l.status)).length;
+        const inOffer = filteredLeads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
         const inMeasurement = filteredLeads.filter(l => ['measurement_scheduled', 'measurement_completed'].includes(l.status)).length;
         // Win Rate: won / (won + lost) — only closed deals count
         const totalClosed = won + lost;
@@ -56,9 +56,9 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
 
         // ── Stale Leads ──
         const staleThresholds: Record<string, number> = {
-            new: 1, formularz: 2, contacted: 3,
+            new: 1, formularz_sent: 3, formularz: 2, contacted: 3,
             measurement_scheduled: 2, measurement_completed: 3,
-            offer_sent: 5, negotiation: 7
+            offer_sent: 5, contact_after_offer: 4, negotiation: 7
         };
         const now = new Date();
         const staleCount = filteredLeads.filter(l => {
@@ -131,9 +131,11 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
         // ── Pipeline Distribution ──
         const pipelineStages = [
             { id: 'new', label: 'Nowe', color: '#3B82F6' },
-            { id: 'formularz', label: 'Formularz', color: '#14B8A6' },
+            { id: 'formularz_sent', label: 'Form. wysł.', color: '#0EA5E9' },
+            { id: 'formularz', label: 'Form. wyp.', color: '#14B8A6' },
             { id: 'contacted', label: 'Kontakt', color: '#6366F1' },
             { id: 'offer_sent', label: 'Oferta', color: '#F59E0B' },
+            { id: 'contact_after_offer', label: 'Po ofercie', color: '#D97706' },
             { id: 'measurement_scheduled', label: 'Pomiar', color: '#06B6D4' },
             { id: 'measurement_completed', label: 'Po pomiarze', color: '#A855F7' },
             { id: 'negotiation', label: 'Negocjacje', color: '#F97316' },
@@ -248,14 +250,15 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
     };
 
     const STATUS_LABELS: Record<string, string> = {
-        new: 'Nowy', formularz: 'Formularz', contacted: 'Skontaktowano',
-        offer_sent: 'Oferta', measurement_scheduled: 'Pomiar um.',
+        new: 'Nowy', formularz_sent: 'Form. wysł.', formularz: 'Form. wyp.', contacted: 'Skontaktowano',
+        offer_sent: 'Oferta', contact_after_offer: 'Po ofercie', measurement_scheduled: 'Pomiar um.',
         measurement_completed: 'Po pomiarze', negotiation: 'Negocjacje',
         won: 'Wygrany', lost: 'Utracony', fair: 'Targi',
     };
     const STATUS_COLORS: Record<string, string> = {
-        new: 'bg-blue-100 text-blue-700', formularz: 'bg-teal-100 text-teal-700',
+        new: 'bg-blue-100 text-blue-700', formularz_sent: 'bg-sky-100 text-sky-700', formularz: 'bg-teal-100 text-teal-700',
         contacted: 'bg-indigo-100 text-indigo-700', offer_sent: 'bg-yellow-100 text-yellow-700',
+        contact_after_offer: 'bg-amber-100 text-amber-700',
         measurement_scheduled: 'bg-cyan-100 text-cyan-700', measurement_completed: 'bg-purple-100 text-purple-700',
         negotiation: 'bg-orange-100 text-orange-700', won: 'bg-emerald-100 text-emerald-700',
         lost: 'bg-red-100 text-red-700', fair: 'bg-pink-100 text-pink-700',

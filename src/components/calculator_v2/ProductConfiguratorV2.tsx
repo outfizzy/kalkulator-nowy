@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 import { WallVisualizer } from './WallVisualizer';
 import { DatabaseService } from '../../services/database';
 import { LeadService } from '../../services/database/lead.service';
+import { OfferService } from '../../services/database/offer.service';
 import { SendEmailModal } from '../leads/SendEmailModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { SettingsService } from '../../services/database/settings.service';
@@ -15,6 +16,7 @@ import type { Customer, Lead, Offer } from '../../types';
 import { generateOfferPDF, generateOfferPDFBase64 } from '../../utils/offerPDF';
 import { CustomerForm } from '../CustomerForm';
 import { calculateDachrechner, type RoofModelId, type DachrechnerResults } from '../../services/dachrechner.service';
+import { OcrInvoiceScannerModal } from './OcrInvoiceScannerModal';
 
 // ======= PROFESSIONAL SVG ICONS =======
 // Thin-line icons for premium calculator UI — replaces all emoji
@@ -1053,9 +1055,29 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [publicLink, setPublicLink] = useState<string | null>(null);
     // Email Workflow State — uses proven SendEmailModal from leads
     const [showSendEmailModal, setShowSendEmailModal] = useState(false);
+    // Attachment state — local files before save, URLs after save
+    const [offerAttachments, setOfferAttachments] = useState<{ id: string; type: string; name: string; url: string; size: number; uploadedAt: string }[]>([]);
+    const [localAttachmentFiles, setLocalAttachmentFiles] = useState<{ type: 'visualization' | 'technical_drawing'; file: File; preview: string }[]>([]);
+    const [uploadingAttachment, setUploadingAttachment] = useState<string | null>(null);
+    // === OFFER VARIANTS (embedded in single offer) ===
+    type OfferVariant = {
+        id: string;
+        label: string; // e.g. "Ekonomiczny", "Standard", "Premium"
+        modelId: string;
+        modelName: string;
+        width: number;
+        projection: number;
+        color: string;
+        variant: string;
+        items: any[];
+        customItems: any[];
+        pricing: any;
+        imageUrl: string;
+    };
+    const [offerVariants, setOfferVariants] = useState<OfferVariant[]>([]);
 
     // === CUSTOM ITEMS (Manual Positions) ===
-    const [customItems, setCustomItems] = useState<{ id: string; name: string; price: number }[]>([]);
+    const [customItems, setCustomItems] = useState<{ id: string; name: string; price: number; description?: string }[]>([]);
     const [newItemName, setNewItemName] = useState('');
     const [newItemPrice, setNewItemPrice] = useState('');
 
@@ -1064,7 +1086,8 @@ export const ProductConfiguratorV2: React.FC = () => {
     const [manualModel, setManualModel] = useState<string>('Trendline');
     const [manualWidth, setManualWidth] = useState<string>('');
     const [manualDepth, setManualDepth] = useState<string>('');
-    const [manualInstallationCost, setManualInstallationCost] = useState<string>('');
+
+    const [isOcrModalOpen, setIsOcrModalOpen] = useState(false);
 
     // === MONTAGE (INSTALLATION) ===
     const [montagePrice, setMontagePrice] = useState<number>(0);
@@ -2242,6 +2265,9 @@ export const ProductConfiguratorV2: React.FC = () => {
             const zoneId = parseInt(snowZoneData.id);
             if (!isNaN(zoneId)) {
                 setZone(zoneId);
+                // Auto-populate the zone result text so it shows in the configurator
+                const loadMap: Record<number, string> = { 1: '0,65', 2: '0,85', 3: '1,10' };
+                setPlzZoneResult(`PLZ ${data.postalCode || ''} → Zone ${zoneId} (${loadMap[zoneId] || '0,85'} kN/m²)`);
             }
         }
 
@@ -2263,8 +2289,8 @@ export const ProductConfiguratorV2: React.FC = () => {
     const terandaDisplayNames = ROOF_MODELS.filter(m => isTerandaModel(m.id)).map(m => m.name);
     const hasTerandaInBasket = basket.some(item => terandaDisplayNames.includes(item.name));
     const isTerandaOnlyBasket = basket.length > 0 && basket.every(item => terandaDisplayNames.includes(item.name));
-    const effectiveTransport = isTerandaOnlyBasket ? 0 : TRANSPORT_COST;
-    const effectivePfand = isTerandaOnlyBasket ? 0 : pfandTotal;
+    const effectiveTransport = isManualMode ? 0 : (isTerandaOnlyBasket ? 0 : TRANSPORT_COST);
+    const effectivePfand = isManualMode ? 0 : (isTerandaOnlyBasket ? 0 : pfandTotal);
     const internalCosts = effectivePfand + effectiveTransport;
     const totalPurchaseCostInternal = purchasePrice + internalCosts; // True cost to company
 
@@ -2398,7 +2424,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                     name: item.name,
                     price: item.price,
                     quantity: 1,
-                    description: isManualMode ? 'Manuelle Angebotsposition' : 'Manuelle Position',
+                    description: item.description || (isManualMode ? 'Manuelle Angebotsposition' : 'Manuelle Position'),
                 })),
                 // Dachrechner technical data
                 dachrechnerData: dachrechnerResults ? {
@@ -2425,8 +2451,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             };
 
             // 4. Build pricing object
-            const manualInstallation = isManualMode ? (parseFloat(manualInstallationCost) || 0) : 0;
-            const installationTotal = isManualMode ? manualInstallation : montagePrice;
+            const installationTotal = montagePrice;
             // PL VAT: 8% with installation (usługa budowlana), 23% without (materiał)
             const plVatRate = installationTotal > 0 ? 1.08 : 1.23;
             const pricing = {
@@ -2453,7 +2478,7 @@ export const ProductConfiguratorV2: React.FC = () => {
             const offer = await DatabaseService.createOffer({
                 offerNumber: `V2-${Date.now()}`,
                 customer: customerData as Customer,
-                product: productConfig as any, // Cast for flexibility with V2 custom types
+                product: productConfig as any,
                 pricing: pricing,
                 status: 'draft',
                 snowZone: { id: '1', value: 0.85, description: 'Zone 1' },
@@ -2461,14 +2486,33 @@ export const ProductConfiguratorV2: React.FC = () => {
                 leadId: lead.id
             });
 
-            // 6. Generate public link
+            // 5b. Upload local attachments to storage
+            if (localAttachmentFiles.length > 0) {
+                for (const localAtt of localAttachmentFiles) {
+                    try {
+                        await OfferService.uploadAttachment(offer.id, localAtt.file, localAtt.type);
+                    } catch (e) {
+                        console.error('Attachment upload error:', e);
+                    }
+                }
+                // Refresh attachments from DB
+                const atts = await OfferService.getAttachments(offer.id);
+                setOfferAttachments(atts);
+                setLocalAttachmentFiles([]);
+            }
+
+            // 5c. Save variants to offer
+            if (offerVariants.length > 0) {
+                await supabase.from('offers').update({ variants: offerVariants }).eq('id', offer.id);
+            }
+
             // 6. Generate public link
             const token = await DatabaseService.ensurePublicToken(offer.id);
             const link = `${window.location.origin}/p/offer/${token}`;
             setPublicLink(link);
             setSavedOfferId(offer.id);
-            setSavedOffer(offer); // Store full offer for PDF generation
-            savedOfferRef.current = offer; // Immediately available (no React batching delay)
+            setSavedOffer(offer);
+            savedOfferRef.current = offer;
 
             toast.success('Oferta zapisana!');
             return offer;
@@ -2521,7 +2565,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                 })),
                 ...customItems.map(ci => ({
                     name: ci.name,
-                    description: 'Manuelle Position',
+                    description: ci.description || '',
                     dimensions: '',
                     price: Math.round(ci.price * saleMultiplier * 100) / 100
                 }))
@@ -2591,7 +2635,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
         const handleGeneratePDF = () => {
             generateOfferPDF(buildPDFData());
-            toast.success('PDF wurde erstellt');
+            toast.success('PDF został wygenerowany');
         };
 
         return (
@@ -2602,47 +2646,53 @@ export const ProductConfiguratorV2: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={() => setView(isManualMode ? 'manual' : 'config')}
-                                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                                className="flex items-center gap-2 text-slate-500 hover:text-slate-900 text-sm transition-colors"
                             >
-                                ← {isManualMode ? 'Zurück zur manuellen Eingabe' : 'Zurück zur Konfiguration'}
+                                ← {isManualMode ? 'Wróć do ręcznej edycji' : 'Wróć do konfiguracji'}
                             </button>
-                            <h1 className="text-2xl font-black text-slate-900">Angebotszusammenfassung</h1>
+                            <div className="flex items-center gap-3">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full">
+                                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Gotowe</span>
+                                </div>
+                                <h1 className="text-xl md:text-2xl font-black text-slate-900">Podsumowanie oferty</h1>
+                            </div>
                         </div>
 
                         {/* Technical Specs — hidden in manual mode */}
                         {!isManualMode ? (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5">{IC.compass('w-4 h-4')} Technische Daten</span>
+                                    <span className="inline-flex items-center gap-1.5">{IC.compass('w-4 h-4')} Dane techniczne</span>
                                 </h2>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                     <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                        <p className="text-slate-500 text-xs uppercase">Breite</p>
+                                        <p className="text-slate-500 text-xs uppercase">Szerokość</p>
                                         <p className="font-bold text-lg">{(width / 1000).toFixed(2)} m</p>
                                     </div>
                                     <div className="bg-slate-50 p-3 rounded-lg text-center">
-                                        <p className="text-slate-500 text-xs uppercase">Tiefe</p>
+                                        <p className="text-slate-500 text-xs uppercase">Głębokość</p>
                                         <p className="font-bold text-lg">{(projection / 1000).toFixed(2)} m</p>
                                     </div>
                                     <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-200">
-                                        <p className="text-indigo-600 text-xs uppercase font-bold">Fläche</p>
+                                        <p className="text-indigo-600 text-xs uppercase font-bold">Powierzchnia</p>
                                         <p className="font-black text-xl text-indigo-700">{areaM2.toFixed(2)} m²</p>
                                     </div>
                                     <div className="bg-amber-50 p-3 rounded-lg text-center border border-amber-200">
-                                        <p className="text-amber-600 text-xs uppercase font-bold">Pfosten</p>
+                                        <p className="text-amber-600 text-xs uppercase font-bold">Słupy</p>
                                         <p className="font-black text-xl text-amber-700">{structuralMetadata?.posts_count || '-'}</p>
                                     </div>
                                 </div>
                                 <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                                    <div><span className="text-slate-500">Modell:</span> <strong>{ROOF_MODELS.find(m => m.id === model)?.name || model}</strong></div>
-                                    <div><span className="text-slate-500">Dachtyp:</span> <strong>{cover}</strong></div>
-                                    <div><span className="text-slate-500">Bauweise:</span> <strong>{construction === 'wall' ? 'Wandmontage' : 'Freistehend'}</strong></div>
+                                    <div><span className="text-slate-500">Model:</span> <strong>{ROOF_MODELS.find(m => m.id === model)?.name || model}</strong></div>
+                                    <div><span className="text-slate-500">Pokrycie:</span> <strong>{cover}</strong></div>
+                                    <div><span className="text-slate-500">Montaż:</span> <strong>{construction === 'wall' ? 'Ścienny' : 'Wolnostojący'}</strong></div>
                                 </div>
                             </div>
                         ) : (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-5 h-5')} Manuelles Angebot</span>
+                                    <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-5 h-5')} Oferta ręczna</span>
                                 </h2>
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden border border-indigo-100">
@@ -2654,7 +2704,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-slate-500 text-xs uppercase">Ausgewähltes Modell</p>
+                                        <p className="text-slate-500 text-xs uppercase">Wybrany model</p>
                                         <p className="font-bold text-xl text-slate-800">{manualModel}</p>
                                         <p className="text-xs text-slate-400">{ROOF_MODELS.find(m => m.id === manualModel)?.description || ''}</p>
                                     </div>
@@ -2666,19 +2716,19 @@ export const ProductConfiguratorV2: React.FC = () => {
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
                             <div className="flex justify-between items-start">
                                 <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5">{IC.roof('w-5 h-5')} Kundendaten</span>
+                                    <span className="inline-flex items-center gap-1.5">{IC.roof('w-5 h-5')} Dane klienta</span>
                                 </h2>
                                 <button
                                     onClick={() => setView('customer')}
                                     className="text-xs text-indigo-600 font-bold hover:underline"
                                 >
-                                    Bearbeiten
+                                    Edytuj
                                 </button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <span className="text-slate-500 block">Name:</span>
+                                    <span className="text-slate-500 block">Imię i nazwisko:</span>
                                     <strong className="text-slate-800">
                                         {customerState ? (customerState.firstName ? `${customerState.firstName} ${customerState.lastName}` : customerState.name) : '-'}
                                     </strong>
@@ -2688,11 +2738,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     <strong className="text-slate-800">{customerState?.email || '-'}</strong>
                                 </div>
                                 <div>
-                                    <span className="text-slate-500 block">Telefon:</span>
+                                    <span className="text-slate-500 block">Tel:</span>
                                     <strong className="text-slate-800">{customerState?.phone || '-'}</strong>
                                 </div>
                                 <div>
-                                    <span className="text-slate-500 block">Adresse:</span>
+                                    <span className="text-slate-500 block">Adres:</span>
                                     <strong className="text-slate-800">
                                         {[customerState?.street, customerState?.postalCode, customerState?.city].filter(Boolean).join(', ') || '-'}
                                     </strong>
@@ -2700,15 +2750,298 @@ export const ProductConfiguratorV2: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* ═══════ WARIANTY OFERTOWE ═══════ */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 text-amber-600">
+                                    <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+                                </svg>
+                                Warianty cenowe
+                                {offerVariants.length > 0 && (
+                                    <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">{offerVariants.length}/5</span>
+                                )}
+                            </h2>
+                            <p className="text-xs text-slate-400 mb-4">Klient zobaczy przełącznik wariantów w interaktywnej ofercie — np. tanie / średnie / drogie zadaszenie.</p>
+
+                            {/* Step-by-step instructions */}
+                            {offerVariants.length === 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                                    <p className="text-xs font-bold text-amber-800 mb-2">Jak dodać warianty?</p>
+                                    <ol className="text-xs text-amber-700 space-y-1 list-decimal list-inside">
+                                        <li>Skonfiguruj pozycje w koszyku (model, wymiary, dodatki)</li>
+                                        <li>Ustaw marżę i rabat — cena się obliczy</li>
+                                        <li>Kliknij <strong>"Dodaj jako wariant"</strong> — system automatycznie cofnie Cię do konfiguratora</li>
+                                        <li>Zmień model/wymiary/dodatki i dodaj kolejny wariant</li>
+                                        <li>Gdy masz wszystkie warianty — wróć do podsumowania i <strong>Zapisz ofertę</strong></li>
+                                    </ol>
+                                </div>
+                            )}
+
+                            {/* Existing variants list */}
+                            {offerVariants.length > 0 && (
+                                <div className="space-y-2 mb-4">
+                                    {offerVariants.map((v, idx) => (
+                                        <div key={v.id} className="flex items-center gap-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl group">
+                                            <span className="w-8 h-8 bg-amber-600 text-white rounded-full flex items-center justify-center text-xs font-black shrink-0">{idx + 1}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-slate-800 truncate">{v.label}</p>
+                                                <p className="text-[11px] text-amber-700">
+                                                    {v.modelName} • {v.width}×{v.projection} mm
+                                                    {v.color && <span> • {v.color}</span>}
+                                                </p>
+                                                <p className="text-xs font-bold text-emerald-700 mt-0.5">
+                                                    {v.pricing?.sellingPriceGross?.toFixed(2) || '?'} {v.pricing?.currency === 'PLN' ? 'zł' : '€'} brutto
+                                                    {v.items && v.items.length > 0 && <span className="text-slate-400 font-normal"> • {v.items.length + (v.customItems?.length || 0)} pozycji</span>}
+                                                </p>
+                                            </div>
+                                            <button onClick={() => setOfferVariants(prev => prev.filter(x => x.id !== v.id))}
+                                                className="text-red-300 hover:text-red-600 text-sm font-bold px-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Usuń wariant">✕</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Add current config as variant */}
+                            {offerVariants.length < 5 && (
+                                <div className="space-y-3">
+                                    {/* Suggested variant names */}
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className="text-xs text-slate-400 mr-1 self-center">Sugerowane:</span>
+                                        {['Ekonomiczny', 'Standard', 'Komfort', 'Premium', 'Exclusive'].filter(
+                                            name => !offerVariants.some(v => v.label === name)
+                                        ).map(name => (
+                                            <button
+                                                key={name}
+                                                onClick={() => {
+                                                    const input = document.getElementById('variant-label-input') as HTMLInputElement;
+                                                    if (input) input.value = name;
+                                                }}
+                                                className="px-2.5 py-1 bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 rounded-lg text-xs font-medium transition-colors border border-transparent hover:border-amber-200"
+                                            >
+                                                {name}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder={`Nazwa wariantu ${offerVariants.length + 1}`}
+                                            id="variant-label-input"
+                                            className="flex-1 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const labelInput = document.getElementById('variant-label-input') as HTMLInputElement;
+                                                const label = labelInput?.value?.trim();
+                                                if (!label) { toast.error('Podaj nazwę wariantu'); return; }
+                                                if (!isManualMode && basket.length === 0 && customItems.length === 0) { toast.error('Dodaj pozycje do koszyka'); return; }
+                                                if (isManualMode && customItems.length === 0) { toast.error('Dodaj pozycje'); return; }
+
+                                                const selectedModel = isManualMode ? manualModel : model;
+                                                const selectedModelConfig = ROOF_MODELS.find(m => m.id === selectedModel);
+                                                const newVariant: typeof offerVariants[0] = {
+                                                    id: `var-${Date.now()}`,
+                                                    label,
+                                                    modelId: selectedModel,
+                                                    modelName: selectedModelConfig?.name || selectedModel,
+                                                    width: isManualMode ? (parseInt(manualWidth) || 0) : width,
+                                                    projection: isManualMode ? (parseInt(manualDepth) || 0) : projection,
+                                                    color: isManualMode ? '' : color,
+                                                    variant: isManualMode ? '' : (cover === 'Glass' ? glassVariant : polyVariant),
+                                                    items: isManualMode ? [] : basket.map(b => ({ name: b.name, config: b.config, dimensions: b.dimensions, price: b.price })),
+                                                    customItems: customItems.map(item => ({ id: item.id, name: item.name, price: item.price, quantity: 1 })),
+                                                    pricing: {
+                                                        basePrice: basketTotal,
+                                                        customItemsPrice: customItemsTotal,
+                                                        marginPercentage: margin,
+                                                        discountPercentage: discount,
+                                                        sellingPriceNet: isPL ? finalPrice * eurRate : finalPrice,
+                                                        sellingPriceGross: isPL ? finalPrice * eurRate * (montagePrice > 0 ? 1.08 : 1.23) : finalPrice * 1.19,
+                                                        currency: isPL ? 'PLN' : 'EUR',
+                                                        installationCosts: montagePrice > 0 ? { totalInstallation: montagePrice } : undefined
+                                                    },
+                                                    imageUrl: selectedModelConfig?.image_url || `/images/models/${selectedModel.toLowerCase().replace(/\s+/g, '-').replace(/\+/g, '-plus')}.jpg`,
+                                                };
+                                                setOfferVariants(prev => [...prev, newVariant]);
+                                                labelInput.value = '';
+                                                toast.success(`Wariant "${label}" dodany! Skonfiguruj kolejny wariant.`, { icon: '✅' });
+
+                                                // Auto-navigate back to configurator for next variant
+                                                setBasket([]);
+                                                setCustomItems([]);
+                                                setMontagePrice(0);
+                                                setMargin(40);
+                                                setDiscount(0);
+                                                setView(isManualMode ? 'manual' : 'config');
+                                            }}
+                                            className="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold text-sm hover:bg-amber-700 transition-colors whitespace-nowrap"
+                                        >
+                                            + Dodaj jako wariant
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {offerVariants.length >= 5 && (
+                                <p className="text-xs text-amber-600 text-center font-bold">✓ Osiągnięto limit 5 wariantów — możesz zapisać ofertę</p>
+                            )}
+
+                            {/* Info about saved variants */}
+                            {offerVariants.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-amber-200">
+                                    <p className="text-xs text-amber-600 text-center">
+                                        {offerVariants.length} wariant{offerVariants.length === 1 ? '' : offerVariants.length < 5 ? 'y' : 'ów'} zapisane • dane klienta i załączniki zachowane
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ═══════ ZAŁĄCZNIKI (PRZED zapisaniem) ═══════ */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
+                                {IC.clipboard('w-5 h-5')} Załączniki do oferty
+                            </h2>
+                            <p className="text-xs text-slate-400 mb-4">Wizualizacja i rysunek techniczny — widoczne dla klienta w interaktywnej ofercie</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Visualization */}
+                                {(() => {
+                                    const uploaded = offerAttachments.find(a => a.type === 'visualization');
+                                    const local = localAttachmentFiles.find(a => a.type === 'visualization');
+                                    const hasFile = uploaded || local;
+                                    return (
+                                        <div className={`relative border-2 border-dashed rounded-xl p-4 transition-all ${hasFile ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30'}`}>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${hasFile ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
+                                                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-slate-700">Wizualizacja 3D</p>
+                                                    <p className="text-xs text-slate-400 truncate">
+                                                        {uploaded ? uploaded.name : local ? `📎 ${local.file.name}` : 'PDF lub obraz'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {hasFile ? (
+                                                <div className="flex gap-2">
+                                                    {uploaded && (
+                                                        <a href={uploaded.url} target="_blank" rel="noopener noreferrer"
+                                                            className="flex-1 text-center py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors">
+                                                            Podgląd ↗
+                                                        </a>
+                                                    )}
+                                                    {local && !uploaded && (
+                                                        <span className="flex-1 text-center py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-200">
+                                                            Zostanie przesłana po zapisaniu
+                                                        </span>
+                                                    )}
+                                                    <button onClick={() => {
+                                                        if (uploaded && savedOfferId) {
+                                                            OfferService.removeAttachment(savedOfferId, uploaded.id);
+                                                            setOfferAttachments(prev => prev.filter(a => a.id !== uploaded.id));
+                                                        }
+                                                        setLocalAttachmentFiles(prev => prev.filter(a => a.type !== 'visualization'));
+                                                        toast.success('Usunięto');
+                                                    }} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors">
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label className="block w-full text-center py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-indigo-700 transition-all">
+                                                    + Dodaj wizualizację
+                                                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            setLocalAttachmentFiles(prev => [...prev.filter(a => a.type !== 'visualization'), { type: 'visualization', file, preview: URL.createObjectURL(file) }]);
+                                                            toast.success('Wizualizacja dodana!');
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Technical Drawing */}
+                                {(() => {
+                                    const uploaded = offerAttachments.find(a => a.type === 'technical_drawing');
+                                    const local = localAttachmentFiles.find(a => a.type === 'technical_drawing');
+                                    const hasFile = uploaded || local;
+                                    return (
+                                        <div className={`relative border-2 border-dashed rounded-xl p-4 transition-all ${hasFile ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30'}`}>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${hasFile ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                                                        <path d="M14 2v6h6" />
+                                                        <path d="M9 15h6M9 11h3" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-slate-700">Rysunek techniczny</p>
+                                                    <p className="text-xs text-slate-400 truncate">
+                                                        {uploaded ? uploaded.name : local ? `📎 ${local.file.name}` : 'PDF lub obraz'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {hasFile ? (
+                                                <div className="flex gap-2">
+                                                    {uploaded && (
+                                                        <a href={uploaded.url} target="_blank" rel="noopener noreferrer"
+                                                            className="flex-1 text-center py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors">
+                                                            Podgląd ↗
+                                                        </a>
+                                                    )}
+                                                    {local && !uploaded && (
+                                                        <span className="flex-1 text-center py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-200">
+                                                            Zostanie przesłany po zapisaniu
+                                                        </span>
+                                                    )}
+                                                    <button onClick={() => {
+                                                        if (uploaded && savedOfferId) {
+                                                            OfferService.removeAttachment(savedOfferId, uploaded.id);
+                                                            setOfferAttachments(prev => prev.filter(a => a.id !== uploaded.id));
+                                                        }
+                                                        setLocalAttachmentFiles(prev => prev.filter(a => a.type !== 'technical_drawing'));
+                                                        toast.success('Usunięto');
+                                                    }} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors">
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label className="block w-full text-center py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-indigo-700 transition-all">
+                                                    + Dodaj rysunek
+                                                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            setLocalAttachmentFiles(prev => [...prev.filter(a => a.type !== 'technical_drawing'), { type: 'technical_drawing', file, preview: URL.createObjectURL(file) }]);
+                                                            toast.success('Rysunek dodany!');
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+
                         {/* Items Table */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.cart('w-5 h-5')} Positionen</h2>
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.cart('w-5 h-5')} Pozycje</h2>
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-slate-100">
                                         <th className="text-left py-2 text-slate-500">Produkt</th>
-                                        <th className="text-left py-2 text-slate-500">Konfiguration</th>
-                                        <th className="text-right py-2 text-slate-500">Preis</th>
+                                        <th className="text-left py-2 text-slate-500">Konfiguracja</th>
+                                        <th className="text-right py-2 text-slate-500">Cena</th>
                                         <th className="w-10"></th>
                                     </tr>
                                 </thead>
@@ -2727,7 +3060,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                                 <button
                                                     onClick={() => removeFromBasket(item.id)}
                                                     className="text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded"
-                                                    title="Entfernen"
+                                                    title="Usuń"
                                                 >
                                                     ✕
                                                 </button>
@@ -2737,7 +3070,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {customItems.map((item) => (
                                         <tr key={item.id} className="border-b border-slate-50 last:border-0 bg-blue-50">
                                             <td className="py-3 font-medium text-blue-700"><span className="inline-flex items-center gap-1">{IC.clipboard('w-3.5 h-3.5')} {item.name}</span></td>
-                                            <td className="py-3 text-slate-600 text-xs">Manuell hinzugefügt</td>
+                                            <td className="py-3 text-slate-600 text-xs">Dodane ręcznie</td>
                                             <td className="py-3 text-right font-bold">{formatCurrency(item.price)}</td>
                                             <td className="py-3 text-center">
                                                 <button
@@ -2754,24 +3087,24 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {montagePrice > 0 && (
                                         <tr className="border-t border-slate-100 bg-blue-50">
                                             <td className="py-3 font-medium text-blue-700"><span className="inline-flex items-center gap-1">{IC.wrench('w-3.5 h-3.5')} Montage</span></td>
-                                            <td className="py-3 text-slate-600 text-xs">Montagekosten (netto, ohne Aufschlag)</td>
+                                            <td className="py-3 text-slate-600 text-xs">Koszty montażu (netto, bez narzutu)</td>
                                             <td className="py-3 text-right font-bold text-blue-700">{formatCurrency(montagePrice)}</td>
                                             <td></td>
                                         </tr>
                                     )}
                                     {extraPostTotalPrice > 0 && (
                                         <tr className="border-t border-slate-100 bg-amber-50">
-                                            <td className="py-3 font-medium text-amber-700"><span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Zusatzpfosten</span></td>
+                                            <td className="py-3 font-medium text-amber-700"><span className="inline-flex items-center gap-1">{IC.build('w-4 h-4')} Dodatkowe słupy</span></td>
                                             <td className="py-3 text-slate-600 text-xs">
-                                                {extraPosts > 0 && `${extraPosts}× Zusatzpfosten`}
-                                                {extraPostHeight === 3000 && ` + Höhenaufschlag 3000mm (${totalPostCount} Pfosten)`}
+                                                {extraPosts > 0 && `${extraPosts}× dodatkowy słup`}
+                                                {extraPostHeight === 3000 && ` + dopłata za wysokość 3000mm (${totalPostCount} słupów)`}
                                             </td>
                                             <td className="py-3 text-right font-bold text-amber-700">{formatCurrency(extraPostTotalPrice)}</td>
                                             <td></td>
                                         </tr>
                                     )}
                                     <tr className="border-t-2 border-slate-200">
-                                        <td colSpan={2} className="py-3 font-bold">Zwischensumme</td>
+                                        <td colSpan={2} className="py-3 font-bold">Suma częściowa</td>
                                         <td className="py-3 text-right font-bold">{formatCurrency(subtotal)}</td>
                                         <td></td>
                                     </tr>
@@ -2780,20 +3113,20 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                             {/* Add Custom Item */}
                             <div className="mt-4 pt-4 border-t border-slate-100">
-                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Position hinzufügen</p>
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Dodaj pozycję</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         value={newItemName}
                                         onChange={e => setNewItemName(e.target.value)}
-                                        placeholder="Beschreibung..."
+                                        placeholder="Opis pozycji..."
                                         className="flex-1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
                                     />
                                     <input
                                         type="number"
                                         value={newItemPrice}
                                         onChange={e => setNewItemPrice(e.target.value)}
-                                        placeholder="Preis €"
+                                        placeholder="Cena €"
                                         className="w-32 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-right"
                                     />
                                     <button
@@ -2801,7 +3134,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         disabled={!newItemName.trim()}
                                         className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm disabled:opacity-50"
                                     >
-                                        + Hinzufügen
+                                        + Dodaj
                                     </button>
                                 </div>
                             </div>
@@ -2809,17 +3142,17 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                         {/* Margin & Discount */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.compass('w-5 h-5')} Marge & Rabatt</h2>
+                            <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">{IC.compass('w-5 h-5')} Marża i rabat</h2>
 
                             {/* Purchase Discount Info (from Admin) */}
                             {purchaseDiscount > 0 && (
                                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm text-green-700 inline-flex items-center gap-1">{IC.check('w-3.5 h-3.5')} Einkaufsrabatt (Admin):</span>
+                                        <span className="text-sm text-green-700 inline-flex items-center gap-1">{IC.check('w-3.5 h-3.5')} Rabat zakupowy (Admin):</span>
                                         <span className="font-bold text-green-800">{purchaseDiscount}%</span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1 text-xs text-green-600">
-                                        <span>Einkaufspreis (Produkte):</span>
+                                        <span>Cena zakupu (produkty):</span>
                                         <span className="font-bold">{formatCurrency(purchasePrice)}</span>
                                     </div>
                                 </div>
@@ -2828,18 +3161,18 @@ export const ProductConfiguratorV2: React.FC = () => {
                             {/* Internal Costs: Pfand + Transport — visible only to sales rep */}
                             {subtotal > 0 && (
                                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                                    <p className="text-xs font-bold text-amber-700 uppercase mb-2 flex items-center gap-1">{IC.cart('w-3.5 h-3.5')} Interne Kosten (nicht auf dem Angebot sichtbar)</p>
+                                    <p className="text-xs font-bold text-amber-700 uppercase mb-2 flex items-center gap-1">{IC.cart('w-3.5 h-3.5')} Koszty wewnętrzne (niewidoczne na ofercie)</p>
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-center text-sm text-amber-800">
-                                            <span>Pfand (Verpackungspfand):</span>
-                                            <span className="font-bold">{formatCurrency(effectivePfand)}{isTerandaOnlyBasket ? ' (inkl.)' : ''}</span>
+                                            <span>Kaucja (opakowania):</span>
+                                            <span className="font-bold">{formatCurrency(effectivePfand)}{isTerandaOnlyBasket ? ' (w cenie)' : ''}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm text-amber-800">
                                             <span>Transport:</span>
-                                            <span className="font-bold">{formatCurrency(effectiveTransport)}{isTerandaOnlyBasket ? ' (inkl.)' : ''}</span>
+                                            <span className="font-bold">{formatCurrency(effectiveTransport)}{isTerandaOnlyBasket ? ' (w cenie)' : ''}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm font-bold text-amber-900 pt-1 border-t border-amber-200">
-                                            <span>Gesamte Einkaufskosten:</span>
+                                            <span>Całkowity koszt zakupu:</span>
                                             <span>{formatCurrency(totalPurchaseCostInternal)}</span>
                                         </div>
                                     </div>
@@ -2847,11 +3180,11 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     {finalPrice > 0 && (
                                         <div className="mt-2 pt-2 border-t border-amber-300">
                                             <div className="flex justify-between items-center text-sm">
-                                                <span className="text-amber-800">Verkaufspreis (netto):</span>
+                                                <span className="text-amber-800">Cena sprzedaży (netto):</span>
                                                 <span className="font-bold text-amber-900">{formatCurrency(finalPrice)}</span>
                                             </div>
                                             <div className={`flex justify-between items-center text-sm font-bold mt-1 ${(finalPrice - totalPurchaseCostInternal - montagePrice) > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                                                <span className="inline-flex items-center gap-1">{IC.compass('w-3.5 h-3.5')} Rohertrag:</span>
+                                                <span className="inline-flex items-center gap-1">{IC.compass('w-3.5 h-3.5')} Zysk brutto:</span>
                                                 <span>{formatCurrency(finalPrice - totalPurchaseCostInternal - montagePrice)} ({totalPurchaseCostInternal > 0 ? (((finalPrice - totalPurchaseCostInternal - montagePrice) / totalPurchaseCostInternal) * 100).toFixed(1) : 0}%)</span>
                                             </div>
                                         </div>
@@ -2861,7 +3194,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marge (%)</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Marża (%)</label>
                                     <input
                                         type="number"
                                         value={margin}
@@ -2888,7 +3221,7 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                             {/* MONTAGE PRICE */}
                             <div className="mt-4 pt-4 border-t border-slate-100">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">{IC.wrench('w-3 h-3')} Montage (netto)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">{IC.wrench('w-3 h-3')} Montaż (netto)</label>
                                 <div className="flex items-center gap-3">
                                     <input
                                         type="number"
@@ -2901,7 +3234,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     />
                                     <span className="text-slate-500 font-bold text-lg flex-shrink-0">€ netto</span>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-1">Wird zum Endpreis addiert (keine Marge/Rabatt)</p>
+                                <p className="text-xs text-slate-400 mt-1">Dodawany do ceny końcowej (bez marży/rabatu)</p>
                             </div>
                         </div>
 
@@ -2929,9 +3262,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         </>
                                     ) : (
                                         <>
-                                            <p className="text-indigo-200 text-sm">Endpreis (netto)</p>
+                                            <p className="text-indigo-200 text-sm">Cena końcowa (netto)</p>
                                             <p className="text-4xl font-black">{formatCurrency(finalPrice)}</p>
-                                            {montagePrice > 0 && <p className="text-indigo-200 text-xs">inkl. Montage: {formatCurrency(montagePrice)}</p>}
+                                            {montagePrice > 0 && <p className="text-indigo-200 text-xs">w tym montaż: {formatCurrency(montagePrice)}</p>}
                                             <p className="text-indigo-200 text-sm mt-1">z 19% VAT = {formatCurrency(finalPrice * 1.19)}</p>
                                         </>
                                     )}
@@ -2951,7 +3284,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 <div className="flex items-center gap-3 text-green-700">
                                     <span className="text-2xl">{IC.check('w-8 h-8')}</span>
                                     <div>
-                                        <p className="font-bold">Angebot erfolgreich gespeichert!</p>
+                                        <p className="font-bold">Oferta zapisana pomyślnie!</p>
                                         <p className="text-xs text-green-600">ID: {savedOfferId}</p>
                                     </div>
                                 </div>
@@ -2960,7 +3293,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 {publicLink && (
                                     <div className="bg-white p-4 rounded-xl border border-green-100 space-y-2">
                                         <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                            <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} Link zur interaktiven Angebotsseite</span>
+                                            <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} Link do interaktywnej oferty</span>
                                         </p>
                                         <div className="flex gap-2">
                                             <input
@@ -2995,19 +3328,19 @@ export const ProductConfiguratorV2: React.FC = () => {
                                         onClick={() => setShowSendEmailModal(true)}
                                         className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                                     >
-                                        <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} E-Mail senden</span>
+                                        <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} Wyślij e-mail</span>
                                     </button>
                                     <button
                                         onClick={handleGeneratePDF}
                                         className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
                                     >
-                                        <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-4 h-4')} PDF herunterladen</span>
+                                        <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-4 h-4')} Pobierz PDF</span>
                                     </button>
                                     <button
                                         onClick={() => navigate('/dashboard')}
                                         className="px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
                                     >
-                                        Beenden
+                                        Zakończ
                                     </button>
                                 </div>
                             </div>
@@ -3016,23 +3349,23 @@ export const ProductConfiguratorV2: React.FC = () => {
                             <div className="flex flex-wrap gap-3">
                                 <button
                                     onClick={handleSaveOffer}
-                                    disabled={savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
-                                    className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || (!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
+                                    disabled={savingOffer || ((!isManualMode && basket.length === 0) && (isManualMode || customItems.length === 0) && offerVariants.length === 0)}
+                                    className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${savingOffer || ((!isManualMode && basket.length === 0) && (isManualMode || customItems.length === 0) && offerVariants.length === 0)
                                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                         : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
                                         }`}
                                 >
-                                    {savingOffer ? 'Speichern...' : <><span className="inline-flex items-center gap-1.5">{IC.check('w-4 h-4')} Angebot speichern</span></>}
+                                    {savingOffer ? 'Zapisywanie...' : <><span className="inline-flex items-center gap-1.5">{IC.check('w-4 h-4')} Zapisz ofertę{offerVariants.length > 0 ? ` (${offerVariants.length} wariant${offerVariants.length === 1 ? '' : 'y'})` : ''}</span></>}
                                 </button>
                                 <button
                                     onClick={() => setShowSendEmailModal(true)}
-                                    disabled={(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)}
-                                    className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${(!isManualMode && basket.length === 0) || (isManualMode && customItems.length === 0)
+                                    disabled={((!isManualMode && basket.length === 0) && (isManualMode || customItems.length === 0) && offerVariants.length === 0)}
+                                    className={`py-4 px-6 rounded-xl font-bold text-lg transition-all ${((!isManualMode && basket.length === 0) && (isManualMode || customItems.length === 0) && offerVariants.length === 0)
                                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
                                         }`}
                                 >
-                                    <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} E-Mail senden</span>
+                                    <span className="inline-flex items-center gap-1.5">{IC.link('w-4 h-4')} Wyślij e-mail</span>
                                 </button>
                             </div>
                         )}
@@ -3074,36 +3407,52 @@ export const ProductConfiguratorV2: React.FC = () => {
             {view === 'mode-select' && (
                 <div className="col-span-12 max-w-3xl mx-auto space-y-8">
                     <div className="text-center">
-                        <h1 className="text-3xl font-black text-slate-900 mb-2">Angebotsart wählen</h1>
-                        <p className="text-slate-500">Wie möchten Sie das Angebot erstellen?</p>
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50 rounded-full mb-4">
+                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Kreator ofert</span>
+                        </div>
+                        <h1 className="text-3xl font-black text-slate-900 mb-2">Wybierz tryb oferty</h1>
+                        <p className="text-slate-500">Jak chcesz stworzyć ofertę?</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Standard Calculator */}
                         <button
                             onClick={() => { setIsManualMode(false); setView('config'); }}
-                            className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-indigo-400 hover:shadow-lg transition-all text-left group"
+                            className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100/50 hover:-translate-y-1 transition-all text-left group"
                         >
-                            <div className="flex items-center justify-center mb-4">{IC.compass('w-12 h-12 text-indigo-400')}</div>
+                            <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                                {IC.compass('w-7 h-7 text-indigo-500')}
+                            </div>
                             <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">Kalkulator</h2>
                             <p className="text-sm text-slate-500 leading-relaxed">
-                                Automatische Preisberechnung basierend auf Modell, Maßen und Konfiguration.
-                                Ideal für Standardprodukte aus dem Aluxe-Sortiment.
+                                Automatyczne obliczanie cen na podstawie modelu, wymiarów i konfiguracji.
+                                Idealny do standardowych produktów.
                             </p>
-                            <div className="mt-4 text-xs text-slate-400">Dach • Wände • Markisen • Zubehör</div>
+                            <div className="mt-5 flex flex-wrap gap-1.5">
+                                {['Dach', 'Ściany', 'Markizy', 'Akcesoria'].map(tag => (
+                                    <span key={tag} className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{tag}</span>
+                                ))}
+                            </div>
                         </button>
 
                         {/* Manual Offer */}
                         <button
                             onClick={() => { setIsManualMode(true); setView('manual'); }}
-                            className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-emerald-400 hover:shadow-lg transition-all text-left group"
+                            className="bg-white rounded-2xl shadow-sm border-2 border-slate-200 p-8 hover:border-emerald-400 hover:shadow-xl hover:shadow-emerald-100/50 hover:-translate-y-1 transition-all text-left group"
                         >
-                            <div className="flex items-center justify-center mb-4">{IC.clipboard('w-12 h-12 text-slate-400')}</div>
-                            <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">Manuelles Angebot</h2>
+                            <div className="w-14 h-14 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                                {IC.clipboard('w-7 h-7 text-emerald-500')}
+                            </div>
+                            <h2 className="text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">Oferta ręczna</h2>
                             <p className="text-sm text-slate-500 leading-relaxed">
-                                Positionen frei eingeben mit Name und Preis.
-                                Ideal für individuelle Angebote und Sonderanfertigungen.
+                                Pozycje wpisywane ręcznie z nazwą i ceną.
+                                Idealny do indywidualnych ofert i zamówień specjalnych.
                             </p>
-                            <div className="mt-4 text-xs text-slate-400">Freie Eingabe • Flexibel • Schnell</div>
+                            <div className="mt-5 flex flex-wrap gap-1.5">
+                                {['Dowolne pozycje', 'Elastyczny', 'Szybki'].map(tag => (
+                                    <span key={tag} className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">{tag}</span>
+                                ))}
+                            </div>
                         </button>
                     </div>
                     <div className="text-center">
@@ -3111,7 +3460,7 @@ export const ProductConfiguratorV2: React.FC = () => {
                             onClick={() => setView('customer')}
                             className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
                         >
-                            ← Zurück zu Kundendaten
+                            ← Wróć do danych klienta
                         </button>
                     </div>
                 </div>
@@ -3126,9 +3475,9 @@ export const ProductConfiguratorV2: React.FC = () => {
                             onClick={() => setView('mode-select')}
                             className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
                         >
-                            ← Zurück zur Auswahl
+                            ← Wróć do wyboru
                         </button>
-                        <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">{IC.clipboard('w-7 h-7')} Manuelles Angebot</h1>
+                        <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">{IC.clipboard('w-7 h-7')} Oferta ręczna</h1>
                     </div>
 
                     {/* Customer compact header */}
@@ -3209,9 +3558,18 @@ export const ProductConfiguratorV2: React.FC = () => {
 
                     {/* Line Items */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-5 h-5')} Angebotspositionen</span>
-                        </h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5">{IC.clipboard('w-5 h-5')} Angebotspositionen</span>
+                            </h2>
+                            <button
+                                onClick={() => setIsOcrModalOpen(true)}
+                                className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 transition-colors flex items-center gap-2 border border-indigo-200"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                Angebot hochladen (OCR)
+                            </button>
+                        </div>
 
                         {customItems.length > 0 && (
                             <table className="w-full text-sm mb-4">
@@ -3308,26 +3666,6 @@ export const ProductConfiguratorV2: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Installation Cost (optional) */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5">{IC.wrench('w-5 h-5')} Montagekosten</span> <span className="text-xs text-slate-400 font-normal">(optional — wird dem Kunden separat angezeigt)</span>
-                        </h2>
-                        <div className="max-w-xs">
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Montage netto (€)</label>
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    value={manualInstallationCost}
-                                    onChange={e => setManualInstallationCost(e.target.value)}
-                                    placeholder="0.00"
-                                    className="w-full p-3 pr-12 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
-                                />
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">€</div>
-                            </div>
-                            <p className="text-xs text-slate-400 mt-1">Wird in der Kundenansicht als separate Position "Fachmontage & Logistik" angezeigt.</p>
-                        </div>
-                    </div>
 
                     {/* Margin & Discount */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -3477,12 +3815,22 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     </span>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setView('customer')}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
-                            >
-                                Ändern
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {offerVariants.length > 0 && (
+                                    <span className="text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
+                                            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+                                        </svg>
+                                        {offerVariants.length} wariant{offerVariants.length === 1 ? '' : 'y'} zapisane
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setView('customer')}
+                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                                >
+                                    Ändern
+                                </button>
+                            </div>
                         </div>
 
                         {/* Stepper */}
@@ -5780,6 +6128,25 @@ export const ProductConfiguratorV2: React.FC = () => {
                                 Dalej →
                             </button>
                         </div>
+
+                        {/* Quick jump to summary when variants already exist */}
+                        {offerVariants.length > 0 && (
+                            <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="w-10 h-10 bg-amber-600 text-white rounded-full flex items-center justify-center text-sm font-black shrink-0">{offerVariants.length}</span>
+                                    <div>
+                                        <p className="font-bold text-sm text-slate-800">Masz {offerVariants.length} wariant{offerVariants.length === 1 ? '' : 'y'}</p>
+                                        <p className="text-xs text-amber-700">Możesz dodać kolejny wariant lub przejść do zapisu oferty</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setView('summary')}
+                                    className="px-5 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm hover:bg-amber-700 transition-colors whitespace-nowrap shadow-sm"
+                                >
+                                    Przejdź do podsumowania →
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* RIGHT COLUMN: Summary (Always visible in Config/Summary view) */}
@@ -6020,13 +6387,13 @@ export const ProductConfiguratorV2: React.FC = () => {
                                     </div>
 
                                     <button
-                                        onClick={() => basket.length > 0 ? setView('summary') : toast.error('Bitte Positionen hinzufügen')}
-                                        className={`w-full mt-3 py-2 rounded-lg font-bold text-sm ${basket.length > 0
+                                        onClick={() => (basket.length > 0 || offerVariants.length > 0) ? setView('summary') : toast.error('Dodaj pozycje do koszyka')}
+                                        className={`w-full mt-3 py-2 rounded-lg font-bold text-sm ${(basket.length > 0 || offerVariants.length > 0)
                                             ? 'bg-slate-900 text-white hover:bg-slate-800'
                                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                             }`}
                                     >
-                                        Weiter zum Angebot →
+                                        {offerVariants.length > 0 && basket.length === 0 ? 'Podsumowanie wariantów →' : 'Weiter zum Angebot →'}
                                     </button>
                                 </div>
                             </div>
@@ -6048,6 +6415,20 @@ export const ProductConfiguratorV2: React.FC = () => {
                 leadId={savedOfferRef.current?.leadId}
                 offer={savedOfferRef.current || undefined}
             />
+            {isOcrModalOpen && (
+                <OcrInvoiceScannerModal
+                    onClose={() => setIsOcrModalOpen(false)}
+                    onImport={(items) => {
+                        const newItems = items.map(item => ({
+                            id: `manual-ocr-${Math.random().toString(36).substr(2, 9)}`,
+                            name: item.name,
+                            price: item.price,
+                            description: item.description
+                        }));
+                        setCustomItems(prev => [...prev, ...newItems]);
+                    }}
+                />
+            )}
         </div >
     );
 };

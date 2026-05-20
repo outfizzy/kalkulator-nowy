@@ -228,6 +228,31 @@ export const ContractsList: React.FC = () => {
                                             )}
                                         </div>
                                     </div>
+                                    {/* Row 1.5: Ordered Items Progress */}
+                                    {contract.orderedItems && contract.orderedItems.length > 0 && (() => {
+                                        const oi = contract.orderedItems;
+                                        const pending = oi.filter(i => i.status === 'pending').length;
+                                        const ordered = oi.filter(i => i.status === 'ordered').length;
+                                        const inProd = oi.filter(i => i.status === 'in_production').length;
+                                        const shipped = oi.filter(i => i.status === 'shipped').length;
+                                        const delivered = oi.filter(i => i.status === 'delivered').length;
+                                        const total = oi.length;
+                                        const donePercent = Math.round(((delivered + shipped) / total) * 100);
+                                        return (
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+                                                    {delivered > 0 && <div className="h-full bg-green-500" style={{ width: `${(delivered / total) * 100}%` }} />}
+                                                    {shipped > 0 && <div className="h-full bg-teal-500" style={{ width: `${(shipped / total) * 100}%` }} />}
+                                                    {inProd > 0 && <div className="h-full bg-purple-500" style={{ width: `${(inProd / total) * 100}%` }} />}
+                                                    {ordered > 0 && <div className="h-full bg-blue-500" style={{ width: `${(ordered / total) * 100}%` }} />}
+                                                    {pending > 0 && <div className="h-full bg-amber-400" style={{ width: `${(pending / total) * 100}%` }} />}
+                                                </div>
+                                                <span className="text-[9px] text-slate-400 font-medium">
+                                                    📦 {delivered + shipped}/{total}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
                                     {/* Row 2: Client + Value */}
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="min-w-0">
@@ -264,6 +289,7 @@ export const ContractsList: React.FC = () => {
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-500 uppercase">Zaliczka</th>
                                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase">Handlowiec</th>
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-500 uppercase">Montaż</th>
+                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-500 uppercase">Towar</th>
                                     <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase">Netto</th>
                                     {canSeeCommission && <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase">Prowizja</th>}
                                     <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase"></th>
@@ -272,7 +298,7 @@ export const ContractsList: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {filteredContracts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={canSeeCommission ? 10 : 9} className="px-4 py-12 text-center text-slate-500">
+                                        <td colSpan={canSeeCommission ? 11 : 10} className="px-4 py-12 text-center text-slate-500">
                                             Brak umów spełniających kryteria
                                         </td>
                                     </tr>
@@ -329,6 +355,38 @@ export const ContractsList: React.FC = () => {
                                                             {installation.status === 'completed' ? 'Gotowy' : installation.status === 'scheduled' ? 'Plan' : 'Oczek.'}
                                                         </span>
                                                     ) : <span className="text-slate-300">-</span>}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-center">
+                                                    {contract.orderedItems && contract.orderedItems.length > 0 ? (() => {
+                                                        const oi = contract.orderedItems;
+                                                        const pending = oi.filter(i => i.status === 'pending').length;
+                                                        const ordered = oi.filter(i => i.status === 'ordered').length;
+                                                        const inProd = oi.filter(i => i.status === 'in_production').length;
+                                                        const shipped = oi.filter(i => i.status === 'shipped').length;
+                                                        const delivered = oi.filter(i => i.status === 'delivered').length;
+                                                        const total = oi.length;
+                                                        const allDone = delivered === total;
+                                                        const totalCost = oi.reduce((s, it) => s + ((it.purchaseCost || 0) * (it.quantity || 1)), 0);
+                                                        return (
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <div className="flex items-center gap-1">
+                                                                    {pending > 0 && <span className="w-2 h-2 rounded-full bg-amber-400" title={`${pending} oczekuje`} />}
+                                                                    {ordered > 0 && <span className="w-2 h-2 rounded-full bg-blue-500" title={`${ordered} zamówione`} />}
+                                                                    {inProd > 0 && <span className="w-2 h-2 rounded-full bg-purple-500" title={`${inProd} w produkcji`} />}
+                                                                    {shipped > 0 && <span className="w-2 h-2 rounded-full bg-teal-500" title={`${shipped} wysłane`} />}
+                                                                    {delivered > 0 && <span className="w-2 h-2 rounded-full bg-green-500" title={`${delivered} dostarczone`} />}
+                                                                </div>
+                                                                <span className={`text-[9px] font-bold ${allDone ? 'text-green-600' : 'text-slate-500'}`}>
+                                                                    {allDone ? '✅' : `${delivered + shipped}/${total}`}
+                                                                </span>
+                                                                {totalCost > 0 && (
+                                                                    <span className="text-[9px] text-emerald-600 font-medium">
+                                                                        {totalCost.toFixed(0)}€
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })() : <span className="text-slate-300 text-xs">—</span>}
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-slate-900">
                                                     {(contract.pricing?.finalPriceNet || contract.pricing?.sellingPriceNet || 0).toFixed(0)} €

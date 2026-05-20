@@ -184,9 +184,9 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
         e.preventDefault();
         // Basic validation
         const newErrors: Record<string, string> = {};
-        if (!customer.lastName) newErrors.lastName = 'Nachname ist erforderlich';
-        if (!customer.postalCode) newErrors.postalCode = 'PLZ ist erforderlich';
-        if (!customer.city) newErrors.city = 'Ort ist erforderlich';
+        if (!customer.lastName) newErrors.lastName = 'Nazwisko jest wymagane';
+        if (!customer.postalCode) newErrors.postalCode = 'Kod pocztowy jest wymagany';
+        if (!customer.city) newErrors.city = 'Miejscowość jest wymagana';
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
@@ -213,8 +213,8 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-bold text-slate-900">Bestehenden Kunden suchen</h3>
-                                <p className="text-sm text-accent-dark">Oder neue Daten unten eingeben</p>
+                                <h3 className="font-bold text-slate-900">Wyszukaj istniejącego klienta</h3>
+                                <p className="text-sm text-accent-dark">Lub wpisz nowe dane poniżej</p>
                             </div>
                         </div>
                         <button
@@ -241,7 +241,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             className="px-4 py-2 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:border-accent hover:text-accent font-medium text-sm transition-all flex items-center gap-2"
                         >
                             <span className="text-xl">⚡️</span>
-                            Schnellangebot (ohne Daten)
+                            Szybka wycena (bez danych)
                         </button>
                     </div>
                     <div className="relative customer-search-container">
@@ -250,7 +250,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             value={searchQuery}
                             onChange={handleSearchChange}
                             onFocus={() => setShowDropdown(true)}
-                            placeholder="Name, Nachname, Ort oder PLZ eingeben..."
+                            placeholder="Imię, nazwisko, miasto lub kod pocztowy..."
                             className="w-full p-3 pl-10 border-2 border-accent/60 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-white shadow-sm transition-all"
                         />
                         <svg className="w-5 h-5 text-accent absolute left-3 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -281,7 +281,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                             {item.customer.firstName} {item.customer.lastName}
                                         </div>
                                         <div className="text-sm text-slate-600 mt-1">
-                                            {item.customer.postalCode} {item.customer.city} • <span className="text-accent font-medium">{item.offerCount} {item.offerCount === 1 ? 'Angebot' : 'Angebote'}</span>
+                                            {item.customer.postalCode} {item.customer.city} • <span className="text-accent font-medium">{item.offerCount} {item.offerCount === 1 ? 'oferta' : 'ofert'}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -293,7 +293,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 <svg className="w-5 h-5 inline mr-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Keine Kunden gefunden für "{searchQuery}"
+                                Nie znaleziono klientów dla "{searchQuery}"
                             </div>
                         )}
                     </div>
@@ -305,13 +305,13 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <span className="text-2xl">👤</span>
-                        <h3 className="text-xl font-bold text-slate-800">Persönliche Daten</h3>
+                        <h3 className="text-xl font-bold text-slate-800">Dane osobowe</h3>
                     </div>
 
                     <div className="space-y-5">
                         {/* Salutation */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-3">Anrede</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-3">Zwrot grzecznościowy</label>
                             <div className="flex gap-4">
                                 {['Herr', 'Frau', 'Firma'].map(opt => (
                                     <label key={opt} className={`flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-3 rounded-xl border-2 transition-all ${customer.salutation === opt ? 'border-accent bg-accent/5 text-accent font-bold' : 'border-slate-200 hover:border-accent/30'}`}>
@@ -332,7 +332,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         {/* Name fields */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Vorname</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Imię</label>
                                 <input
                                     type="text"
                                     name="firstName"
@@ -344,7 +344,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Nachname / Firmenname <span className="text-red-500">*</span>
+                                    Nazwisko / Firma <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -364,14 +364,14 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <span className="text-2xl">📍</span>
-                        <h3 className="text-xl font-bold text-slate-800">Adresse</h3>
+                        <h3 className="text-xl font-bold text-slate-800">Adres</h3>
                     </div>
 
                     <div className="space-y-5">
                         {/* Street and House Number */}
                         <div className="grid grid-cols-3 gap-5">
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Straße</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Ulica</label>
                                 <input
                                     type="text"
                                     name="street"
@@ -382,7 +382,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Hausnr.</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Nr domu</label>
                                 <input
                                     type="text"
                                     name="houseNumber"
@@ -398,7 +398,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         <div className="grid grid-cols-3 gap-5">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    PLZ <span className="text-red-500">*</span>
+                                    Kod pocztowy <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -413,7 +413,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                             </div>
                             <div className="col-span-2">
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Ort <span className="text-red-500">*</span>
+                                    Miejscowość <span className="text-red-500">*</span>
                                     {customer.city && !cityManuallyEdited.current && customer.postalCode && <span className="ml-1.5 text-xs text-emerald-500 font-normal">✓ auto</span>}
                                 </label>
                                 <input
@@ -491,7 +491,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                                         {plzLookupLoading ? (
                                             <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></span> Schneelastzone wird geprüft (AI)...</>
                                         ) : (
-                                            <>🔍 Schneelastzone per AI verfeinern</>
+                                            <>🔍 Doprecyzuj strefę śniegową (AI)</>
                                         )}
                                     </button>
                                 )}
@@ -535,50 +535,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                     </div>
                 </section>
 
-                {/* Section 4: Assignments (New) */}
-                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-                        <span className="text-2xl">🤝</span>
-                        <h3 className="text-xl font-bold text-slate-800">Zuweisungen</h3>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Betreuer / Vertreter</label>
-                            <select
-                                name="representative_id"
-                                value={customer.representative_id || ''}
-                                onChange={handleChange}
-                                className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-white"
-                            >
-                                <option value="">-- Betreuer wählen --</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.firstName} {u.lastName} ({u.role})
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-slate-500 mt-1">Zuständige Person für den Kundenkontakt.</p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Vertragsunterzeichner</label>
-                            <select
-                                name="contract_signer_id"
-                                value={customer.contract_signer_id || ''}
-                                onChange={handleChange}
-                                className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all bg-white"
-                            >
-                                <option value="">-- Person wählen --</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.firstName} {u.lastName} ({u.role})
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-slate-500 mt-1">Person, die den Vertrag unterzeichnet.</p>
-                        </div>
-                    </div>
-                </section>
 
                 {/* Submit Button */}
                 <div className="flex justify-end">
@@ -586,7 +543,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onComplete, initialD
                         type="submit"
                         className="px-8 py-4 bg-accent text-white rounded-xl font-bold text-lg hover:bg-orange-600 transition-all shadow-lg shadow-accent/30 hover:shadow-xl hover:scale-[1.02] flex items-center gap-3"
                     >
-                        <span>{submitLabel || 'Weiter: Produktkonfiguration'}</span>
+                        <span>{submitLabel || 'Dalej: Konfiguracja produktu'}</span>
                         {submitLabel ? (
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

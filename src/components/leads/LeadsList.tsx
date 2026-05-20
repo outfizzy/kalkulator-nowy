@@ -81,7 +81,7 @@ export const LeadsList: React.FC = () => {
         setLoadingClosed(true);
         try {
             const closedLeads = await DatabaseService.getLeads({
-                excludeStatuses: ['new', 'formularz', 'contacted', 'offer_sent', 'measurement_scheduled', 'measurement_completed', 'negotiation', 'fair']
+                excludeStatuses: ['new', 'formularz_sent', 'formularz', 'contacted', 'offer_sent', 'contact_after_offer', 'measurement_scheduled', 'measurement_completed', 'negotiation', 'fair']
             });
             setLeads(prev => {
                 const existingIds = new Set(prev.map(l => l.id));
@@ -145,12 +145,14 @@ export const LeadsList: React.FC = () => {
             }
         }
 
-        // Assignee Filter
+        // Assignee Filter (includes additional assignees)
         if (filterAssignee !== 'all') {
             if (filterAssignee === 'unassigned') {
                 if (lead.assignedTo) return false;
             } else {
-                if (lead.assignedTo !== filterAssignee) return false;
+                const isPrimary = lead.assignedTo === filterAssignee;
+                const isAdditional = (lead.additionalAssignees || []).includes(filterAssignee);
+                if (!isPrimary && !isAdditional) return false;
             }
         }
 
@@ -200,10 +202,12 @@ export const LeadsList: React.FC = () => {
         const styles: Record<string, string> = {
             new: 'bg-blue-100 text-blue-800',
             contacted: 'bg-yellow-100 text-yellow-800',
+            formularz_sent: 'bg-sky-100 text-sky-800',
             formularz: 'bg-teal-100 text-teal-800',
             measurement_scheduled: 'bg-cyan-100 text-cyan-800',
             measurement_completed: 'bg-purple-100 text-purple-800',
             offer_sent: 'bg-indigo-100 text-indigo-800',
+            contact_after_offer: 'bg-amber-100 text-amber-800',
             negotiation: 'bg-purple-100 text-purple-800',
             won: 'bg-green-100 text-green-800',
             lost: 'bg-red-100 text-red-800',
@@ -212,10 +216,12 @@ export const LeadsList: React.FC = () => {
         const labels: Record<string, string> = {
             new: 'Nowy',
             contacted: 'Skontaktowano',
-            formularz: 'Nowy (Form.)',
+            formularz_sent: 'Form. wysłany',
+            formularz: 'Form. wypełniony',
             measurement_scheduled: 'Umówiony na pomiar',
             measurement_completed: 'Pomiar odbył się',
             offer_sent: 'Oferta Wysłana',
+            contact_after_offer: 'Kontakt po ofercie',
             negotiation: 'Negocjacje',
             won: 'Wygrany',
             lost: 'Utracony',
@@ -305,11 +311,11 @@ export const LeadsList: React.FC = () => {
     // ── Compute quick KPIs for always-visible strip ──
     const quickKpis = React.useMemo(() => {
         const total = filteredLeads.length;
-        const newLeads = filteredLeads.filter(l => ['new', 'formularz'].includes(l.status)).length;
-        const inProcess = filteredLeads.filter(l => ['contacted', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'negotiation'].includes(l.status)).length;
+        const newLeads = filteredLeads.filter(l => ['new', 'formularz_sent', 'formularz'].includes(l.status)).length;
+        const inProcess = filteredLeads.filter(l => ['contacted', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
         const won = filteredLeads.filter(l => l.status === 'won').length;
         const lost = filteredLeads.filter(l => l.status === 'lost').length;
-        const offerSent = filteredLeads.filter(l => ['offer_sent', 'negotiation'].includes(l.status)).length;
+        const offerSent = filteredLeads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
         const offerRate = total > 0 ? ((offerSent / total) * 100).toFixed(0) : '0';
         const totalClosed = won + lost;
         const winRate = totalClosed > 0 ? ((won / totalClosed) * 100).toFixed(0) : '—';
@@ -467,7 +473,12 @@ export const LeadsList: React.FC = () => {
                                     )}
                                 </td>
                                 <td className="px-6 py-4 text-slate-600">
-                                    {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName} ` : '-'}
+                                    <div className="flex items-center gap-1">
+                                        {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '-'}
+                                        {(lead.additionalAssigneesProfiles?.length || 0) > 0 && (
+                                            <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title={(lead.additionalAssigneesProfiles || []).map(p => `${p.firstName} ${p.lastName}`).join(', ')}>+{lead.additionalAssigneesProfiles!.length}</span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 text-right text-slate-500">
                                     {new Date(lead.createdAt).toLocaleDateString()}
@@ -636,10 +647,12 @@ export const LeadsList: React.FC = () => {
                         <option value="new">Nowy</option>
                         <option value="fair">Targi (Nowy)</option>
                         <option value="contacted">Skontaktowano</option>
-                        <option value="formularz">Nowy (Formularz)</option>
+                        <option value="formularz_sent">Formularz wysłany</option>
+                        <option value="formularz">Formularz wypełniony</option>
                         <option value="measurement_scheduled">Umówiony na pomiar</option>
                         <option value="measurement_completed">Pomiar odbył się</option>
-                        <option value="offer_sent">Oferta</option>
+                        <option value="offer_sent">Oferta wysłana</option>
+                        <option value="contact_after_offer">Kontakt po ofercie</option>
                         <option value="negotiation">Negocjacje</option>
                         <option value="won">Wygrany</option>
                         <option value="lost">Utracony</option>
@@ -741,9 +754,11 @@ export const LeadsList: React.FC = () => {
                             <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none">
                                 <option value="">Jaki status...</option>
                                 <option value="new">Nowy</option>
-                                <option value="formularz">Nowy (Form.)</option>
+                                <option value="formularz_sent">Form. wysłany</option>
+                                <option value="formularz">Form. wypełniony</option>
                                 <option value="contacted">Skontaktowano</option>
                                 <option value="offer_sent">Oferta Wysłana</option>
+                                <option value="contact_after_offer">Kontakt po ofercie</option>
                                 <option value="measurement_scheduled">Umówiony na pomiar</option>
                                 <option value="measurement_completed">Pomiar odbył się</option>
                                 <option value="negotiation">Negocjacje</option>

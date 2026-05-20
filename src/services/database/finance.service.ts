@@ -63,7 +63,7 @@ export const FinanceService = {
         let query = supabase
             .from('wallet_transactions')
             .select('*')
-            .order('date', { ascending: false });
+            .order('created_at', { ascending: false });
 
         if (filters?.type) {
             query = query.eq('type', filters.type);
@@ -94,6 +94,23 @@ export const FinanceService = {
             }
         }
 
+        // Also fetch deposit profile names
+        const depositByIds = [...new Set(data.map(r => r.deposited_by).filter(Boolean))];
+        let depositProfileMap: Record<string, string> = {};
+        if (depositByIds.length > 0) {
+            const missingIds = depositByIds.filter(id => !profileMap[id]);
+            if (missingIds.length > 0) {
+                const { data: depositProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', missingIds);
+                if (depositProfiles) {
+                    depositProfileMap = Object.fromEntries(depositProfiles.map(p => [p.id, p.full_name]));
+                }
+            }
+        }
+        const allProfileMap = { ...profileMap, ...depositProfileMap };
+
         return data.map(row => ({
             id: row.id,
             type: row.type,
@@ -106,12 +123,17 @@ export const FinanceService = {
             customerName: row.customer_name,
             contractNumber: row.contract_number,
             processedBy: row.processed_by,
-            processedByName: profileMap[row.processed_by] || undefined,
-            createdAt: new Date(row.created_at)
+            processedByName: allProfileMap[row.processed_by] || undefined,
+            createdAt: new Date(row.created_at),
+            depositedAmount: row.deposited_amount ? Number(row.deposited_amount) : undefined,
+            depositDate: row.deposit_date ? new Date(row.deposit_date) : undefined,
+            depositedBy: row.deposited_by || undefined,
+            depositedByName: row.deposited_by ? allProfileMap[row.deposited_by] : undefined
         }));
     },
 
     async createWalletTransaction(transaction: Omit<WalletTransaction, 'id' | 'createdAt' | 'processedBy'>): Promise<WalletTransaction> {
+        if (!transaction.amount || transaction.amount <= 0) throw new Error('Kwota musi być większa od 0');
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
@@ -173,6 +195,7 @@ export const FinanceService = {
             currentBalance: 0,
             totalIncome: 0,
             totalExpense: 0,
+            totalDeposited: 0,
             monthlyIncome: 0,
             monthlyExpense: 0
         };
@@ -184,6 +207,7 @@ export const FinanceService = {
 
         transactions?.forEach(tx => {
             const amount = Number(tx.amount);
+            const deposited = Number(tx.deposited_amount) || 0;
             const date = new Date(tx.date);
             const isCurrentMonth = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
             const currency = tx.currency as 'PLN' | 'EUR' || 'EUR'; // Default to EUR if missing
@@ -192,6 +216,7 @@ export const FinanceService = {
 
             if (tx.type === 'income') {
                 targetStats.totalIncome += amount;
+                targetStats.totalDeposited += deposited;
                 if (isCurrentMonth) {
                     targetStats.monthlyIncome += amount;
                 }
@@ -203,13 +228,16 @@ export const FinanceService = {
             }
         });
 
-        stats.pln.currentBalance = stats.pln.totalIncome - stats.pln.totalExpense;
-        stats.eur.currentBalance = stats.eur.totalIncome - stats.eur.totalExpense;
+        // Cash balance = income - expenses - deposited to bank
+        stats.pln.currentBalance = stats.pln.totalIncome - stats.pln.totalExpense - stats.pln.totalDeposited;
+        stats.eur.currentBalance = stats.eur.totalIncome - stats.eur.totalExpense - stats.eur.totalDeposited;
 
         return stats;
     },
 
     async exchangeWalletTransaction(transactionId: string, exchangeRate: number): Promise<WalletTransaction> {
+        if (!exchangeRate || exchangeRate <= 0) throw new Error('Kurs wymiany musi być większy od 0');
+
         // First get the current transaction
         const { data: currentTx, error: fetchError } = await supabase
             .from('wallet_transactions')
@@ -220,9 +248,12 @@ export const FinanceService = {
         if (fetchError) throw fetchError;
         if (!currentTx) throw new Error('Transaction not found');
         if (currentTx.currency !== 'EUR') throw new Error('Can only exchange EUR transactions');
+        if (currentTx.exchange_rate) throw new Error('Ta transakcja została już wymieniona');
 
         const originalAmount = Number(currentTx.amount);
         const convertedAmount = originalAmount * exchangeRate;
+        const currentDeposited = Number(currentTx.deposited_amount) || 0;
+        const convertedDeposited = currentDeposited * exchangeRate;
 
         // Update the transaction with new currency and exchange info
         const { data, error } = await supabase
@@ -232,7 +263,8 @@ export const FinanceService = {
                 amount: convertedAmount,
                 exchange_rate: exchangeRate,
                 original_currency: 'EUR',
-                original_amount: originalAmount
+                original_amount: originalAmount,
+                deposited_amount: convertedDeposited
             })
             .eq('id', transactionId)
             .select()
@@ -274,7 +306,7 @@ export const FinanceService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        // Insert into deleted_wallet_transactions
+        // Insert into deleted_wallet_transactions (including deposit data)
         const { error: insertError } = await supabase
             .from('deleted_wallet_transactions')
             .insert({
@@ -291,6 +323,9 @@ export const FinanceService = {
                 exchange_rate: transaction.exchange_rate,
                 original_currency: transaction.original_currency,
                 original_amount: transaction.original_amount,
+                deposited_amount: transaction.deposited_amount,
+                deposit_date: transaction.deposit_date,
+                deposited_by: transaction.deposited_by,
                 deletion_reason: reason,
                 deleted_by: user.id,
                 processed_by: transaction.processed_by,
@@ -417,5 +452,107 @@ export const FinanceService = {
         });
 
         return { expense: mapTx(expenseData), income: mapTx(incomeData) };
+    },
+
+    /**
+     * Deposit cash transaction to bank account.
+     * Updates the deposited_amount on the transaction.
+     */
+    async depositToBank(transactionId: string, depositAmount: number): Promise<WalletTransaction> {
+        if (!depositAmount || depositAmount <= 0) throw new Error('Kwota wpłaty musi być większa od 0');
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Get current transaction
+        const { data: currentTx, error: fetchError } = await supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('id', transactionId)
+            .single();
+
+        if (fetchError) throw fetchError;
+        if (!currentTx) throw new Error('Transaction not found');
+        if (currentTx.type !== 'income') throw new Error('Wpłata na konto możliwa tylko dla przychodów');
+
+        const currentDeposited = Number(currentTx.deposited_amount) || 0;
+        const newDeposited = currentDeposited + depositAmount;
+        const txAmount = Number(currentTx.amount);
+
+        if (newDeposited > txAmount) {
+            throw new Error(`Kwota wpłaty (${newDeposited.toFixed(2)}) przekracza kwotę transakcji (${txAmount.toFixed(2)})`);
+        }
+
+        const { data, error } = await supabase
+            .from('wallet_transactions')
+            .update({
+                deposited_amount: newDeposited,
+                deposit_date: new Date().toISOString(),
+                deposited_by: user.id
+            })
+            .eq('id', transactionId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Get user profile name
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+
+        return {
+            id: data.id,
+            type: data.type,
+            amount: Number(data.amount),
+            currency: data.currency || 'EUR',
+            category: data.category,
+            description: data.description,
+            date: data.date,
+            customerId: data.customer_id,
+            customerName: data.customer_name,
+            contractNumber: data.contract_number,
+            processedBy: data.processed_by,
+            createdAt: new Date(data.created_at),
+            depositedAmount: Number(data.deposited_amount),
+            depositDate: data.deposit_date ? new Date(data.deposit_date) : undefined,
+            depositedBy: data.deposited_by,
+            depositedByName: profile?.full_name || undefined
+        };
+    },
+
+    /**
+     * Bulk deposit: marks multiple income transactions as fully deposited to bank.
+     */
+    async depositToBankBulk(transactionIds: string[]): Promise<void> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const now = new Date().toISOString();
+
+        // For each transaction, set deposited_amount = amount (full deposit)
+        for (const txId of transactionIds) {
+            const { data: tx, error: fetchError } = await supabase
+                .from('wallet_transactions')
+                .select('amount, type')
+                .eq('id', txId)
+                .single();
+
+            if (fetchError) throw fetchError;
+            if (!tx || tx.type !== 'income') continue;
+
+            const { error } = await supabase
+                .from('wallet_transactions')
+                .update({
+                    deposited_amount: Number(tx.amount),
+                    deposit_date: now,
+                    deposited_by: user.id
+                })
+                .eq('id', txId);
+
+            if (error) throw error;
+        }
     },
 };

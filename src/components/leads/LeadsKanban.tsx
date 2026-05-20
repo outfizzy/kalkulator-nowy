@@ -53,9 +53,11 @@ interface LeadsKanbanProps {
 
 const COLUMNS: { id: LeadStatus; title: string; color: string }[] = [
     { id: 'new', title: 'Nowe', color: 'bg-blue-50 border-blue-100 text-blue-700' },
-    { id: 'formularz', title: 'Formularz', color: 'bg-teal-50 border-teal-100 text-teal-700' },
+    { id: 'formularz_sent', title: 'Formularz wysłany', color: 'bg-sky-50 border-sky-100 text-sky-700' },
+    { id: 'formularz', title: 'Formularz wypełniony', color: 'bg-teal-50 border-teal-100 text-teal-700' },
     { id: 'contacted', title: 'Skontaktowano', color: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
     { id: 'offer_sent', title: 'Wysłano Ofertę', color: 'bg-yellow-50 border-yellow-100 text-yellow-700' },
+    { id: 'contact_after_offer', title: 'Kontakt po ofercie', color: 'bg-amber-50 border-amber-100 text-amber-700' },
     { id: 'measurement_scheduled', title: 'Umówiony na pomiar', color: 'bg-cyan-50 border-cyan-100 text-cyan-700' },
     { id: 'measurement_completed', title: 'Pomiar odbył się', color: 'bg-purple-50 border-purple-100 text-purple-700' },
     { id: 'negotiation', title: 'Negocjacje', color: 'bg-orange-50 border-orange-100 text-orange-700' },
@@ -66,9 +68,11 @@ const COLUMNS: { id: LeadStatus; title: string; color: string }[] = [
 
 const COLUMN_ICONS: Record<LeadStatus, React.ReactNode> = {
     new: <Sparkles className="w-4 h-4" />,
+    formularz_sent: <Send className="w-4 h-4" />,
     formularz: <ClipboardCheck className="w-4 h-4" />,
     contacted: <Phone className="w-4 h-4" />,
     offer_sent: <Mail className="w-4 h-4" />,
+    contact_after_offer: <MessageSquare className="w-4 h-4" />,
     measurement_scheduled: <CalendarDays className="w-4 h-4" />,
     measurement_completed: <CheckCircle2 className="w-4 h-4" />,
     negotiation: <MessageCircle className="w-4 h-4" />,
@@ -80,9 +84,9 @@ const COLUMN_ICONS: Record<LeadStatus, React.ReactNode> = {
 
 // Stage-specific stale thresholds (days without contact)
 const STALE_THRESHOLDS: Record<string, number> = {
-    new: 1, formularz: 2, contacted: 3,
+    new: 1, formularz_sent: 3, formularz: 2, contacted: 3,
     measurement_scheduled: 2, measurement_completed: 3,
-    offer_sent: 5, negotiation: 7
+    offer_sent: 5, contact_after_offer: 4, negotiation: 7
 };
 
 const isLeadStale = (lead: Lead) => {
@@ -136,7 +140,7 @@ type OfferCardInfo = {
     interactionCount: number;
 };
 
-const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo, offerValue }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo; offerValue?: { total: number; count: number; lastNet: number } }) => {
+const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, formCompleted, offerViewInfo, offerValue }: { lead: Lead; onClick: (id: string) => void; onUpdate: () => void; onSchedule: (lead: Lead) => void; onDelete: (id: string) => void; isAdmin: boolean; formCompleted?: boolean; offerViewInfo?: OfferCardInfo; offerValue?: { total: number; count: number; lastNet: number; lastSentAt?: string } }) => {
     const navigate = useNavigate();
     const {
         attributes,
@@ -411,8 +415,8 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 </div>
             )}
 
-            {/* Offer value badge — for leads in offer_sent/negotiation */}
-            {['offer_sent', 'negotiation'].includes(lead.status) && (offerValue || (lead as any).wonValue) && (() => {
+            {/* Offer value badge — for leads in offer_sent/contact_after_offer/negotiation */}
+            {['offer_sent', 'contact_after_offer', 'negotiation'].includes(lead.status) && (offerValue || (lead as any).wonValue) && (() => {
                 const val = offerValue?.lastNet || offerValue?.total || (lead as any).wonValue || 0;
                 const count = offerValue?.count || 0;
                 if (val <= 0) return null;
@@ -426,6 +430,14 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                 );
             })()}
 
+            {/* Offer sent date tile */}
+            {offerValue?.lastSentAt && (
+                <div className="mb-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100">
+                    <Send className="w-3 h-3 text-indigo-400 shrink-0" />
+                    <span className="text-[10px] font-semibold text-indigo-600">Oferta wysłana: {new Date(offerValue.lastSentAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                </div>
+            )}
+
             <div className="pt-2 mt-1 border-t border-slate-100/80 flex items-center justify-between text-xs min-w-0 gap-2">
                 <div className="flex items-center gap-2">
                     {lead.assignee ? (
@@ -436,6 +448,9 @@ const KanbanCard = ({ lead, onClick, onUpdate, onSchedule, onDelete, isAdmin, fo
                             <span className="text-slate-600 font-medium truncate max-w-[90px] text-[11px]">
                                 {lead.assignee.firstName} {lead.assignee.lastName[0]}.
                             </span>
+                            {(lead.additionalAssigneesProfiles?.length || 0) > 0 && (
+                                <span className="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full" title={(lead.additionalAssigneesProfiles || []).map(p => `${p.firstName} ${p.lastName}`).join(', ')}>+{lead.additionalAssigneesProfiles!.length}</span>
+                            )}
                         </>
                     ) : (
                         <div className="flex items-center gap-1.5 text-slate-400">
@@ -666,7 +681,7 @@ interface KanbanColumnProps {
     onAutoAssign?: () => void;
     onBulkEmail?: () => void;
     offerViewMap: Record<string, OfferCardInfo>;
-    leadOfferValues: Record<string, { total: number; count: number; lastNet: number }>;
+    leadOfferValues: Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }>;
 }
 
 const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: KanbanColumnProps) => {
@@ -704,7 +719,7 @@ const KanbanColumn = ({ column, leads, onNavigate, onUpdate, onSchedule, onDelet
                     </h3>
                     <div className="flex items-center gap-1.5">
                         {/* Pipeline value for offer stages */}
-                        {['offer_sent', 'negotiation'].includes(column.id) && (() => {
+                        {['offer_sent', 'contact_after_offer', 'negotiation'].includes(column.id) && (() => {
                             const totalVal = leads.reduce((sum, l) => {
                                 const val = leadOfferValues[l.id]?.lastNet || (l as any).wonValue || 0;
                                 return sum + val;
@@ -823,24 +838,24 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const [offerValueInput, setOfferValueInput] = useState('');
 
     // Cache of lead -> total offer values from system
-    const [leadOfferValues, setLeadOfferValues] = useState<Record<string, { total: number; count: number; lastNet: number }>>({});
+    const [leadOfferValues, setLeadOfferValues] = useState<Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }>>({});
     useEffect(() => {
-        const relevantLeads = leads.filter(l => ['offer_sent', 'negotiation', 'measurement_scheduled', 'measurement_completed'].includes(l.status));
+        const relevantLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation', 'measurement_scheduled', 'measurement_completed'].includes(l.status));
         if (relevantLeads.length === 0) return;
         const fetchValues = async () => {
             const ids = relevantLeads.map(l => l.id);
             const { data } = await supabase
                 .from('offers')
-                .select('lead_id, pricing')
+                .select('lead_id, pricing, created_at')
                 .in('lead_id', ids)
                 .order('created_at', { ascending: false });
             if (!data) return;
-            const map: Record<string, { total: number; count: number; lastNet: number }> = {};
+            const map: Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }> = {};
             for (const o of data) {
                 const net = (o.pricing as any)?.sellingPriceNet || 0;
                 if (!map[o.lead_id]) {
                     // First result = latest offer (ordered by created_at desc)
-                    map[o.lead_id] = { total: net, count: 1, lastNet: net };
+                    map[o.lead_id] = { total: net, count: 1, lastNet: net, lastSentAt: o.created_at };
                 } else {
                     // Only count, don't add to total — we show last offer only
                     map[o.lead_id].count += 1;
@@ -872,10 +887,12 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         const cols: Record<LeadStatus, Lead[]> = {
             new: [],
             contacted: [],
+            formularz_sent: [],
             formularz: [],
             measurement_scheduled: [],
             measurement_completed: [],
             offer_sent: [],
+            contact_after_offer: [],
             negotiation: [],
             won: [],
             lost: [],
@@ -931,7 +948,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     // Track offer view status + customer interactions for offer_sent/negotiation leads
     const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({});
     useEffect(() => {
-        const relevantLeads = leads.filter(l => ['offer_sent', 'negotiation'].includes(l.status));
+        const relevantLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status));
         if (relevantLeads.length === 0) { setOfferViewMap({}); return; }
 
         const fetchOfferViews = async () => {
@@ -1037,7 +1054,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 }
 
                 // Moving to offer_sent or negotiation -> auto-fill offer value or ask
-                const offerStages: LeadStatus[] = ['offer_sent', 'negotiation'];
+                const offerStages: LeadStatus[] = ['offer_sent', 'contact_after_offer', 'negotiation'];
                 if (offerStages.includes(newStatus) && !offerStages.includes(lead.status)) {
                     // Check if lead already has system offers
                     const { data: offers } = await supabase
@@ -1168,7 +1185,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         // New leads = early funnel only
         const newLeads = leads.filter(l => ['new', 'formularz', 'contacted'].includes(l.status));
         // Advanced = past the contact stage
-        const advancedLeads = leads.filter(l => ['offer_sent', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
+        const advancedLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
         const wonLeads = leads.filter(l => l.status === 'won');
         const lostLeads = leads.filter(l => l.status === 'lost');
 
@@ -1178,7 +1195,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
         // Offer conversion: leads that got at least to offer_sent / total non-fair leads
         const allReal = leads.filter(l => l.status !== 'fair');
-        const pastOffer = leads.filter(l => ['offer_sent', 'negotiation', 'measurement_scheduled', 'measurement_completed', 'won', 'lost'].includes(l.status));
+        const pastOffer = leads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation', 'measurement_scheduled', 'measurement_completed', 'won', 'lost'].includes(l.status));
         const offerRate = allReal.length > 0 ? Math.round((pastOffer.length / allReal.length) * 100) : 0;
 
         // Average pipeline time for won leads

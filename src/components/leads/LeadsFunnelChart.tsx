@@ -19,10 +19,11 @@ export const LeadsFunnelChart: React.FC<LeadsFunnelChartProps> = ({ leads }) => 
     // 1. Aggregate Data
     const stats = {
         total: leads.length,
-        newAll: leads.filter(l => ['new', 'formularz'].includes(l.status)).length,
+        newAll: leads.filter(l => ['new', 'formularz_sent', 'formularz'].includes(l.status)).length,
         contacted: leads.filter(l => l.status === 'contacted').length,
         measurement: leads.filter(l => ['measurement_scheduled', 'measurement_completed'].includes(l.status)).length,
         offer_sent: leads.filter(l => l.status === 'offer_sent').length,
+        contact_after_offer: leads.filter(l => l.status === 'contact_after_offer').length,
         negotiation: leads.filter(l => l.status === 'negotiation').length,
         won: leads.filter(l => l.status === 'won').length,
         lost: leads.filter(l => l.status === 'lost').length,
@@ -37,6 +38,7 @@ export const LeadsFunnelChart: React.FC<LeadsFunnelChartProps> = ({ leads }) => 
         { name: 'Kontakt', count: stats.contacted, color: '#a5b4fc' },
         { name: 'Pomiar', count: stats.measurement, color: '#67e8f9' },
         { name: 'Oferta', count: stats.offer_sent, color: '#fcd34d' },
+        { name: 'Po ofercie', count: stats.contact_after_offer, color: '#f59e0b' },
         { name: 'Negocjacje', count: stats.negotiation, color: '#fdba74' },
         { name: 'Wygrane', count: stats.won, color: '#86efac' },
         { name: 'Utracone', count: stats.lost, color: '#fca5a5' },

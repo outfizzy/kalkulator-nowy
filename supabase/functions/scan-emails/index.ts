@@ -416,8 +416,8 @@ Deno.serve(async (req) => {
                     if (!leadData.email) leadData.email = senderEmail;
                     if (!leadData.lastName) leadData.lastName = senderName;
 
-                    const isShared = profile.email.toLowerCase().includes('buero') || profile.email.toLowerCase().includes('kontakt');
-                    const assignedTo = isShared ? null : profile.id;
+                    // [2026-05-06] Never auto-assign — leads remain without opiekun
+                    const assignedTo = null;
 
                     const { error } = await supabaseAdmin.from('leads').insert({
                         status: 'new',

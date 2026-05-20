@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { InstallerSessionService, type WorkSession } from '../../services/database/installer-session.service';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
+import { DollarSign, ChevronDown, Wrench, Briefcase, Euro, Loader2 } from 'lucide-react';
 
 interface TeamCostRow {
     teamName: string;
@@ -316,59 +317,57 @@ export const LiveCostWidget: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-gradient-to-br from-violet-100 to-purple-100 rounded-xl">
-                        <span className="text-xl">💰</span>
-                    </div>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-slate-100 rounded-lg animate-pulse" />
                     <div>
-                        <h3 className="font-bold text-slate-800">Koszty robocizny — LIVE</h3>
-                        <p className="text-xs text-slate-400">Ładowanie danych...</p>
+                        <div className="h-4 bg-slate-100 rounded w-48 animate-pulse" />
+                        <div className="h-3 bg-slate-50 rounded w-32 mt-1 animate-pulse" />
                     </div>
                 </div>
-                <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
+                <div className="flex justify-center py-6">
+                    <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {/* Header — clickable to collapse */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-4 text-white text-left flex items-center justify-between hover:from-violet-700 hover:to-purple-700 transition-all"
+                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
             >
                 <div className="flex items-center gap-3">
-                    <span className="text-2xl">💰</span>
+                    <div className="p-2 bg-violet-50 rounded-lg text-violet-600">
+                        <DollarSign className="w-5 h-5" />
+                    </div>
                     <div>
-                        <h3 className="font-bold text-lg">Koszty robocizny — LIVE</h3>
-                        <p className="text-white/60 text-xs">
+                        <h3 className="text-sm font-semibold text-slate-800">Koszty robocizny — LIVE</h3>
+                        <p className="text-[10px] text-slate-400">
                             Montażyści + Przedstawiciele · {currentMonthNameCap}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     {activeCount > 0 && (
-                        <div className="flex items-center gap-2 bg-white/15 backdrop-blur rounded-xl px-3 py-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-sm font-bold">{activeCount} aktywn{activeCount === 1 ? 'a' : 'e'}</span>
-                        </div>
+                        <span className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            {activeCount} aktywn{activeCount === 1 ? 'a' : 'e'}
+                        </span>
                     )}
                     <div className="text-right">
-                        <div className="text-base font-bold leading-tight">
+                        <div className="text-xs font-semibold text-slate-700 leading-tight">
                             {todayInstallerTotal > 0 && <span>{todayInstallerTotal.toFixed(0)} €</span>}
-                            {todayInstallerTotal > 0 && todaySalesRepPLN > 0 && <span className="text-white/40 mx-1">+</span>}
+                            {todayInstallerTotal > 0 && todaySalesRepPLN > 0 && <span className="text-slate-300 mx-1">+</span>}
                             {todaySalesRepPLN > 0 && <span>{todaySalesRepPLN.toFixed(0)} zł</span>}
                         </div>
                         {totalProwizja > 0 && (
-                            <p className="text-[10px] text-emerald-300 font-semibold">+ {totalProwizja.toFixed(0)} € prowizji</p>
+                            <p className="text-[10px] text-emerald-600 font-medium">+ {totalProwizja.toFixed(0)} € prowizji</p>
                         )}
                     </div>
-                    <svg className={`w-5 h-5 transition-transform ${collapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
                 </div>
             </button>
 
@@ -408,22 +407,22 @@ export const LiveCostWidget: React.FC = () => {
 
                     {/* Summary Cards */}
                     <div className="grid grid-cols-3 gap-2.5 px-4 pt-4 pb-2">
-                        <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl p-3 border border-violet-200">
-                            <p className="text-[10px] text-violet-600 font-bold uppercase tracking-wider">🔧 Montaż</p>
+                        <div className="bg-violet-50 rounded-lg p-3 border border-violet-100">
+                            <p className="text-[10px] text-violet-600 font-semibold uppercase tracking-wider flex items-center gap-1"><Wrench className="w-3 h-3" /> Montaż</p>
                             <p className="text-xl font-bold text-violet-800 mt-1">
                                 {monthlyInstallerCost.toFixed(0)} <span className="text-xs font-medium">€</span>
                             </p>
                             <p className="text-[10px] text-violet-500 mt-0.5">/ miesiąc</p>
                         </div>
-                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200">
-                            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">💼 Podstawy</p>
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                            <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wider flex items-center gap-1"><Briefcase className="w-3 h-3" /> Podstawy</p>
                             <p className="text-xl font-bold text-blue-800 mt-1">
                                 {monthlySalesRepCost.toFixed(0)} <span className="text-xs font-medium">zł</span>
                             </p>
                             <p className="text-[10px] text-blue-500 mt-0.5">/ miesiąc</p>
                         </div>
-                        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-3 border border-emerald-200">
-                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">💶 Prowizje</p>
+                        <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                            <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider flex items-center gap-1"><Euro className="w-3 h-3" /> Prowizje</p>
                             <p className="text-xl font-bold text-emerald-800 mt-1">
                                 {totalProwizja.toFixed(0)} <span className="text-xs font-medium">€</span>
                             </p>
@@ -434,8 +433,8 @@ export const LiveCostWidget: React.FC = () => {
                     {/* Installer Teams Table */}
                     {teamRows.length > 0 && (
                         <div className="px-4 pb-2 pt-2">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                🔧 Ekipy montażowe — dziś
+                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Wrench className="w-3.5 h-3.5" /> Ekipy montażowe — dziś
                             </h4>
                             <div className="space-y-1.5">
                                 {teamRows.map((row, i) => (
@@ -475,8 +474,8 @@ export const LiveCostWidget: React.FC = () => {
                     {/* Sales Reps Table */}
                     {salesReps.length > 0 && (
                         <div className="px-4 py-3 border-t border-slate-100">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                💼 Przedstawiciele handlowi (8:00 – 16:00)
+                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Briefcase className="w-3.5 h-3.5" /> Przedstawiciele handlowi (8:00 – 16:00)
                             </h4>
                             <div className="space-y-1.5">
                                 {salesReps.map((rep, i) => (

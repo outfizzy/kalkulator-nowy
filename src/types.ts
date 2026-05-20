@@ -150,7 +150,7 @@ export type RoofType = 'polycarbonate' | 'glass' | 'tin';
 export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
 
 // --- Leads Types ---
-export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'negotiation' | 'won' | 'lost' | 'fair' | 'formularz';
+export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'contact_after_offer' | 'negotiation' | 'won' | 'lost' | 'fair' | 'formularz_sent' | 'formularz';
 export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'website_pl' | 'targi' | 'other';
 
 export interface Lead {
@@ -168,11 +168,17 @@ export interface Lead {
         companyName?: string;
     };
     customerId?: string; // Link to Customers
-    assignedTo?: string; // User ID
+    assignedTo?: string; // User ID (primary caretaker)
+    additionalAssignees?: string[]; // Additional caretaker User IDs
     assignee?: {
         firstName: string;
         lastName: string;
     };
+    additionalAssigneesProfiles?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+    }[];
     emailMessageId?: string; // If from email
     notes?: string;
     createdAt: Date;
@@ -203,6 +209,9 @@ export interface Lead {
     wonValue?: number;       // Contract value in EUR
     wonAt?: Date;
     attachments?: { name: string; url: string; type: string; size: number }[];
+    // Technical documents (from PDF Rebrand tool)
+    technicalPdfUrl?: string;
+    visualizationPdfUrl?: string;
 }
 
 // --- Fair Module Types ---
@@ -362,6 +371,13 @@ export interface ProductConfig {
     isManual?: boolean;
     manualDescription?: string;
     manualPrice?: number;
+
+    // OCR Offer Mode
+    isOcr?: boolean;
+    ocrItems?: { name: string; quantity: number; price: number; unit: string; total: number }[];
+    ocrInstallationFee?: number;
+    ocrMargin?: number;
+    ocrBasePrice?: number;
 
     // Calculator V2 Surcharges
     selectedSurcharges?: string[];
@@ -639,7 +655,7 @@ export interface Installation {
     };
     productSummary: string; // e.g., "Trendstyle 4000x3000"
     status: InstallationStatus;
-    partsStatus?: 'pending' | 'partial' | 'all_delivered' | 'none';
+    partsStatus?: 'none' | 'partial' | 'all_delivered' | 'ready' | 'loaded' | 'on_site';
     scheduledDate?: string; // ISO Date string
     teamId?: string; // Assigned team ID
     team?: InstallationTeam; // Assigned team details
@@ -734,6 +750,11 @@ export interface OrderedItem {
     orderGroupTotal?: number; // Total price for the group
     // Order documents (PDF, images)
     orderDocuments?: { name: string; url: string; uploadedAt: string }[];
+    // ── Goods Receipt (Przyjęcie towaru) ──
+    receivedAt?: string;       // ISO timestamp — when physically received
+    receivedBy?: string;       // Name of person who accepted delivery
+    receivedNotes?: string;    // Notes at reception ("damaged packaging", "1 profile missing")
+    receivedPhoto?: string;    // URL of delivery photo
 }
 
 export interface InstallationSettings {
@@ -877,12 +898,19 @@ export interface WalletTransaction {
     exchangeRate?: number;
     originalCurrency?: 'EUR' | 'PLN';
     originalAmount?: number;
+
+    // Bank deposit tracking
+    depositedAmount?: number; // How much was deposited to bank
+    depositDate?: Date; // When it was deposited
+    depositedBy?: string; // Who deposited it
+    depositedByName?: string; // Full name from profiles join
 }
 
 export interface CurrencyStats {
     currentBalance: number;
     totalIncome: number;
     totalExpense: number;
+    totalDeposited: number; // Amount deposited to bank (leaves cash)
     monthlyIncome: number;
     monthlyExpense: number;
 }

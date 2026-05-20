@@ -68,6 +68,8 @@ export const MiniTelephonyWidget: React.FC = () => {
     const [callStats, setCallStats] = useState({ total: 0, answered: 0, missed: 0 });
     const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
     const [customers, setCustomers] = useState<MiniCustomer[]>([]);
+    const [unreadSMS, setUnreadSMS] = useState(0);
+    const [unreadWhatsApp, setUnreadWhatsApp] = useState(0);
     const [loading, setLoading] = useState(true);
 
     const loadStats = async () => {
@@ -75,7 +77,7 @@ export const MiniTelephonyWidget: React.FC = () => {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            const [statsRes, missedRes, custRes] = await Promise.all([
+            const [statsRes, missedRes, custRes, smsUnreadRes, waUnreadRes] = await Promise.all([
                 supabase
                     .from('call_logs')
                     .select('status, direction')
@@ -84,14 +86,28 @@ export const MiniTelephonyWidget: React.FC = () => {
                     .from('call_logs')
                     .select('id, from_number, to_number, created_at, status')
                     .eq('direction', 'inbound')
-                    .in('status', ['no-answer', 'busy', 'failed'])
+                    .in('status', ['no-answer', 'busy', 'failed', 'missed'])
                     .gte('created_at', today.toISOString())
                     .order('created_at', { ascending: false })
                     .limit(20),
                 supabase
                     .from('customers')
                     .select('id, first_name, last_name, phone')
-                    .not('phone', 'is', null)
+                    .not('phone', 'is', null),
+                // Count unread SMS
+                supabase
+                    .from('sms_logs')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('channel', 'sms')
+                    .eq('direction', 'inbound')
+                    .eq('is_read', false),
+                // Count unread WhatsApp
+                supabase
+                    .from('sms_logs')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('channel', 'whatsapp')
+                    .eq('direction', 'inbound')
+                    .eq('is_read', false),
             ]);
 
             if (!statsRes.error && statsRes.data) {
@@ -99,12 +115,14 @@ export const MiniTelephonyWidget: React.FC = () => {
                     total: statsRes.data.length,
                     answered: statsRes.data.filter(c => c.status === 'completed').length,
                     missed: statsRes.data.filter(c =>
-                        ['no-answer', 'busy', 'failed'].includes(c.status) && c.direction === 'inbound'
+                        ['no-answer', 'busy', 'failed', 'missed'].includes(c.status) && c.direction === 'inbound'
                     ).length,
                 });
             }
             if (!missedRes.error && missedRes.data) setMissedCalls(missedRes.data);
             if (!custRes.error && custRes.data) setCustomers(custRes.data);
+            if (!smsUnreadRes.error) setUnreadSMS(smsUnreadRes.count || 0);
+            if (!waUnreadRes.error) setUnreadWhatsApp(waUnreadRes.count || 0);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -126,11 +144,20 @@ export const MiniTelephonyWidget: React.FC = () => {
         return null;
     };
 
+    const totalNotifications = callStats.missed + unreadSMS + unreadWhatsApp;
+
     return (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-full flex flex-col p-5">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 text-green-600 rounded-lg">{PhoneIcon}</div>
+                    <div className="p-2 bg-green-100 text-green-600 rounded-lg relative">
+                        {PhoneIcon}
+                        {totalNotifications > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 animate-pulse">
+                                {totalNotifications > 99 ? '99+' : totalNotifications}
+                            </span>
+                        )}
+                    </div>
                     <h3 className="text-lg font-bold text-slate-800">Telefonia</h3>
                 </div>
                 <Link to="/telephony/calls" className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
@@ -156,14 +183,53 @@ export const MiniTelephonyWidget: React.FC = () => {
                             <div className="text-lg font-bold text-emerald-700">{callStats.answered}</div>
                             <div className="text-[10px] text-emerald-600 font-medium">ODEBRANE</div>
                         </div>
-                        <div className="bg-red-50 rounded-xl p-3 text-center">
+                        <div className="bg-red-50 rounded-xl p-3 text-center relative">
                             <div className="flex items-center justify-center gap-1.5 mb-1">
                                 <span className="text-red-500">{PhoneMissed}</span>
                             </div>
                             <div className="text-lg font-bold text-red-600">{callStats.missed}</div>
                             <div className="text-[10px] text-red-500 font-medium">NIEODEBRANE</div>
+                            {callStats.missed > 0 && (
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                            )}
                         </div>
                     </div>
+
+                    {/* ── Messaging Badges ── */}
+                    {(unreadSMS > 0 || unreadWhatsApp > 0) && (
+                        <div className="grid grid-cols-2 gap-2">
+                            {unreadSMS > 0 && (
+                                <Link
+                                    to="/telephony/sms"
+                                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 transition-colors group"
+                                >
+                                    <span className="text-blue-500 text-sm">💬</span>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[10px] text-blue-500 font-bold uppercase">SMS</div>
+                                    </div>
+                                    <span className="min-w-[20px] h-5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5 group-hover:scale-110 transition-transform">
+                                        {unreadSMS > 99 ? '99+' : unreadSMS}
+                                    </span>
+                                </Link>
+                            )}
+                            {unreadWhatsApp > 0 && (
+                                <Link
+                                    to="/telephony/whatsapp"
+                                    className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl hover:bg-green-100 transition-colors group"
+                                >
+                                    <span className="text-green-500 text-sm">
+                                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" /></svg>
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[10px] text-green-600 font-bold uppercase">WhatsApp</div>
+                                    </div>
+                                    <span className="min-w-[20px] h-5 bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5 group-hover:scale-110 transition-transform">
+                                        {unreadWhatsApp > 99 ? '99+' : unreadWhatsApp}
+                                    </span>
+                                </Link>
+                            )}
+                        </div>
+                    )}
 
                     {/* Missed Incoming Calls List */}
                     {missedCalls.length > 0 && (
@@ -201,13 +267,23 @@ export const MiniTelephonyWidget: React.FC = () => {
             )}
 
             <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-2">
-                <Link to="/telephony/whatsapp" className="flex items-center justify-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 py-2 rounded-lg hover:bg-green-100 transition-colors">
+                <Link to="/telephony/whatsapp" className="flex items-center justify-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 py-2 rounded-lg hover:bg-green-100 transition-colors relative">
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" /></svg>
                     WhatsApp
+                    {unreadWhatsApp > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-green-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                            {unreadWhatsApp}
+                        </span>
+                    )}
                 </Link>
-                <Link to="/telephony/sms" className="flex items-center justify-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 py-2 rounded-lg hover:bg-blue-100 transition-colors">
+                <Link to="/telephony/sms" className="flex items-center justify-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 py-2 rounded-lg hover:bg-blue-100 transition-colors relative">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                     SMS
+                    {unreadSMS > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                            {unreadSMS}
+                        </span>
+                    )}
                 </Link>
             </div>
         </div>

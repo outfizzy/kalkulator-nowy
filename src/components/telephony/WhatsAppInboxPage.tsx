@@ -43,7 +43,7 @@ function normalizePhone(phone: string): string {
 }
 
 export const WhatsAppInboxPage: React.FC = () => {
-    const [conversations, setConversations] = useState<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number }[]>([]);
+    const [conversations, setConversations] = useState<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number; unreadCount: number; contactName: string | null }[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
     const [thread, setThread] = useState<SMSLog[]>([]);
@@ -113,6 +113,12 @@ export const WhatsAppInboxPage: React.FC = () => {
         try {
             const data = await TelephonyService.getWhatsAppThread(phone);
             setThread(data);
+            // Mark thread as read
+            await TelephonyService.markWhatsAppThreadRead(phone);
+            // Update local state to clear unread badge
+            setConversations(prev => prev.map(c =>
+                c.phoneNumber === phone ? { ...c, unreadCount: 0 } : c
+            ));
         } catch (e) { console.error(e); }
         finally { setThreadLoading(false); }
     };
@@ -191,7 +197,7 @@ export const WhatsAppInboxPage: React.FC = () => {
 
     // Count stats
     const totalConversations = conversations.length;
-    const unreadCount = conversations.filter(c => c.lastMessage.direction === 'inbound').length;
+    const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
     return (
         <div className="wa-container" style={{ height: 'calc(100vh - 130px)', display: 'flex', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>
@@ -243,8 +249,11 @@ export const WhatsAppInboxPage: React.FC = () => {
                 {/* Stats bar */}
                 <div style={{ padding: '6px 16px', background: '#182229', display: 'flex', gap: '12px', borderBottom: '1px solid #313D45', fontSize: '11px' }}>
                     <span style={{ color: '#8696A0' }}>Rozmowy: <strong style={{ color: '#E9EDEF' }}>{totalConversations}</strong></span>
-                    {unreadCount > 0 && (
-                        <span style={{ color: WA_GREEN }}>Nowe: <strong>{unreadCount}</strong></span>
+                    {totalUnread > 0 && (
+                        <span style={{ color: WA_GREEN, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: WA_GREEN, animation: 'pulse 2s infinite' }} />
+                            Nowe: <strong>{totalUnread}</strong>
+                        </span>
                     )}
                     <span style={{ color: '#8696A0' }}>Kontakty: <strong style={{ color: '#E9EDEF' }}>{contacts.length}</strong></span>
                 </div>
@@ -311,9 +320,11 @@ export const WhatsAppInboxPage: React.FC = () => {
                     ) : (
                         filteredConvos.map(conv => {
                             const isSelected = selectedPhone === conv.phoneNumber;
-                            const isInbound = conv.lastMessage.direction === 'inbound';
+                            const hasUnread = conv.unreadCount > 0;
                             const contact = resolveContact(conv.phoneNumber);
-                            const displayName = contact ? `${contact.firstName} ${contact.lastName}` : conv.phoneNumber;
+                            // Prefer service-resolved name, then local CRM lookup
+                            const displayName = conv.contactName || (contact ? `${contact.firstName} ${contact.lastName}` : conv.phoneNumber);
+                            const hasContactName = !!(conv.contactName || contact);
                             return (
                                 <div
                                     key={conv.phoneNumber}
@@ -328,9 +339,9 @@ export const WhatsAppInboxPage: React.FC = () => {
                                     onMouseLeave={e => !isSelected && (e.currentTarget.style.background = 'transparent')}
                                 >
                                     {/* Avatar */}
-                                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: contact ? '#00A884' : '#6B7B8D', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontWeight: 700, fontSize: '16px' }}>
-                                        {contact ? (
-                                            <span>{contact.firstName[0]}{contact.lastName[0]}</span>
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: hasContactName ? '#00A884' : '#6B7B8D', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontWeight: 700, fontSize: '16px' }}>
+                                        {hasContactName ? (
+                                            <span>{displayName.split(' ').map((w: string) => w[0] || '').slice(0, 2).join('')}</span>
                                         ) : (
                                             <svg viewBox="0 0 212 212" width="48" height="48">
                                                 <path fill="#DFE5E7" d="M106.251.5C164.653.5 212 47.846 212 106.25S164.653 212 106.25 212C47.846 212 .5 164.654.5 106.25S47.846.5 106.251.5z" />
@@ -341,25 +352,25 @@ export const WhatsAppInboxPage: React.FC = () => {
                                     {/* Content */}
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                            <span style={{ color: '#E9EDEF', fontSize: contact ? '15px' : '14px', fontWeight: contact ? 500 : 400, fontFamily: contact ? 'inherit' : 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <span style={{ color: hasUnread ? '#E9EDEF' : '#E9EDEF', fontSize: hasContactName ? '15px' : '14px', fontWeight: hasUnread ? 600 : (hasContactName ? 500 : 400), fontFamily: hasContactName ? 'inherit' : 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 {displayName}
                                             </span>
-                                            <span style={{ color: isInbound ? WA_GREEN : '#8696A0', fontSize: '12px', flexShrink: 0, marginLeft: '8px' }}>{timeFormat(conv.lastMessage.created_at)}</span>
+                                            <span style={{ color: hasUnread ? WA_GREEN : '#8696A0', fontSize: '12px', flexShrink: 0, marginLeft: '8px', fontWeight: hasUnread ? 600 : 400 }}>{timeFormat(conv.lastMessage.created_at)}</span>
                                         </div>
-                                        {contact && (
+                                        {hasContactName && (
                                             <div style={{ color: '#667781', fontSize: '11px', marginBottom: '1px', fontFamily: 'monospace' }}>{conv.phoneNumber}</div>
                                         )}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            {!isInbound && <DoubleCheck />}
-                                            <span style={{ color: '#8696A0', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {conv.lastMessage.direction === 'outbound' && <DoubleCheck />}
+                                            <span style={{ color: hasUnread ? '#D1D7DB' : '#8696A0', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: hasUnread ? 500 : 400 }}>
                                                 {conv.lastMessage.body?.substring(0, 50)}
                                             </span>
                                         </div>
                                     </div>
-                                    {/* Unread badge for inbound */}
-                                    {isInbound && (
-                                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: WA_GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: WA_DARK, flexShrink: 0 }}>
-                                            {conv.messageCount > 9 ? '9+' : conv.messageCount}
+                                    {/* Unread badge */}
+                                    {hasUnread && (
+                                        <div style={{ minWidth: '20px', height: '20px', borderRadius: '50%', background: WA_GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: WA_DARK, flexShrink: 0, padding: '0 4px' }}>
+                                            {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
                                         </div>
                                     )}
                                 </div>

@@ -76,6 +76,7 @@ export interface SMSLog {
     channel: 'sms' | 'whatsapp';
     error_code: string | null;
     error_message: string | null;
+    is_read: boolean;
     created_at: string;
     // Joined
     lead?: { name: string } | null;
@@ -89,6 +90,24 @@ export interface TelephonySettings {
 // ===== SERVICE =====
 
 export const TelephonyService = {
+    // Generate all phone number format variants for matching against DB records
+    _phoneVariants(phone: string): string[] {
+        const e164 = normalizePhone(phone);
+        const variants = new Set<string>();
+        variants.add(phone); // original
+        if (e164) variants.add(e164); // E.164: +4915116595307
+        // Local format: 015116595307
+        if (e164.startsWith('+49')) {
+            variants.add('0' + e164.slice(3));
+        } else if (e164.startsWith('+48')) {
+            variants.add(e164.slice(3));
+        }
+        // Without +: 4915116595307
+        if (e164.startsWith('+')) variants.add(e164.slice(1));
+        // WhatsApp prefix
+        variants.add(`whatsapp:${e164}`);
+        return Array.from(variants).filter(v => v.length > 0);
+    },
 
     // ─── PHONE NUMBERS ───
 
@@ -211,7 +230,7 @@ export const TelephonyService = {
             .order('started_at', { ascending: false });
 
         if (options?.direction) query = query.eq('direction', options.direction);
-        if (options?.status) query = query.eq('status', options.status);
+        if (options?.status) query = query.in('status', ['missed', 'no-answer']);
         if (options?.userId) query = query.eq('user_id', options.userId);
         if (options?.limit) query = query.limit(options.limit);
         if (options?.offset) query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
@@ -352,7 +371,7 @@ export const TelephonyService = {
         return { data: data || [], count: count || 0 };
     },
 
-    async getSMSConversations(): Promise<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number }[]> {
+    async getSMSConversations(): Promise<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number; unreadCount: number; contactName: string | null }[]> {
         const { data, error } = await supabase
             .from('sms_logs')
             .select('*')
@@ -361,28 +380,99 @@ export const TelephonyService = {
 
         if (error) throw error;
 
+        // Group by NORMALIZED phone number to merge duplicates (e.g. 015xxx and +4915xxx)
         const grouped: Record<string, SMSLog[]> = {};
         for (const sms of data || []) {
-            const otherNumber = sms.direction === 'outbound' ? sms.to_number : sms.from_number;
+            const rawOther = sms.direction === 'outbound' ? sms.to_number : sms.from_number;
+            const otherNumber = normalizePhone(rawOther) || rawOther;
             if (!grouped[otherNumber]) grouped[otherNumber] = [];
             grouped[otherNumber].push(sms);
+        }
+
+        // Resolve contact names for all unique phone numbers
+        const phoneNumbers = Object.keys(grouped);
+        const nameMap = new Map<string, string>();
+
+        if (phoneNumbers.length > 0) {
+            // Batch lookup: check customers table
+            const { data: customers } = await supabase
+                .from('customers')
+                .select('phone, first_name, last_name')
+                .not('phone', 'is', null);
+
+            for (const c of customers || []) {
+                if (c.phone) {
+                    const normalizedCustPhone = normalizePhone(c.phone);
+                    for (const num of phoneNumbers) {
+                        if (num === normalizedCustPhone || num === c.phone) {
+                            if (!nameMap.has(num)) {
+                                nameMap.set(num, `${c.first_name || ''} ${c.last_name || ''}`.trim());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // For numbers not found in customers, check leads
+            const unresolvedNumbers = phoneNumbers.filter(n => !nameMap.has(n));
+            if (unresolvedNumbers.length > 0) {
+                const { data: leads } = await supabase
+                    .from('leads')
+                    .select('customer_data')
+                    .not('customer_data', 'is', null);
+
+                for (const lead of leads || []) {
+                    const cd = lead.customer_data;
+                    if (cd?.phone) {
+                        const normalizedLeadPhone = normalizePhone(cd.phone);
+                        for (const num of unresolvedNumbers) {
+                            if (num === normalizedLeadPhone || num.endsWith(normalizedLeadPhone.slice(-9)) || normalizedLeadPhone.endsWith(num.slice(-9))) {
+                                if (!nameMap.has(num)) {
+                                    nameMap.set(num, `${cd.firstName || ''} ${cd.lastName || ''}`.trim());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         return Object.entries(grouped)
             .map(([phoneNumber, messages]) => ({
                 phoneNumber,
                 lastMessage: messages[0],
-                messageCount: messages.length
+                messageCount: messages.length,
+                unreadCount: messages.filter(m => m.direction === 'inbound' && !m.is_read).length,
+                contactName: nameMap.get(phoneNumber) || null,
             }))
             .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
     },
 
+    async markSMSThreadRead(phoneNumber: string): Promise<void> {
+        // Build all possible format variants of this phone number
+        const variants = this._phoneVariants(phoneNumber);
+        
+        for (const variant of variants) {
+            await supabase
+                .from('sms_logs')
+                .update({ is_read: true })
+                .eq('channel', 'sms')
+                .eq('direction', 'inbound')
+                .eq('is_read', false)
+                .eq('from_number', variant);
+        }
+    },
+
     async getSMSThread(phoneNumber: string): Promise<SMSLog[]> {
+        // Build all possible format variants to match messages in any format
+        const variants = this._phoneVariants(phoneNumber);
+        const orClauses = variants.flatMap(v => [`from_number.eq.${v}`, `to_number.eq.${v}`]).join(',');
+
         const { data, error } = await supabase
             .from('sms_logs')
             .select('*')
             .eq('channel', 'sms')
-            .or(`from_number.eq.${phoneNumber},to_number.eq.${phoneNumber}`)
+            .or(orClauses)
             .order('created_at', { ascending: true });
 
         if (error) throw error;
@@ -417,7 +507,7 @@ export const TelephonyService = {
         return data;
     },
 
-    async getWhatsAppConversations(): Promise<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number }[]> {
+    async getWhatsAppConversations(): Promise<{ phoneNumber: string; lastMessage: SMSLog; messageCount: number; unreadCount: number; contactName: string | null }[]> {
         const { data, error } = await supabase
             .from('sms_logs')
             .select('*')
@@ -426,28 +516,91 @@ export const TelephonyService = {
 
         if (error) throw error;
 
+        // Group by NORMALIZED phone number to merge duplicates
         const grouped: Record<string, SMSLog[]> = {};
         for (const msg of data || []) {
-            const otherNumber = msg.direction === 'outbound' ? msg.to_number : msg.from_number;
+            const rawOther = msg.direction === 'outbound' ? msg.to_number : msg.from_number;
+            const otherNumber = normalizePhone(rawOther) || rawOther;
             if (!grouped[otherNumber]) grouped[otherNumber] = [];
             grouped[otherNumber].push(msg);
+        }
+
+        // Resolve contact names for all unique phone numbers
+        const phoneNumbers = Object.keys(grouped);
+        const nameMap = new Map<string, string>();
+
+        if (phoneNumbers.length > 0) {
+            const { data: customers } = await supabase
+                .from('customers')
+                .select('phone, first_name, last_name')
+                .not('phone', 'is', null);
+
+            if (customers) {
+                for (const phone of phoneNumbers) {
+                    const cleanPhone = phone.replace(/[\s\-()]/g, '').replace('whatsapp:', '');
+                    const match = customers.find(c => {
+                        const cp = (c.phone || '').replace(/[\s\-()]/g, '');
+                        return cp === cleanPhone || cp === cleanPhone.replace(/^\+/, '') || `+${cp}` === cleanPhone;
+                    });
+                    if (match) {
+                        nameMap.set(phone, `${match.first_name || ''} ${match.last_name || ''}`.trim());
+                    }
+                }
+            }
+
+            // Also check leads
+            const { data: leads } = await supabase
+                .from('leads')
+                .select('customer_data');
+
+            if (leads) {
+                for (const phone of phoneNumbers) {
+                    if (nameMap.has(phone)) continue;
+                    const cleanPhone = phone.replace(/[\s\-()]/g, '').replace('whatsapp:', '');
+                    const match = leads.find(l => {
+                        const lp = (l.customer_data?.phone || '').replace(/[\s\-()]/g, '');
+                        return lp === cleanPhone || lp === cleanPhone.replace(/^\+/, '') || `+${lp}` === cleanPhone;
+                    });
+                    if (match?.customer_data) {
+                        nameMap.set(phone, `${match.customer_data.firstName || ''} ${match.customer_data.lastName || ''}`.trim());
+                    }
+                }
+            }
         }
 
         return Object.entries(grouped)
             .map(([phoneNumber, messages]) => ({
                 phoneNumber,
                 lastMessage: messages[0],
-                messageCount: messages.length
+                messageCount: messages.length,
+                unreadCount: messages.filter(m => m.direction === 'inbound' && m.is_read === false).length,
+                contactName: nameMap.get(phoneNumber) || null,
             }))
             .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
     },
 
+    async markWhatsAppThreadRead(phoneNumber: string): Promise<void> {
+        const variants = this._phoneVariants(phoneNumber);
+        for (const variant of variants) {
+            await supabase
+                .from('sms_logs')
+                .update({ is_read: true })
+                .eq('channel', 'whatsapp')
+                .eq('direction', 'inbound')
+                .eq('is_read', false)
+                .eq('from_number', variant);
+        }
+    },
+
     async getWhatsAppThread(phoneNumber: string): Promise<SMSLog[]> {
+        const variants = this._phoneVariants(phoneNumber);
+        const orClauses = variants.flatMap(v => [`from_number.eq.${v}`, `to_number.eq.${v}`]).join(',');
+
         const { data, error } = await supabase
             .from('sms_logs')
             .select('*')
             .eq('channel', 'whatsapp')
-            .or(`from_number.eq.${phoneNumber},to_number.eq.${phoneNumber}`)
+            .or(orClauses)
             .order('created_at', { ascending: true });
 
         if (error) throw error;
@@ -628,13 +781,31 @@ export const TelephonyService = {
 
     async getTwilioToken(): Promise<{ token: string; identity: string }> {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+        if (!session) throw new Error('Brak sesji — zaloguj się ponownie');
 
         const { data, error } = await supabase.functions.invoke('voice-token', {
             headers: { Authorization: `Bearer ${session.access_token}` }
         });
 
-        if (error || !data?.token) throw new Error('Failed to get Twilio token');
+        // Edge function error (network/deployment issue)
+        if (error) {
+            console.error('[TelephonyService] Edge function error:', error);
+            throw new Error('Nie udało się połączyć z serwisem telefonicznym');
+        }
+
+        // 200-OK Payload pattern: edge function returns { error, code, details } on failure
+        if (data?.error) {
+            console.error('[TelephonyService] Token error:', data.code, data.error, data.details);
+            const err = new Error(data.error) as any;
+            err.code = data.code;
+            err.details = data.details;
+            throw err;
+        }
+
+        if (!data?.token) {
+            throw new Error('Serwer nie zwrócił tokenu Twilio');
+        }
+
         return data;
     },
 
@@ -724,7 +895,7 @@ export const TelephonyService = {
     },
 
     async lookupContact(phoneNumber: string): Promise<{
-        type: 'lead' | 'customer' | null;
+        type: 'lead' | 'customer' | 'team' | null;
         id: string | null;
         name: string | null;
         leadStatus?: string | null;
@@ -733,7 +904,24 @@ export const TelephonyService = {
     }> {
         const variants = this._phoneVariants(phoneNumber);
 
-        // Build OR filter for all variants against leads
+        // ── STEP 0: Check if this is a team member (profiles table) ──
+        // This prevents matching internal team phone numbers against test/real leads
+        const teamFilter = variants.map(v => `phone.eq.${v}`).join(',');
+        const { data: teamMembers } = await supabase
+            .from('profiles')
+            .select('id, full_name, phone')
+            .or(teamFilter)
+            .limit(1);
+
+        if (teamMembers && teamMembers.length > 0) {
+            return {
+                type: 'team',
+                id: teamMembers[0].id,
+                name: teamMembers[0].full_name,
+            };
+        }
+
+        // ── STEP 1: Check leads ──
         const leadFilter = variants
             .map(v => `customer_data->>phone.eq.${v}`)
             .join(',');
@@ -767,7 +955,7 @@ export const TelephonyService = {
             };
         }
 
-        // Then customers — try all variants
+        // ── STEP 2: Check customers ──
         const custFilter = variants
             .map(v => `phone.eq.${v}`)
             .join(',');
@@ -932,9 +1120,26 @@ export const TelephonyService = {
 
         if (unlinkedLogs.length > 0) {
             // Collect unique phone numbers from unlinked calls
-            const phonesToLookup = [...new Set(unlinkedLogs.map(l =>
+            const allPhones = [...new Set(unlinkedLogs.map(l =>
                 l.direction === 'inbound' ? l.from_number : l.to_number
             ).filter(Boolean))];
+
+            // ── Exclude team member phones from lookup ──
+            // This prevents matching internal team numbers against test/real leads
+            const { data: teamProfiles } = await supabase
+                .from('profiles')
+                .select('phone')
+                .not('phone', 'is', null);
+            const teamPhoneSet = new Set<string>();
+            for (const p of teamProfiles || []) {
+                if (!p.phone) continue;
+                const variants = this._phoneVariants(p.phone);
+                variants.forEach(v => teamPhoneSet.add(v));
+            }
+            const phonesToLookup = allPhones.filter(phone => {
+                const variants = this._phoneVariants(phone);
+                return !variants.some(v => teamPhoneSet.has(v));
+            });
 
             // Batch lookup: gather all variants for all phones
             const allLeadFilters: string[] = [];
@@ -981,6 +1186,8 @@ export const TelephonyService = {
                     .from('customers')
                     .select('id, first_name, last_name, phone')
                     .or(allCustFilters.join(','))
+                    .neq('phone', '')
+                    .not('phone', 'is', null)
                     .limit(50);
 
                 if (matchedCustomers && matchedCustomers.length > 0) {
@@ -988,6 +1195,8 @@ export const TelephonyService = {
                         if (phoneLookups[phone]) continue;
                         const variants = phoneToVariants[phone];
                         const match = matchedCustomers.find((c: any) => {
+                            // Skip customers with empty/short phone
+                            if (!c.phone || c.phone.length < 7) return false;
                             return variants.some(v => v === c.phone);
                         });
                         if (match) {

@@ -480,10 +480,13 @@ export const CallHistoryPage: React.FC = () => {
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <p className="font-semibold text-slate-800 text-sm">
-                                                        {call.direction === 'inbound'
-                                                            ? (call.lead ? call.lead.name : call.customer ? `${call.customer.firstName} ${call.customer.lastName}` : call.from_number)
-                                                            : (call.lead ? call.lead.name : call.customer ? `${call.customer.firstName} ${call.customer.lastName}` : call.to_number)
-                                                        }
+                                                        {(() => {
+                                                            const phone = call.direction === 'inbound' ? call.from_number : call.to_number;
+                                                            const contactName = call.lead?.name
+                                                                || (call.customer ? `${call.customer.firstName} ${call.customer.lastName}`.trim() : null);
+                                                            // Show contact name if found, with phone below; otherwise just phone
+                                                            return contactName || phone;
+                                                        })()}
                                                     </p>
                                                     {/* CRM link badges */}
                                                     {call.lead_id && call.lead && (
@@ -500,6 +503,24 @@ export const CallHistoryPage: React.FC = () => {
                                                             className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded hover:bg-purple-200 transition-colors"
                                                         >
                                                             Klient →
+                                                        </button>
+                                                    )}
+                                                    {/* No CRM link — show quick "Dodaj lead" button */}
+                                                    {!call.lead_id && !call.customer_id && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const phone = call.direction === 'inbound' ? call.from_number : call.to_number;
+                                                                setExtractedData(prev => ({
+                                                                    ...prev,
+                                                                    [call.id]: { firstName: '', lastName: '', phone, email: '', company: '', address: '', notes: call.summary || '' },
+                                                                }));
+                                                                setSelectedCall(call);
+                                                            }}
+                                                            className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded hover:bg-amber-200 transition-colors"
+                                                            title="Dodaj jako nowego leada"
+                                                        >
+                                                            + Lead
                                                         </button>
                                                     )}
                                                     {/* Sentiment badge */}

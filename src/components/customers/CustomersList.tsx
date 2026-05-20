@@ -88,9 +88,14 @@ export const CustomersList: React.FC = () => {
                 const offerStats = customerOfferStats.get(cId) || { count: 0, lastDate: new Date(0), latestId: '' };
                 const contractStats = customerContractStats.get(cId) || { count: 0, hasSigned: false };
 
+                // Use customer created_at as fallback activity date for customers without offers
+                const activityDate = offerStats.lastDate.getTime() > 0
+                    ? offerStats.lastDate
+                    : (c as any).created_at ? new Date((c as any).created_at) : new Date(0);
+
                 return {
                     customer: c,
-                    lastOfferDate: offerStats.lastDate,
+                    lastOfferDate: activityDate,
                     offerCount: offerStats.count,
                     latestOfferId: offerStats.latestId,
                     contractCount: contractStats.count,
@@ -98,7 +103,7 @@ export const CustomersList: React.FC = () => {
                 };
             });
 
-            // Sort by Last Activity (Offer Date)
+            // Sort by Last Activity (Offer Date or created_at fallback)
             customersWithStats.sort((a, b) => b.lastOfferDate.getTime() - a.lastOfferDate.getTime());
 
             setCustomers(customersWithStats);
@@ -116,15 +121,16 @@ export const CustomersList: React.FC = () => {
     }, []);
 
     const filteredCustomers = customers.filter(item => {
-        // 1. Text Search
+        // 1. Text Search (null-safe — fields can be null/undefined from DB)
         const query = searchQuery.toLowerCase();
         const c = item.customer;
         const matchesSearch = !searchQuery || (
-            c.firstName.toLowerCase().includes(query) ||
-            c.lastName.toLowerCase().includes(query) ||
-            c.city.toLowerCase().includes(query) ||
-            c.email.toLowerCase().includes(query) ||
-            c.phone.includes(query)
+            (c.firstName || '').toLowerCase().includes(query) ||
+            (c.lastName || '').toLowerCase().includes(query) ||
+            (c.city || '').toLowerCase().includes(query) ||
+            (c.email || '').toLowerCase().includes(query) ||
+            (c.phone || '').includes(query) ||
+            (c.companyName || '').toLowerCase().includes(query)
         );
 
         if (!matchesSearch) return false;

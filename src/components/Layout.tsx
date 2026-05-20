@@ -201,6 +201,7 @@ export const Layout: React.FC = () => {
                                 {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
                                 {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
                                 <NavLink to="/dachrechner" label="Kalkulator dachowy" icon="clipboard" />
+                                <NavLink to="/tools" label="Narzędzia" icon="tools" />
 
                                 <NavLink to="/admin/fairs" label="Targi i eventy" icon="calendar" />
                             </>)}
@@ -288,7 +289,7 @@ export const Layout: React.FC = () => {
                                 {hasPermission('team_management') && <NavLink to="/admin/users" label="Zespół i uprawnienia" icon="users" />}
                                 {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki produktów" icon="clipboard" />}
                                 {hasPermission('pricing_management') && <NavLink to="/admin/product-images" label="Galeria produktów" icon="offers" />}
-                                {hasPermission('inventory_lite') && <NavLink to="/admin/inventory" label="Stan magazynowy" icon="box" />}
+                                {(hasPermission('inventory_lite') || currentUser?.role === 'manager') && <NavLink to="/admin/inventory" label="Stan magazynowy" icon="box" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/wallet" label="Portfel prowizji" icon="clipboard" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/installers" label="Ekipy montażowe" icon="users" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="Dziennik paliwa" icon="clipboard" />}
@@ -409,6 +410,7 @@ export const Layout: React.FC = () => {
                                     {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" onClick={() => setMobileMenuOpen(false)} />}
                                     <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
+                                    <NavLink to="/tools" label="Narzędzia" icon="tools" onClick={() => setMobileMenuOpen(false)} />
 
                                 </div>
                             )}

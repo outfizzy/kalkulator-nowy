@@ -114,10 +114,47 @@ export const AIService = {
     },
 
     async deleteSession(sessionId: string) {
-        // Delete messages first
+        // 1. Get session info
+        const { data: session } = await supabase
+            .from('chat_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+
+        // 2. Get all messages for snapshot
+        const { data: messages } = await supabase
+            .from('chat_messages')
+            .select('role, content, created_at')
+            .eq('session_id', sessionId)
+            .order('created_at', { ascending: true });
+
+        // 3. Archive to deleted table
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        await supabase.from('chat_sessions_deleted').insert({
+            original_session_id: sessionId,
+            title: session?.title,
+            channel: session?.channel,
+            user_id: session?.user_id,
+            deleted_by: userId,
+            original_created_at: session?.created_at,
+            original_updated_at: session?.updated_at,
+            messages_snapshot: messages || [],
+        });
+
+        // 4. Delete messages then session
         await supabase.from('chat_messages').delete().eq('session_id', sessionId);
         const { error } = await supabase.from('chat_sessions').delete().eq('id', sessionId);
         if (error) throw error;
+    },
+
+    // Admin: get archived/deleted sessions
+    async getDeletedSessions() {
+        const { data, error } = await supabase
+            .from('chat_sessions_deleted')
+            .select('*')
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
     },
 
     async getSessionMessages(sessionId: string) {
@@ -155,7 +192,7 @@ export const AIService = {
                 throw error;
             }
 
-            return data;
+            return { content: data.reply || data.content || '', toolsUsed: data.toolsUsed };
         } catch (error) {
             console.error('AI Service Error:', error);
             throw error;

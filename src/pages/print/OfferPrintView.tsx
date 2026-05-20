@@ -117,6 +117,15 @@ export const OfferPrintView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [productImage, setProductImage] = useState<string | null>(null);
 
+    // Parse variant index from URL query param
+    const variantIdx = (() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const v = params.get('variant');
+            return v !== null ? parseInt(v) : null;
+        } catch { return null; }
+    })();
+
     useEffect(() => {
         const fetchOffer = async () => {
             if (!token) return;
@@ -124,13 +133,18 @@ export const OfferPrintView: React.FC = () => {
                 const data = await OfferService.getOfferByToken(token);
                 setOffer(data);
 
+                // Determine which modelId to use for image lookup
+                const variants = (data as any)?.variants || [];
+                const activeVariant = variantIdx !== null && variants[variantIdx] ? variants[variantIdx] : null;
+                const modelIdForImage = activeVariant?.modelId || data?.product?.modelId;
+
                 // Fetch Product Image from Price Table
-                if (data?.product?.modelId) {
+                if (modelIdForImage) {
                     try {
                         const { data: tableData } = await supabase
                             .from('price_tables')
                             .select('attributes')
-                            .eq('product_definition_id', data.product.modelId)
+                            .eq('product_definition_id', modelIdForImage)
                             .limit(1);
 
                         if (tableData?.[0]?.attributes?.image_url) {
@@ -180,18 +194,30 @@ export const OfferPrintView: React.FC = () => {
     }
 
     const c = offer.customer || {} as any;
-    const isManual = !!(offer.product as any)?.isManual;
-    const model = isManual ? 'Individuelles Angebot' : translateForView(offer.product?.modelId || '', 'models');
-    const p = offer.product as any;
+
+    // ═══ VARIANT OVERRIDE ═══
+    // If ?variant=N is present and valid, use that variant's data for the entire PDF
+    const variants = (offer as any)?.variants || [];
+    const activeVariant = variantIdx !== null && variants[variantIdx] ? variants[variantIdx] : null;
+    const variantLabel = activeVariant?.label || null;
+
+    const p = activeVariant
+        ? { ...offer.product, modelId: activeVariant.modelId, width: activeVariant.width, projection: activeVariant.projection, color: activeVariant.color, items: activeVariant.items || [], customItems: activeVariant.customItems || [] } as any
+        : offer.product as any;
+
+    const variantPricing = activeVariant?.pricing || null;
+
+    const isManual = activeVariant ? false : !!(offer.product as any)?.isManual;
+    const model = isManual ? 'Individuelles Angebot' : translateForView(p?.modelId || '', 'models');
     const dach = p?.dachrechnerData || null;
 
-    // Calculations (with null safety)
-    const installNet = Number(offer.pricing?.installationCosts?.totalInstallation) || 0;
-    const totalNet = Number(offer.pricing?.sellingPriceNet) || 0;
-    const totalGross = Number(offer.pricing?.sellingPriceGross) || (totalNet * 1.19);
+    // Calculations — use variant pricing if available
+    const installNet = Number(variantPricing?.installationCosts?.totalInstallation || offer.pricing?.installationCosts?.totalInstallation) || 0;
+    const totalNet = Number(variantPricing?.sellingPriceNet || offer.pricing?.sellingPriceNet) || 0;
+    const totalGross = Number(variantPricing?.sellingPriceGross || offer.pricing?.sellingPriceGross) || (totalNet * 1.19);
     const totalVat = totalGross - totalNet;
     const productOnlyNet = totalNet - installNet;
-    const discount = Number(offer.pricing?.discountValue) || 0;
+    const discount = Number(variantPricing?.discountValue || offer.pricing?.discountValue) || 0;
     const hasDiscount = discount > 0;
     const discountGross = hasDiscount ? discount * 1.19 : 0;
     const originalGross = hasDiscount ? totalGross + discountGross : 0;
@@ -212,15 +238,13 @@ export const OfferPrintView: React.FC = () => {
     const isCombined = !!(p?.splitPoint && Number(p?.width) > 7000);
 
     // ═══ SALE PRICE MULTIPLIER ═══
-    // Items stored in DB have CATALOG (purchase) prices.
-    // We must scale them proportionally so their SUM matches the customer-facing sellingPriceNet.
-    const catalogTotal = (Number(offer.pricing?.basePrice) || 0) + (Number((offer.pricing as any)?.customItemsPrice) || 0);
-    const sellingNetForProducts = totalNet - installNet; // sellingPriceNet includes install, remove it
-    const discountPct = Number((offer.pricing as any)?.discountPercentage) || 0;
+    const catalogTotal = (Number(variantPricing?.basePrice || offer.pricing?.basePrice) || 0) + (Number(variantPricing?.customItemsPrice || (offer.pricing as any)?.customItemsPrice) || 0);
+    const sellingNetForProducts = totalNet - installNet;
+    const discountPct = Number(variantPricing?.discountPercentage || (offer.pricing as any)?.discountPercentage) || 0;
     const preDiscountSelling = discountPct > 0 ? sellingNetForProducts / (1 - discountPct / 100) : sellingNetForProducts;
     const saleMultiplier = catalogTotal > 0 ? preDiscountSelling / catalogTotal : 1;
 
-    // Collect all line items (with safety) — prices multiplied by saleMultiplier
+    // Collect all line items
     const lineItems: Array<{ name: string; subtext?: string; price: number; isBold?: boolean }> = [];
 
     // Base product
@@ -228,7 +252,7 @@ export const OfferPrintView: React.FC = () => {
         lineItems.push({
             name: `${model} Terrassenüberdachung`,
             subtext: 'Hochwertiges Aluminiumprofilsystem, pulverbeschichtet. Inkl. Pfosten, Rinnenprofil und Wandanschluss.',
-            price: Math.round((Number(offer.pricing?.basePrice) || 0) * saleMultiplier * 100) / 100,
+            price: Math.round((Number(variantPricing?.basePrice || offer.pricing?.basePrice) || 0) * saleMultiplier * 100) / 100,
             isBold: true,
         });
     }
@@ -471,8 +495,9 @@ export const OfferPrintView: React.FC = () => {
 
                                         {/* Offer Badge */}
                                         <div style={{ width: '70mm', flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '2px', overflow: 'hidden', background: '#f8fafc' }}>
-                                            <div style={{ background: '#121c2d', padding: '5px 12px' }} className="bg-force">
+                                            <div style={{ background: '#121c2d', padding: '5px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="bg-force">
                                                 <span style={{ color: '#c5a065', fontSize: '7pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Angebot</span>
+                                                {variantLabel && <span style={{ color: '#38bdf8', fontSize: '7pt', fontWeight: 'bold' }}>Variante: {variantLabel}</span>}
                                             </div>
                                             <div style={{ padding: '10px 12px' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
@@ -495,7 +520,9 @@ export const OfferPrintView: React.FC = () => {
                                     <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'flex-start' }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <h1 style={{ fontSize: '22pt', fontWeight: 'bold', color: '#121c2d', margin: '0 0 4px 0', lineHeight: 1.2 }}>{model}</h1>
-                                            <h2 style={{ color: '#c5a065', fontWeight: 500, fontSize: '12pt', margin: '0 0 16px 0' }}>Ihr persönliches Angebot</h2>
+                                            <h2 style={{ color: '#c5a065', fontWeight: 500, fontSize: '12pt', margin: '0 0 16px 0' }}>
+                                                {variantLabel ? `Variante „${variantLabel}“ — Ihr persönliches Angebot` : 'Ihr persönliches Angebot'}
+                                            </h2>
 
                                             <div style={{ fontSize: '10pt', color: '#475569', lineHeight: 1.7 }}>
                                                 <p style={{ margin: '0 0 8px 0' }}>
