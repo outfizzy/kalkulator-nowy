@@ -1640,6 +1640,11 @@ export const LeadDetailsPage: React.FC = () => {
                 isOpen={isSnowZoneModalOpen}
                 onClose={() => setIsSnowZoneModalOpen(false)}
                 onSent={async () => {
+                    // Update local lead status only if in early stage (mirrors SnowZoneEmailModal logic)
+                    const earlyStatuses = ['new', 'formularz_sent', 'formularz'];
+                    if (earlyStatuses.includes(lead.status)) {
+                        setLead(prev => prev ? { ...prev, status: 'formularz_sent' as any } : null);
+                    }
                     setActiveTab('form');
                     if (id) {
                         const cfgs = await ConfiguratorService.getByLeadId(id);

@@ -179,10 +179,14 @@ export const BulkWelcomeEmailModal: React.FC<BulkWelcomeEmailModalProps> = ({
                             formEmailSentTo: entry.email,
                             configuratorUrl: configuratorUrl || undefined,
                         };
-                        await supabase.from('leads').update({
+                        const { error: updateError } = await supabase.from('leads').update({
                             customer_data: updatedData,
-                            status: 'formularz_sent'
+                            status: 'formularz_sent',
+                            updated_at: new Date().toISOString()
                         }).eq('id', lead.id);
+                        if (updateError) {
+                            console.error(`[Bulk Email] DB update failed for ${lead.id}:`, updateError);
+                        }
                     }
                 } catch (dbErr) {
                     console.error(`[Bulk Email] Failed to save tracking for ${lead.id}:`, dbErr);

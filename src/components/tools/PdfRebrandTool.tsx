@@ -224,11 +224,17 @@ export const PdfRebrandTool: React.FC = () => {
                         const { width, height } = page.getSize();
 
                         // ═══ LOGO REPLACEMENT ═══
-                        const logoPos = findLogoPosition(context, page, height) || {
-                            x: 656.22, y: height - 538.58, w: 73.42, h: 16.16,
-                        };
+                        // Try to find logo position from content streams (works for technical PDFs)
+                        const detectedPos = findLogoPosition(context, page, height);
+
+                        // Fallback positions when detection fails:
+                        // - Technical: logo is in the specs table (bottom-right area)
+                        // - Visualization: logo is top-right corner of rendered 3D image
+                        const technicalFallback = { x: 656.22, y: height - 538.58, w: 73.42, h: 16.16 };
+                        const visualFallback = { x: 420, y: height - 62, w: 140, h: 40 };
 
                         if (mode === 'technical' || mode === 'both') {
+                            const logoPos = detectedPos || technicalFallback;
                             // White cover over Teranda logo
                             const cx = logoPos.x - 5;
                             const cy = logoPos.y - 4;
@@ -248,16 +254,28 @@ export const PdfRebrandTool: React.FC = () => {
                         }
 
                         if (mode === 'visualization' || mode === 'both') {
-                            if (logoPos.y > height / 2) {
-                                const cx = logoPos.x - 5;
-                                const cy = logoPos.y - 4;
-                                const cw = logoPos.w + 12;
-                                const ch = logoPos.h + 8;
+                            // For visualizations: the Teranda logo is rendered as part of the 3D image
+                            // in the top-right corner. We overlay a white rect + our logo on top.
+                            const logoPos = detectedPos || visualFallback;
+                            const useVisualPos = !detectedPos || logoPos.y > height / 2;
+                            
+                            if (useVisualPos) {
+                                // Use the visual fallback position (top-right of page)
+                                const vp = !detectedPos ? visualFallback : logoPos;
+                                const cx = vp.x - 8;
+                                const cy = vp.y - 6;
+                                const cw = vp.w + 16;
+                                const ch = vp.h + 12;
+                                // White background to cover Teranda
                                 page.drawRectangle({ x: cx, y: cy, width: cw, height: ch, color: rgb(1, 1, 1) });
-                                let lw = cw - 4; let lh = lw / LOGO_ASPECT;
-                                if (lh > ch - 2) { lh = ch - 2; lw = lh * LOGO_ASPECT; }
+                                // Polendach24 logo — slightly larger for visibility
+                                let lw = cw - 8;
+                                let lh = lw / LOGO_ASPECT;
+                                if (lh > ch - 4) { lh = ch - 4; lw = lh * LOGO_ASPECT; }
                                 page.drawImage(logoImage, {
-                                    x: cx + (cw - lw) / 2, y: cy + (ch - lh) / 2, width: lw, height: lh,
+                                    x: cx + (cw - lw) / 2,
+                                    y: cy + (ch - lh) / 2,
+                                    width: lw, height: lh,
                                 });
                             }
                         }

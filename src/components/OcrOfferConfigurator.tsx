@@ -39,6 +39,7 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
   // Financial state
   const [marginPct, setMarginPct] = useState<string>(initialData?.ocrMargin?.toString() || '30');
   const [installationFee, setInstallationFee] = useState<string>(initialData?.ocrInstallationFee?.toString() || '0');
+  const [invoiceTotal, setInvoiceTotal] = useState<number>(initialData?.ocrBasePrice || 0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,15 +70,44 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
         if (fnError) throw new Error(fnError.message || 'Scan failed');
         if (data?.error) throw new Error(data.error);
 
-        const items: ScannedItem[] = (data.items || []).map((item: any) => ({
-          name: item.name || '',
-          quantity: item.quantity || 1,
-          unit: item.unit || 'szt',
-          price: item.price || 0,
-          total: item.total || (item.price || 0) * (item.quantity || 1),
-        }));
+        const items: ScannedItem[] = (data.items || []).map((item: any) => {
+          const qty = item.quantity || 1;
+          // AI returns totalPrice (sum for this item). Derive unit price.
+          const itemTotal = item.totalPrice ?? item.total ?? item.price ?? 0;
+          const unitPrice = qty > 0 ? itemTotal / qty : itemTotal;
+          return {
+            name: item.name || '',
+            quantity: qty,
+            unit: item.unit || 'szt',
+            price: Math.round(unitPrice * 100) / 100,
+            total: Math.round(itemTotal * 100) / 100,
+          };
+        });
+
+        // Add global costs (transport, packaging) as separate line items
+        if (data.globalCosts && Array.isArray(data.globalCosts)) {
+          for (const gc of data.globalCosts) {
+            if (gc.price && gc.price > 0) {
+              items.push({
+                name: gc.name || 'Versand & Verpackung',
+                quantity: 1,
+                unit: 'szt',
+                price: Math.round((gc.price || 0) * 100) / 100,
+                total: Math.round((gc.price || 0) * 100) / 100,
+              });
+            }
+          }
+        }
 
         setScannedItems(items);
+
+        // Capture invoiceTotal (Gesamtpreis netto) from AI — this is the purchase cost
+        if (data.invoiceTotal && data.invoiceTotal > 0) {
+          setInvoiceTotal(data.invoiceTotal);
+        } else {
+          // Fallback: sum of items
+          setInvoiceTotal(items.reduce((s: number, i: ScannedItem) => s + i.total, 0));
+        }
         
         // Auto-generate description for client
         const autoDesc = items.map(i => `- ${i.name} (${i.quantity} ${i.unit})`).join('\n');
@@ -127,6 +157,7 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
     setStep('upload');
     setImagePreview(null);
     setScannedItems([]);
+    setInvoiceTotal(0);
   };
 
   const handleSubmit = () => {
@@ -143,13 +174,12 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
       return;
     }
 
-    const basePrice = scannedItems.reduce((acc, item) => acc + item.total, 0);
+    // Use invoiceTotal (Gesamtpreis from invoice) as the purchase cost base
+    const basePrice = invoiceTotal > 0 ? invoiceTotal : scannedItems.reduce((acc, item) => acc + item.total, 0);
     const margin = parseFloat(marginPct) / 100 || 0;
     const installCost = parseFloat(installationFee) || 0;
 
-    // Kalkulacja: Narzut (Markup) od ceny bazowej lub marża od stu?
-    // Domyślnie bezpieczniej i powszechniej jako markup w takich kalkulatorach, ew. Marża od stu (cena = koszt / (1 - marża))
-    // Użyjmy "Narzut / Margin markup" -> Selling = Base + (Base * Margin) + Install
+    // Selling = Gesamtpreis (Einkauf) + Margin markup + Installation
     const sellingPriceNet = basePrice * (1 + margin) + installCost;
 
     const config: ProductConfig = {
@@ -174,8 +204,9 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
     onComplete(config);
   };
 
-  const basePriceTotal = scannedItems.reduce((acc, item) => acc + item.total, 0);
-  const calculatedSellingPrice = basePriceTotal * (1 + (parseFloat(marginPct) / 100 || 0)) + (parseFloat(installationFee) || 0);
+  const itemsSum = scannedItems.reduce((acc, item) => acc + item.total, 0);
+  const effectiveBasePrice = invoiceTotal > 0 ? invoiceTotal : itemsSum;
+  const calculatedSellingPrice = effectiveBasePrice * (1 + (parseFloat(marginPct) / 100 || 0)) + (parseFloat(installationFee) || 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -336,9 +367,23 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
                   </tbody>
                   <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                     <tr>
-                      <td colSpan={3} className="px-4 py-3 text-right text-slate-600">Suma (Koszt zakupu Netto):</td>
-                      <td className="px-4 py-3 text-right text-slate-800 text-base">{basePriceTotal.toFixed(2)} €</td>
+                      <td colSpan={3} className="px-4 py-2 text-right text-slate-500 text-xs">Suma pozycji:</td>
+                      <td className="px-4 py-2 text-right text-slate-500 text-sm">{itemsSum.toFixed(2)} €</td>
                       <td></td>
+                    </tr>
+                    <tr className="bg-amber-50 border-t border-amber-200">
+                      <td colSpan={3} className="px-4 py-3 text-right text-amber-800 font-bold">
+                        Gesamtpreis Netto (Einkaufspreis):
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={invoiceTotal || ''}
+                          onChange={e => setInvoiceTotal(Math.max(0, parseFloat(e.target.value) || 0))}
+                          className="w-28 text-right font-mono font-bold text-lg text-amber-900 bg-white border border-amber-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-amber-400 outline-none"
+                        />
+                      </td>
+                      <td className="px-2 text-amber-600 text-[10px]">€</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -356,8 +401,17 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div className="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+              <div className="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
               <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wider mb-2">Kalkulacja</h4>
+
+              {/* Einkaufspreis from invoice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold text-amber-800">Einkaufspreis (Gesamtpreis Netto)</span>
+                  <span className="font-mono font-bold text-amber-900 text-lg">{effectiveBasePrice.toFixed(2)} €</span>
+                </div>
+                <p className="text-[10px] text-amber-600 mt-0.5">Z faktury dostawcy — od tej kwoty liczymy marżę</p>
+              </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Narzut (Marża) %</label>
@@ -371,7 +425,9 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">%</div>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">Obliczane jako: Koszt + (Koszt * {marginPct}%)</p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {effectiveBasePrice.toFixed(2)} + ({effectiveBasePrice.toFixed(2)} × {marginPct}%) = {(effectiveBasePrice * (1 + (parseFloat(marginPct) / 100 || 0))).toFixed(2)} €
+                </p>
               </div>
 
               <div>
@@ -393,6 +449,9 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
                   <span className="text-slate-600 font-medium">Cena dla Klienta (Netto)</span>
                   <span className="text-2xl font-black text-emerald-600">{calculatedSellingPrice.toFixed(2)} EUR</span>
                 </div>
+                <p className="text-[10px] text-slate-400 mt-1 text-right">
+                  Zysk: {(calculatedSellingPrice - effectiveBasePrice - (parseFloat(installationFee) || 0)).toFixed(2)} € ({((parseFloat(marginPct) || 0)).toFixed(0)}% narzut)
+                </p>
               </div>
             </div>
 

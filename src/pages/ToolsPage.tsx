@@ -50,6 +50,21 @@ const TOOLS = [
         borderColor: 'border-indigo-200 hover:border-indigo-300',
         action: 'inline' as const,
     },
+    {
+        id: 'product-images' as const,
+        title: 'Zdjęcia Produktów',
+        titleDe: 'Produktbilder',
+        description: 'Zarządzaj zdjęciami modeli — zmień zdjęcie główne i galerię w ofercie interaktywnej.',
+        icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+        ),
+        color: 'bg-cyan-100 text-cyan-600',
+        borderColor: 'border-cyan-200 hover:border-cyan-300',
+        action: 'navigate' as const,
+        path: '/admin/product-images',
+    },
 ];
 
 export const ToolsPage: React.FC = () => {

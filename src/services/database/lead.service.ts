@@ -180,34 +180,10 @@ export const LeadService = {
             }
         }
 
-        // --- Assignment Protection Logic ---
+        // --- Assignment Logic ---
+        // When assignedTo is explicitly provided, always respect it
         if (updates.assignedTo !== undefined) {
-            if (updates.assignedTo === null) {
-                // Only allow clearing assignment when moving to 'new' status or if lead was unassigned
-                if (updates.status === 'new') {
-                    dbUpdates.assigned_to = null;
-                } else {
-                    // Check current lead state before clearing
-                    const { data: currentLead } = await supabase
-                        .from('leads')
-                        .select('assigned_to, status')
-                        .eq('id', id)
-                        .single();
-
-                    if (currentLead?.assigned_to) {
-                        console.warn(
-                            `[LeadService] ⚠️ BLOCKED: Attempt to clear assigned_to on lead ${id} ` +
-                            `(current: ${currentLead.assigned_to}, status: ${currentLead.status} → ${updates.status || 'unchanged'}). ` +
-                            `Keeping existing assignment.`
-                        );
-                        // Do NOT set assigned_to = null — keep existing assignment
-                    } else {
-                        dbUpdates.assigned_to = null;
-                    }
-                }
-            } else {
-                dbUpdates.assigned_to = updates.assignedTo;
-            }
+            dbUpdates.assigned_to = updates.assignedTo; // null = clear, UUID = assign
         }
 
         const { error } = await supabase
@@ -420,7 +396,8 @@ export const LeadService = {
         let query = supabase
             .from('leads')
             .select('*')
-            .order('updated_at', { ascending: false });
+            .order('updated_at', { ascending: false })
+            .range(0, 9999); // Supabase default = 1000, override to 10k
 
         // Optionally exclude certain statuses for faster loading
         if (options?.excludeStatuses && options.excludeStatuses.length > 0) {

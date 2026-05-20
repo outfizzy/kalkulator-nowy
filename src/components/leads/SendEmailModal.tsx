@@ -185,25 +185,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
             let attachments: any[] = [];
 
             if (useOfferTemplate && selectedOffer) {
-                // 1. Generate PDF
-                toast.loading('Generowanie PDF oferty...', { id: 'pdf-gen' });
-                try {
-                    const pdfBase64 = await generateOfferPDFData(selectedOffer);
-
-                    // 2. Attach PDF
-                    attachments.push({
-                        filename: `Angebot_${selectedOffer.offerNumber || selectedOffer.id.substring(0, 8)}.pdf`,
-                        content: pdfBase64,
-                        contentType: 'application/pdf'
-                    });
-                } catch (err: any) {
-                    console.error('PDF Gen Error', err);
-                    toast.dismiss('pdf-gen');
-                    const msg = err instanceof Error ? err.message : (err?.message || JSON.stringify(err));
-                    toast.error(`Błąd generowania PDF: ${msg}`);
-                    setLoading(false);
-                    return;
-                }
+                // PDF attachment temporarily disabled — only interactive link is sent
 
                 // 3. Generate HTML Body
                 try {
@@ -502,8 +484,8 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                                     </svg>
                                 </div>
                                 <div>
-                                    <h4 className="font-semibold text-blue-900 text-sm">Wysyłka Oferty PDF</h4>
-                                    <p className="text-xs text-blue-700">Użyj szablonu HTML i załącz PDF</p>
+                                    <h4 className="font-semibold text-blue-900 text-sm">Wysyłka Oferty (Link)</h4>
+                                    <p className="text-xs text-blue-700">Użyj szablonu HTML z linkiem do oferty</p>
                                 </div>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
@@ -578,7 +560,7 @@ export const SendEmailModal: React.FC<SendEmailModalProps> = ({ isOpen, onClose,
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 <p className="font-medium">Zostanie użyty szablon HTML oferty</p>
-                                <p className="text-sm">PDF zostanie dodany jako załącznik</p>
+                                <p className="text-sm">Link do interaktywnej oferty w treści maila</p>
                             </div>
                         ) : null}
                         <textarea

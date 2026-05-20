@@ -4,7 +4,44 @@
  * 
  * Images are stored in /public/images/models/
  * Hero images sourced from aluxe.eu manufacturer product pages
+ * 
+ * Overrides from Supabase app_settings are loaded once and cached.
  */
+
+import { supabase } from '../lib/supabase';
+
+// Override cache
+interface ImageOverrides {
+    [modelId: string]: {
+        hero?: string;
+        gallery?: string[];
+    };
+}
+let _overridesCache: ImageOverrides | null = null;
+let _overridesLoading: Promise<void> | null = null;
+
+/** Load overrides from app_settings (called once, cached) */
+export async function loadImageOverrides(): Promise<ImageOverrides> {
+    if (_overridesCache) return _overridesCache;
+    if (_overridesLoading) { await _overridesLoading; return _overridesCache || {}; }
+    _overridesLoading = (async () => {
+        try {
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'model_image_overrides')
+                .single();
+            _overridesCache = data?.value ? (typeof data.value === 'string' ? JSON.parse(data.value) : data.value) : {};
+        } catch {
+            _overridesCache = {};
+        }
+    })();
+    await _overridesLoading;
+    return _overridesCache || {};
+}
+
+// Eagerly start loading on module init (non-blocking)
+loadImageOverrides();
 
 // Model hero image mapping - primary image for each model
 export const MODEL_IMAGES: Record<string, string> = {
@@ -108,11 +145,13 @@ export const MODEL_GALLERY: Record<string, string[]> = {
 };
 
 /**
- * Get gallery images for a model
- * @param modelId - Model ID (e.g., "Trendline")
- * @returns Array of image URLs, or single hero image fallback
+ * Get gallery images for a model (checks overrides first)
  */
 export function getModelGallery(modelId: string): string[] {
+    // Check overrides first
+    const overrideGallery = _overridesCache?.[modelId]?.gallery;
+    if (overrideGallery && overrideGallery.length > 0) return overrideGallery;
+
     if (MODEL_GALLERY[modelId]) return MODEL_GALLERY[modelId];
     
     // Try case-insensitive
@@ -127,12 +166,23 @@ export function getModelGallery(modelId: string): string[] {
 }
 
 /**
- * Get image URL for a model
+ * Get image URL for a model (checks overrides first)
  */
 export function getModelImage(modelName: string): string | undefined {
+    // Check overrides first
+    const overrideHero = _overridesCache?.[modelName]?.hero;
+    if (overrideHero) return overrideHero;
+
     if (MODEL_IMAGES[modelName]) return MODEL_IMAGES[modelName];
 
     const normalizedName = modelName.toLowerCase().trim();
+    
+    // Check overrides with case-insensitive match
+    if (_overridesCache) {
+        const overrideKey = Object.keys(_overridesCache).find(k => k.toLowerCase() === normalizedName);
+        if (overrideKey && _overridesCache[overrideKey]?.hero) return _overridesCache[overrideKey].hero;
+    }
+
     const key = Object.keys(MODEL_IMAGES).find(k => {
         const normalizedKey = k.toLowerCase();
         return normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName);
@@ -167,6 +217,11 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
     'Carport': 'Carport',
     'Pergola': 'Pergola',
     'Pergola Deluxe': 'Pergola Deluxe',
+    'TR10': 'Orangestyle 10',
+    'TR15': 'Trendstyle 15',
+    'TR20': 'Topstyle 20',
+    'Pergola Luxe': 'Pergola Luxe (Manuell)',
+    'Pergola Luxe Electric': 'Pergola Luxe (Elektrisch)',
 };
 
 /**

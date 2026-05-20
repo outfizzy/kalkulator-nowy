@@ -26,6 +26,7 @@ export const LeadsList: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'map'>('kanban');
+    const [listVisibleCount, setListVisibleCount] = useState(50);
     const [showStats, setShowStats] = useState(false);
     const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all');
     // ── Market switcher: pl = zadaszto.pl, de = polendach24.de ──
@@ -47,6 +48,7 @@ export const LeadsList: React.FC = () => {
     const [bulkAssignee, setBulkAssignee] = useState<string>('');
     const [bulkStatus, setBulkStatus] = useState<string>('');
     const [bulkProcessing, setBulkProcessing] = useState(false);
+    const [editingAssignee, setEditingAssignee] = useState<string | null>(null);
 
     const loadData = async () => {
         setLoading(true);
@@ -119,6 +121,9 @@ export const LeadsList: React.FC = () => {
         }
         setCompletedFormLeadIds(completed);
     }, [leads]);
+
+    // Reset list pagination when filters change
+    useEffect(() => { setListVisibleCount(50); }, [filterStatus, filterFair, searchQuery, sortOrder]);
 
     const filteredLeads = leads.filter(lead => {
         // Hide won/lost unless explicitly toggled or filtering by that status
@@ -277,10 +282,25 @@ export const LeadsList: React.FC = () => {
             const ids = Array.from(selectedLeads);
             if (bulkAction === 'assign' && bulkAssignee) {
                 const assignTo = bulkAssignee === 'unassign' ? null : bulkAssignee;
+                let success = 0;
+                let failed = 0;
+                console.log(`[Bulk Assign] Starting: ${ids.length} leads, assignTo=${assignTo}`);
                 for (const id of ids) {
-                    await DatabaseService.updateLead(id, { assignedTo: assignTo } as any);
+                    try {
+                        console.log(`[Bulk Assign] Updating lead ${id} → assigned_to=${assignTo}`);
+                        await DatabaseService.updateLead(id, { assignedTo: assignTo } as any);
+                        success++;
+                    } catch (err: any) {
+                        console.error(`[Bulk Assign] Failed for lead ${id}:`, err);
+                        failed++;
+                    }
                 }
-                toast.success(`Zmieniono opiekuna ${ids.length} leadów`);
+                console.log(`[Bulk Assign] Done: ${success} success, ${failed} failed`);
+                if (failed > 0) {
+                    toast.error(`Zmieniono ${success}/${ids.length} — ${failed} błędów`);
+                } else {
+                    toast.success(`Zmieniono opiekuna ${success} leadów`);
+                }
             } else if (bulkAction === 'status' && bulkStatus) {
                 for (const id of ids) {
                     await DatabaseService.updateLead(id, { status: bulkStatus as any });
@@ -306,8 +326,10 @@ export const LeadsList: React.FC = () => {
             setBulkAction('');
             setBulkAssignee('');
             setBulkStatus('');
-            await loadData();
+            // Use lightweight refresh (no loading spinner) so user sees changes instantly
+            await handleLeadUpdate();
         } catch (err: any) {
+            console.error('[Bulk Action] Error:', err);
             toast.error(err.message || 'Błąd masowej operacji');
         } finally {
             setBulkProcessing(false);
@@ -480,7 +502,45 @@ export const LeadsList: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4 text-slate-600">
                                     <div className="flex items-center gap-1">
-                                        {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : '-'}
+                                        {editingAssignee === lead.id ? (
+                                            <select
+                                                autoFocus
+                                                value={lead.assignedTo || ''}
+                                                onChange={async (e) => {
+                                                    const newAssignee = e.target.value || null;
+                                                    try {
+                                                        await DatabaseService.updateLead(lead.id, { assignedTo: newAssignee } as any);
+                                                        toast.success('Zmieniono opiekuna');
+                                                        setEditingAssignee(null);
+                                                        await handleLeadUpdate();
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'Błąd zmiany opiekuna');
+                                                    }
+                                                }}
+                                                onBlur={() => setEditingAssignee(null)}
+                                                className="text-xs bg-white border border-accent rounded-md px-2 py-1 outline-none min-w-[130px] shadow-sm"
+                                            >
+                                                <option value="">— Brak —</option>
+                                                <optgroup label="Handlowcy">
+                                                    {users.filter(u => u.role === 'sales_rep' || u.role === 'sales_rep_pl').map(u => (
+                                                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                                                    ))}
+                                                </optgroup>
+                                                <optgroup label="Administracja">
+                                                    {users.filter(u => u.role === 'admin' || u.role === 'manager').map(u => (
+                                                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                                                    ))}
+                                                </optgroup>
+                                            </select>
+                                        ) : (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditingAssignee(lead.id); }}
+                                                className="text-left hover:text-accent hover:underline underline-offset-2 cursor-pointer transition-colors text-sm"
+                                                title="Kliknij aby zmienić opiekuna"
+                                            >
+                                                {lead.assignee ? `${lead.assignee.firstName} ${lead.assignee.lastName}` : <span className="text-slate-400 italic">Brak</span>}
+                                            </button>
+                                        )}
                                         {(lead.additionalAssigneesProfiles?.length || 0) > 0 && (
                                             <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title={(lead.additionalAssigneesProfiles || []).map(p => `${p.firstName} ${p.lastName}`).join(', ')}>+{lead.additionalAssigneesProfiles!.length}</span>
                                         )}
@@ -799,7 +859,21 @@ export const LeadsList: React.FC = () => {
                             ))}
                         </div>
                     ) : (
-                        <LeadsTable items={filteredLeads} />
+                        <>
+                            <LeadsTable items={filteredLeads.slice(0, listVisibleCount)} />
+                            {filteredLeads.length > listVisibleCount && (
+                                <div className="p-4 text-center border-t border-slate-100">
+                                    <button
+                                        onClick={() => setListVisibleCount(prev => prev + 50)}
+                                        className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:text-accent bg-slate-50 hover:bg-accent/5 rounded-xl border border-dashed border-slate-300 hover:border-accent/40 transition-all inline-flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                        Załaduj dalej ({filteredLeads.length - listVisibleCount} pozostałych)
+                                    </button>
+                                    <span className="ml-3 text-xs text-slate-400">Wyświetlono {Math.min(listVisibleCount, filteredLeads.length)} z {filteredLeads.length}</span>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
                 </>

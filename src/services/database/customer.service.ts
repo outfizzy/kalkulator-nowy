@@ -5,11 +5,13 @@ import { supabase } from '../../lib/supabase';
 export const CustomerService = {
     // Existing methods...
     async getCustomers(): Promise<Customer[]> {
-        // 1. Fetch customers raw
+        // 1. Fetch customers raw — Supabase defaults to 1000 rows max!
+        // Must set explicit range to fetch all customers.
         const { data: customers, error } = await supabase
             .from('customers')
-            .select('*');
-        // .order('lastName', { ascending: true }); // Removed due to case sensitivity issues
+            .select('*')
+            .order('created_at', { ascending: false })
+            .range(0, 9999); // Supabase default = 1000, override to 10k
 
         if (error) {
             console.error('Error fetching customers:', error);
@@ -435,7 +437,8 @@ export const CustomerService = {
 
         const { data: offers } = await supabase
             .from('offers')
-            .select('created_at, customer_id, customer_data');
+            .select('created_at, customer_id, customer_data')
+            .range(0, 9999);
 
         const map = new Map<string, { customer: Customer, lastOfferDate: Date, offerCount: number }>();
 

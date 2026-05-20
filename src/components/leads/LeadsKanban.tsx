@@ -173,8 +173,15 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
             window.open(`tel:${normalizePhone(phone)}`, '_self');
         }
         try {
-            await DatabaseService.updateLead(lead.id, { status: 'contacted', lastContactDate: new Date() });
-            toast.success('📞 Oznaczono jako skontaktowano');
+            // For formularz_sent: only update lastContactDate (follow-up), don't change status
+            // The lead should stay in formularz_sent until the customer fills the form
+            if (lead.status === 'formularz_sent') {
+                await DatabaseService.updateLead(lead.id, { lastContactDate: new Date() });
+                toast.success('📞 Follow-up — czekamy na formularz');
+            } else {
+                await DatabaseService.updateLead(lead.id, { status: 'contacted', lastContactDate: new Date() });
+                toast.success('📞 Oznaczono jako skontaktowano');
+            }
             onUpdate();
         } catch (error) {
             console.error('Error updating lead:', error);
@@ -524,7 +531,7 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
             {!['won', 'lost', 'fair'].includes(lead.status) && (
                 <div className="mt-2 pt-2 border-t border-slate-100/80 flex flex-wrap gap-1.5">
                     {/* Early stages: Dzwonię + Mail + Pomiar */}
-                    {['new', 'formularz', 'contacted'].includes(lead.status) && (
+                    {['new', 'formularz_sent', 'formularz', 'contacted'].includes(lead.status) && (
                         <>
                             <button
                                 onClick={(e) => {
@@ -684,10 +691,17 @@ interface KanbanColumnProps {
     leadOfferValues: Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }>;
 }
 
+const INITIAL_VISIBLE = 15;
+const LOAD_MORE_STEP = 15;
+
 const KanbanColumn = React.memo(({ column, leads, onNavigate, onUpdate, onSchedule, onDelete, isAdmin, completedFormLeadIds, onAutoAssign, onBulkEmail, offerViewMap, leadOfferValues }: KanbanColumnProps) => {
     const { setNodeRef } = useDroppable({
         id: column.id,
     });
+    const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+
+    // Reset visible count when leads change (e.g. filter applied)
+    useEffect(() => { setVisibleCount(INITIAL_VISIBLE); }, [leads.length]);
 
     const unassignedCount = leads.filter(l => !l.assignedTo).length;
 
@@ -707,6 +721,10 @@ const KanbanColumn = React.memo(({ column, leads, onNavigate, onUpdate, onSchedu
             return bDate - aDate;
         });
     }, [leads, column.id, completedFormLeadIds]);
+
+    const visibleLeads = useMemo(() => sortedLeads.slice(0, visibleCount), [sortedLeads, visibleCount]);
+    const hasMore = sortedLeads.length > visibleCount;
+    const remainingCount = sortedLeads.length - visibleCount;
 
     return (
         <div ref={setNodeRef} className="flex-shrink-0 w-[260px] sm:w-[280px] flex flex-col h-full rounded-2xl bg-slate-50/80 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
@@ -775,13 +793,13 @@ const KanbanColumn = React.memo(({ column, leads, onNavigate, onUpdate, onSchedu
             <div className="p-2.5 flex-1 overflow-y-auto space-y-2.5 min-h-[100px]">
                 <SortableContext
                     id={column.id}
-                    items={sortedLeads.map(l => l.id)}
+                    items={visibleLeads.map(l => l.id)}
                     strategy={verticalListSortingStrategy}
                 >
                     <div className="space-y-2 min-h-[50px]">
-                        {sortedLeads.map((lead, idx) => {
+                        {visibleLeads.map((lead, idx) => {
                             const isCompleted = completedFormLeadIds.has(lead.id);
-                            const prevCompleted = idx > 0 ? completedFormLeadIds.has(sortedLeads[idx - 1].id) : false;
+                            const prevCompleted = idx > 0 ? completedFormLeadIds.has(visibleLeads[idx - 1].id) : false;
                             const showSeparator = column.id === 'formularz' && !isCompleted && (idx === 0 || prevCompleted);
                             
                             return (
@@ -811,6 +829,24 @@ const KanbanColumn = React.memo(({ column, leads, onNavigate, onUpdate, onSchedu
                         })}
                     </div>
                 </SortableContext>
+                {hasMore && (
+                    <button
+                        onClick={() => setVisibleCount(prev => prev + LOAD_MORE_STEP)}
+                        className="w-full mt-2 py-2 text-xs font-bold text-slate-500 hover:text-accent bg-white/80 hover:bg-accent/5 rounded-lg border border-dashed border-slate-300 hover:border-accent/40 transition-all flex items-center justify-center gap-1.5"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        Załaduj dalej ({remainingCount})
+                    </button>
+                )}
+                {!hasMore && sortedLeads.length > INITIAL_VISIBLE && (
+                    <button
+                        onClick={() => setVisibleCount(INITIAL_VISIBLE)}
+                        className="w-full mt-1.5 py-1.5 text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center gap-1"
+                    >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                        Zwiń
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -1183,7 +1219,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     // === MINI-DASHBOARD ===
     const pipelineStats = useMemo(() => {
         // New leads = early funnel only
-        const newLeads = leads.filter(l => ['new', 'formularz', 'contacted'].includes(l.status));
+        const newLeads = leads.filter(l => ['new', 'formularz_sent', 'formularz', 'contacted'].includes(l.status));
         // Advanced = past the contact stage
         const advancedLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
         const wonLeads = leads.filter(l => l.status === 'won');
@@ -1301,7 +1337,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                             offerViewMap={offerViewMap}
                             leadOfferValues={leadOfferValues}
                             onBulkEmail={column.id === 'new' ? () => setBulkEmailOpen(true) : undefined}
-                            onAutoAssign={['new', 'formularz', 'contacted'].includes(column.id) ? () => {
+                            onAutoAssign={['new', 'formularz_sent', 'formularz', 'contacted'].includes(column.id) ? () => {
                                 const columnLeads = columns[column.id] || [];
                                 const unassigned = columnLeads.filter(l => !l.assignedTo);
                                 setAutoAssignLeads(unassigned);

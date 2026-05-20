@@ -59,19 +59,12 @@ export const QuickSMSModal: React.FC<QuickSMSModalProps> = ({ isOpen, onClose, p
     const handleAiTranslate = async () => {
         if (!message.trim()) { toast.error('Bitte zuerst einen Text eingeben'); return; }
 
-        const apiKey = (currentUser as any)?.emailConfig?.openaiKey;
-        if (!apiKey) {
-            toast.error('OpenAI API-Key fehlt. Bitte in den Profileinstellungen konfigurieren.');
-            return;
-        }
-
         setTranslating(true);
         try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                    model: 'gpt-4o-mini',
+            // Use Supabase edge function (server-side API key) instead of user-level OpenAI key
+            const { supabase } = await import('../../lib/supabase');
+            const { data, error } = await supabase.functions.invoke('ai-assistant', {
+                body: {
                     messages: [
                         {
                             role: 'system',
@@ -84,22 +77,21 @@ Deine Aufgabe: Übersetze und/oder verbessere den folgenden Text ins professione
 Gib NUR den verbesserten Text zurück, keine Erklärungen.`
                         },
                         { role: 'user', content: message }
-                    ],
-                    temperature: 0.3,
-                    max_tokens: 300
-                })
+                    ]
+                }
             });
 
-            if (!response.ok) throw new Error('API-Fehler');
-            const data = await response.json();
-            const result = data.choices?.[0]?.message?.content?.trim();
+            if (error) throw error;
+            const result = data?.content || data?.choices?.[0]?.message?.content || data?.reply;
             if (result) {
-                setMessage(result);
+                setMessage(result.trim());
                 toast.success('Text übersetzt & verbessert');
+            } else {
+                toast.error('Keine Antwort vom AI-Service');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('AI translate error:', error);
-            toast.error('Übersetzungsfehler');
+            toast.error('Übersetzungsfehler: ' + (error.message || 'Unbekannter Fehler'));
         } finally {
             setTranslating(false);
         }

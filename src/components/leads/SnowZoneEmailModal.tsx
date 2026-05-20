@@ -146,10 +146,26 @@ export const SnowZoneEmailModal: React.FC<SnowZoneEmailModalProps> = ({
                             formEmailSentTo: to,
                             configuratorUrl: configuratorUrl || undefined,
                         };
-                        await supabase.from('leads').update({
+
+                        // Only advance status to formularz_sent for early-stage leads
+                        // Don't regress leads that are already further in the pipeline
+                        const { data: leadStatusRow } = await supabase
+                            .from('leads')
+                            .select('status')
+                            .eq('id', leadId)
+                            .single();
+
+                        const earlyStatuses = ['new', 'formularz_sent', 'formularz'];
+                        const shouldSetStatus = leadStatusRow && earlyStatuses.includes(leadStatusRow.status);
+
+                        const { error: updateError } = await supabase.from('leads').update({
                             customer_data: updatedData,
-                            status: 'formularz_sent'
+                            ...(shouldSetStatus ? { status: 'formularz_sent' } : {}),
+                            updated_at: new Date().toISOString()
                         }).eq('id', leadId);
+                        if (updateError) {
+                            console.error('Failed to update lead status to formularz_sent:', updateError);
+                        }
                     }
                 } catch (err) {
                     console.error('Failed to save email tracking to lead:', err);
