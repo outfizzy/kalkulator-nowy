@@ -181,7 +181,7 @@ export const BulkWelcomeEmailModal: React.FC<BulkWelcomeEmailModalProps> = ({
                         };
                         await supabase.from('leads').update({
                             customer_data: updatedData,
-                            status: 'formularz'
+                            status: 'formularz_sent'
                         }).eq('id', lead.id);
                     }
                 } catch (dbErr) {
@@ -378,7 +378,7 @@ export const BulkWelcomeEmailModal: React.FC<BulkWelcomeEmailModalProps> = ({
                             <p className="text-xs text-blue-700">
                                 <strong>ℹ️ Co się stanie:</strong> Każdy lead otrzyma e-mail powitalny z
                                 formularzem konfiguratora i informacją o strefie śniegowej.
-                                Status leada zmieni się na "Formularz".
+                                Status leada zmieni się na "Formularz wysłany".
                                 Wysyłka odbywa się sekwencyjnie z odstępem {DELAY_BETWEEN_EMAILS_MS / 1000}s.
                             </p>
                         </div>

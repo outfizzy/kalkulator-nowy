@@ -271,6 +271,19 @@ export class ConfiguratorService {
                 configurationCompletedAt: new Date().toISOString(),
             };
 
+            // Determine if we should advance lead status to 'formularz' (form filled)
+            const earlyStatuses = ['new', 'formularz_sent', 'formularz'];
+            const currentStatus = existingLead?.customer_data?.leadStatus || '';
+            
+            // Fetch current lead status from DB
+            const { data: leadStatusRow } = await supabase
+                .from('leads')
+                .select('status')
+                .eq('id', configRow.lead_id)
+                .single();
+
+            const shouldAdvanceStatus = leadStatusRow && earlyStatuses.includes(leadStatusRow.status);
+
             await supabase
                 .from('leads')
                 .update({
@@ -284,6 +297,8 @@ export class ConfiguratorService {
                             size: 0,
                         })),
                     } : {}),
+                    // Move lead to 'formularz' (form filled) if it's in an early stage
+                    ...(shouldAdvanceStatus ? { status: 'formularz' } : {}),
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', configRow.lead_id);

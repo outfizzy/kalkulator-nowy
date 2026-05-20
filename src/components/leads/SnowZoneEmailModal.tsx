@@ -148,7 +148,7 @@ export const SnowZoneEmailModal: React.FC<SnowZoneEmailModalProps> = ({
                         };
                         await supabase.from('leads').update({
                             customer_data: updatedData,
-                            status: 'formularz'
+                            status: 'formularz_sent'
                         }).eq('id', leadId);
                     }
                 } catch (err) {
