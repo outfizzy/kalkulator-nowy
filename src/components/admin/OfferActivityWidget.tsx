@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Eye, FileText, MessageSquare, Calendar, CheckCircle2,
-    MousePointerClick, Download, ArrowUpRight, ChevronDown, Bell, ExternalLink
+    MousePointerClick, Download, ArrowUpRight, ChevronDown, ChevronRight,
+    Bell, ExternalLink, User
 } from 'lucide-react';
 
 interface OfferActivity {
@@ -96,11 +97,29 @@ function timeAgo(date: Date): string {
     return `${days}d temu`;
 }
 
+interface LeadGroup {
+    leadId: string | null;
+    clientName: string;
+    activities: OfferActivity[];
+    latestAt: Date;
+    hasHighPriority: boolean;
+}
+
 export const OfferActivityWidget: React.FC = () => {
     const { currentUser } = useAuth();
     const [activities, setActivities] = useState<OfferActivity[]>([]);
     const [loading, setLoading] = useState(true);
     const [expanded, setExpanded] = useState(false);
+    const [expandedLeads, setExpandedLeads] = useState<Set<string>>(new Set());
+
+    const toggleLead = (key: string) => {
+        setExpandedLeads(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
 
     const fetchActivities = async () => {
         try {
@@ -217,7 +236,32 @@ export const OfferActivityWidget: React.FC = () => {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
-    const displayActivities = expanded ? activities : activities.slice(0, 8);
+    // Group activities by lead
+    const leadGroups = useMemo(() => {
+        const groups = new Map<string, LeadGroup>();
+        const HP = ['offer_accept', 'measurement_request', 'message_sent'];
+
+        activities.forEach(a => {
+            const key = a.leadId || `orphan-${a.id}`;
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    leadId: a.leadId,
+                    clientName: a.clientName || a.offerName || 'Nieznany',
+                    activities: [],
+                    latestAt: a.createdAt,
+                    hasHighPriority: false,
+                });
+            }
+            const g = groups.get(key)!;
+            g.activities.push(a);
+            if (a.createdAt > g.latestAt) g.latestAt = a.createdAt;
+            if (HP.includes(a.eventType)) g.hasHighPriority = true;
+        });
+
+        return Array.from(groups.values()).sort((a, b) => b.latestAt.getTime() - a.latestAt.getTime());
+    }, [activities]);
+
+    const displayGroups = expanded ? leadGroups : leadGroups.slice(0, 10);
     const todayCount = activities.filter(a => {
         const today = new Date();
         return a.createdAt.toDateString() === today.toDateString();
@@ -228,7 +272,7 @@ export const OfferActivityWidget: React.FC = () => {
     const messageCount = activities.filter(a => a.eventType === 'message_sent').length;
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col" style={{ maxHeight: expanded ? 'none' : '480px' }}>
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col" style={{ maxHeight: expanded ? 'none' : '520px' }}>
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
@@ -242,7 +286,7 @@ export const OfferActivityWidget: React.FC = () => {
                     </div>
                     <div>
                         <h3 className="text-sm font-semibold text-slate-800">Aktywność Ofert</h3>
-                        <p className="text-[10px] text-slate-400">Interakcje klientów z interaktywnymi ofertami • na żywo</p>
+                        <p className="text-[10px] text-slate-400">Interakcje klientów • pogrupowane po leadach • na żywo</p>
                     </div>
                 </div>
                 {/* Mini stats */}
@@ -266,7 +310,7 @@ export const OfferActivityWidget: React.FC = () => {
                 </div>
             </div>
 
-            {/* Activity list */}
+            {/* Activity list — grouped by lead */}
             <div className="flex-1 overflow-y-auto">
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
@@ -279,70 +323,106 @@ export const OfferActivityWidget: React.FC = () => {
                         <p className="text-xs mt-1">Interakcje pojawią się gdy klient otworzy ofertę.</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-50">
-                        {displayActivities.map(activity => {
-                            const config = EVENT_CONFIG[activity.eventType] || DEFAULT_EVENT;
-                            const isHighPriority = ['offer_accept', 'measurement_request', 'message_sent'].includes(activity.eventType);
+                    <div className="divide-y divide-slate-100">
+                        {displayGroups.map(group => {
+                            const key = group.leadId || group.activities[0]?.id || 'unknown';
+                            const isOpen = expandedLeads.has(key);
+                            const eventCounts = new Map<string, number>();
+                            group.activities.forEach(a => {
+                                eventCounts.set(a.eventType, (eventCounts.get(a.eventType) || 0) + 1);
+                            });
 
-                            const content = (
-                                <>
-                                    <div className={`p-1.5 rounded-lg ${config.bgColor} ${config.color} shrink-0 mt-0.5`}>
-                                        {config.icon}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        {/* Client name — big & prominent */}
-                                        {activity.clientName && (
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-sm font-bold text-slate-800 truncate">
-                                                    {activity.clientName}
-                                                </span>
-                                                {activity.leadId && (
-                                                    <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
+                            return (
+                                <div key={key}>
+                                    {/* Lead header row — always visible */}
+                                    <button
+                                        onClick={() => toggleLead(key)}
+                                        className={`w-full flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-slate-50/80 transition-colors text-left ${group.hasHighPriority ? 'bg-amber-50/30' : ''}`}
+                                    >
+                                        {/* Expand chevron */}
+                                        <div className="shrink-0 text-slate-400">
+                                            {isOpen
+                                                ? <ChevronDown className="w-4 h-4" />
+                                                : <ChevronRight className="w-4 h-4" />
+                                            }
+                                        </div>
+
+                                        {/* Avatar */}
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-bold ${group.hasHighPriority ? 'bg-rose-500' : 'bg-indigo-500'}`}>
+                                            {group.clientName.charAt(0).toUpperCase()}
+                                        </div>
+
+                                        {/* Name + summary */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-800 truncate">{group.clientName}</span>
+                                                {group.hasHighPriority && (
+                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
                                                 )}
                                             </div>
-                                        )}
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                            <span className={`text-[11px] font-semibold ${config.color}`}>
-                                                {config.label}
-                                            </span>
-                                            {isHighPriority && (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                                            )}
-                                            {activity.offerName && (
-                                                <span className="text-[10px] text-slate-400">• {activity.offerName}</span>
+                                            {/* Event type badges */}
+                                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                                {Array.from(eventCounts.entries()).map(([type, count]) => {
+                                                    const cfg = EVENT_CONFIG[type] || DEFAULT_EVENT;
+                                                    return (
+                                                        <span key={type} className={`inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded ${cfg.bgColor} ${cfg.color}`}>
+                                                            {cfg.icon}
+                                                            {count > 1 && <span>×{count}</span>}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Time */}
+                                        <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                            {timeAgo(group.latestAt)}
+                                        </span>
+                                    </button>
+
+                                    {/* Expanded: detailed event list + go-to-lead button */}
+                                    {isOpen && (
+                                        <div className="bg-slate-50/50 border-t border-slate-100">
+                                            {/* Individual events */}
+                                            <div className="divide-y divide-slate-100/80">
+                                                {group.activities.map(activity => {
+                                                    const config = EVENT_CONFIG[activity.eventType] || DEFAULT_EVENT;
+                                                    return (
+                                                        <div key={activity.id} className="flex items-center gap-2.5 px-6 sm:px-8 py-2">
+                                                            <div className={`p-1 rounded ${config.bgColor} ${config.color} shrink-0`}>
+                                                                {config.icon}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+                                                                {activity.offerName && (
+                                                                    <span className="text-[10px] text-slate-400 ml-1.5">• {activity.offerName}</span>
+                                                                )}
+                                                                {activity.eventType === 'upgrade_request' && activity.eventData?.upgradeTitle && (
+                                                                    <span className="text-[10px] text-slate-400 ml-1">— {activity.eventData.upgradeTitle}</span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                                                                {timeAgo(activity.createdAt)}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Action: Go to lead */}
+                                            {group.leadId && (
+                                                <div className="px-6 sm:px-8 py-2.5 border-t border-slate-200/60">
+                                                    <Link
+                                                        to={`/leads/${group.leadId}`}
+                                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                                                    >
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                        Przejdź do leada
+                                                    </Link>
+                                                </div>
                                             )}
                                         </div>
-                                        {/* Extra detail for specific events */}
-                                        {activity.eventType === 'upgrade_request' && activity.eventData?.upgradeTitle && (
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Upgrade: {activity.eventData.upgradeTitle}</p>
-                                        )}
-                                        {activity.eventType === 'pdf_click' && activity.eventData?.attachment_type && (
-                                            <p className="text-[10px] text-slate-400 mt-0.5">
-                                                {activity.eventData.attachment_type === 'visualization' ? '3D-Visualisierung' : 'Technische Zeichnung'}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono shrink-0 mt-1">
-                                        {timeAgo(activity.createdAt)}
-                                    </span>
-                                </>
-                            );
-
-                            // Wrap in Link if leadId exists, otherwise plain div
-                            return activity.leadId ? (
-                                <Link
-                                    key={activity.id}
-                                    to={`/leads/${activity.leadId}`}
-                                    className={`flex items-start gap-3 px-4 sm:px-5 py-3 hover:bg-blue-50/50 transition-colors cursor-pointer group ${isHighPriority ? 'bg-amber-50/20' : ''}`}
-                                >
-                                    {content}
-                                </Link>
-                            ) : (
-                                <div
-                                    key={activity.id}
-                                    className={`flex items-start gap-3 px-4 sm:px-5 py-3 ${isHighPriority ? 'bg-amber-50/20' : ''}`}
-                                >
-                                    {content}
+                                    )}
                                 </div>
                             );
                         })}
@@ -351,13 +431,13 @@ export const OfferActivityWidget: React.FC = () => {
             </div>
 
             {/* Show more */}
-            {activities.length > 8 && (
+            {leadGroups.length > 10 && (
                 <button
                     onClick={() => setExpanded(p => !p)}
                     className="w-full py-2.5 border-t border-slate-100 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1"
                 >
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-                    {expanded ? 'Pokaż mniej' : `Pokaż wszystkie (${activities.length})`}
+                    {expanded ? 'Pokaż mniej' : `Pokaż wszystkich (${leadGroups.length})`}
                 </button>
             )}
         </div>
