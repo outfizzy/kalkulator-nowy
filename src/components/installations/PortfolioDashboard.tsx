@@ -115,6 +115,7 @@ const SORT_LABELS: Record<SortMode, string> = {
 export const PortfolioDashboard: React.FC = () => {
     const [realizations, setRealizations] = useState<Realization[]>([]);
     const [installations, setInstallations] = useState<Installation[]>([]);
+    const [contracts, setContracts] = useState<any[]>([]);
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -143,18 +144,21 @@ export const PortfolioDashboard: React.FC = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            // Load each source independently — if one fails, others still work
             let reals: Realization[] = [];
             let allInst: Installation[] = [];
+            let allContracts: any[] = [];
             let allTeams: InstallationTeam[] = [];
 
             try { reals = await DatabaseService.getRealizations(); } catch (e) { console.warn('[Portfolio] getRealizations failed:', e); }
             try { allInst = await DatabaseService.getInstallations(); } catch (e) { console.warn('[Portfolio] getInstallations failed:', e); }
+            try { allContracts = await DatabaseService.getContracts(); } catch (e) { console.warn('[Portfolio] getContracts failed:', e); }
             try { allTeams = await DatabaseService.getTeams(); } catch (e) { console.warn('[Portfolio] getTeams failed:', e); }
 
             setRealizations(reals);
-            const completed = allInst.filter(i => i.status === 'completed' && i.client?.coordinates);
-            setInstallations(completed);
+            // ALL installations with coordinates (not just completed)
+            const withCoords = allInst.filter(i => i.client?.coordinates);
+            setInstallations(withCoords);
+            setContracts(allContracts);
             setTeams(allTeams);
         } catch (error) {
             console.error('Error loading portfolio:', error);
@@ -166,11 +170,11 @@ export const PortfolioDashboard: React.FC = () => {
 
     useEffect(() => { void loadData(); }, []);
 
-    // Merge both data sources into MapItem[]
+    // Merge all data sources into MapItem[]
     const allMapItems: MapItem[] = useMemo(() => {
         const items: MapItem[] = [];
 
-        // From realizations table
+        // 1. From realizations table
         realizations.forEach(r => {
             if (r.latitude && r.longitude) {
                 items.push({
@@ -194,11 +198,14 @@ export const PortfolioDashboard: React.FC = () => {
             }
         });
 
-        // From completed installations (not already in realizations)
+        // 2. From installations with coordinates (not already in realizations)
         const realizationContractIds = new Set(realizations.filter(r => r.contract_id).map(r => r.contract_id));
+        const installationOfferIds = new Set<string>();
         installations.forEach(inst => {
             if (realizationContractIds.has(inst.contractId)) return;
-            if (!inst.client.coordinates) return;
+            if (!inst.client?.coordinates) return;
+
+            installationOfferIds.add(inst.offerId || '');
 
             items.push({
                 id: `i-${inst.id}`,
@@ -220,8 +227,68 @@ export const PortfolioDashboard: React.FC = () => {
             });
         });
 
+        // 3. From contracts NOT already covered by installations or realizations
+        contracts.forEach(contract => {
+            // Skip if installation already covers this contract
+            if (installationOfferIds.has(contract.offerId)) return;
+            if (realizationContractIds.has(contract.id)) return;
+
+            // Try to get coordinates from client data
+            const client = contract.client;
+            if (!client) return;
+
+            // Use client coordinates if available
+            let lat = client.coordinates?.lat;
+            let lng = client.coordinates?.lng;
+
+            // Fallback: approximate from PLZ (German postal codes)
+            if (!lat && client.postalCode) {
+                const plz = String(client.postalCode).replace(/\D/g, '').substring(0, 5);
+                if (plz.length >= 4) {
+                    // Simple PLZ→approximate coordinates for Germany
+                    const plzPrefix = parseInt(plz.substring(0, 2));
+                    // Rough lat/lng grid for German PLZ regions
+                    const plzGrid: Record<number, [number, number]> = {
+                        0: [51.3, 12.4], 1: [52.5, 13.4], 2: [53.6, 10.0], 3: [52.4, 9.7],
+                        4: [51.5, 7.5], 5: [50.9, 7.0], 6: [50.1, 8.7], 7: [48.8, 9.2],
+                        8: [48.1, 11.6], 9: [49.5, 11.1],
+                    };
+                    const region = plzGrid[Math.floor(plzPrefix / 10)];
+                    if (region) {
+                        lat = region[0] + (plzPrefix % 10) * 0.15;
+                        lng = region[1] + (plzPrefix % 10) * 0.12;
+                    }
+                }
+            }
+
+            if (!lat || !lng) return;
+
+            const clientName = [client.firstName, client.lastName].filter(Boolean).join(' ') || client.company || '';
+            const productDesc = contract.product
+                ? (typeof contract.product === 'string' ? contract.product : `${contract.product.modelId || ''} ${contract.product.width || ''}x${contract.product.projection || ''}`)
+                : 'Umowa';
+
+            items.push({
+                id: `c-${contract.id}`,
+                lat,
+                lng,
+                title: productDesc,
+                description: null,
+                product_type: 'Terrassenüberdachung',
+                city: client.city || null,
+                address: client.address || client.street || null,
+                postal_code: client.postalCode || null,
+                client_name: clientName,
+                contract_number: contract.contractNumber || null,
+                contract_id: contract.id,
+                photos: [],
+                completion_date: contract.signedAt ? new Date(contract.signedAt).toISOString() : contract.createdAt ? new Date(contract.createdAt).toISOString() : null,
+                source: 'contract',
+            });
+        });
+
         return items;
-    }, [realizations, installations]);
+    }, [realizations, installations, contracts]);
 
     // Apply filters
     const filteredItems = useMemo(() => {
@@ -430,6 +497,7 @@ export const PortfolioDashboard: React.FC = () => {
                         <option value="all">Wszystkie</option>
                         <option value="manual">Manualne</option>
                         <option value="installation">Z montażu</option>
+                        <option value="contract">Z umów</option>
                     </select>
                 </div>
 
@@ -545,7 +613,7 @@ export const PortfolioDashboard: React.FC = () => {
                                                                 {item.product_type}
                                                             </span>
                                                             <span className="text-[10px] text-slate-400">
-                                                                {item.source === 'manual' ? '✍️ Manualne' : '🔧 Z montażu'}
+                                                                {item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -688,8 +756,8 @@ export const PortfolioDashboard: React.FC = () => {
 
                                                     {/* Source badge */}
                                                     <div className="mt-2 flex items-center gap-2">
-                                                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${item.source === 'manual' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                            {item.source === 'manual' ? '✍️ Manualne' : '🔧 Z montażu'}
+                                                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${item.source === 'manual' ? 'bg-purple-50 text-purple-600' : item.source === 'contract' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                            {item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
                                                         </span>
                                                     </div>
                                                 </div>
