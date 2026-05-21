@@ -24,7 +24,7 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
 
     // Calculate team workload for current week
     const teamWorkload = useMemo(() => {
-        const workload: Record<string, { hours: number; count: number; unavailableDays: number }> = {};
+        const workload: Record<string, { days: number; count: number; unavailableDays: number }> = {};
 
         teams.forEach(team => {
             const teamInstallations = installations.filter(
@@ -34,8 +34,8 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                     new Date(i.scheduledDate) <= weekEnd
             );
 
-            const totalHours = teamInstallations.reduce((sum, inst) => {
-                return sum + ((inst.expectedDuration || 1) * 8);
+            const totalDays = teamInstallations.reduce((sum, inst) => {
+                return sum + (inst.expectedDuration || 1);
             }, 0);
 
             // Count unavailable days in this week
@@ -51,7 +51,7 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
             );
 
             workload[team.id] = {
-                hours: totalHours,
+                days: totalDays,
                 count: teamInstallations.length,
                 unavailableDays: teamUnavail.length
             };
@@ -60,7 +60,7 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
         return workload;
     }, [teams, installations, unavailability, weekStart, weekEnd]);
 
-    const maxWeeklyHours = 40;
+    const maxWeeklyDays = 5; // Mon-Fri
 
     return (
         <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full">
@@ -85,10 +85,10 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
             {/* Teams List */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 {teams.filter(t => t.isActive).map(team => {
-                    const load = teamWorkload[team.id] || { hours: 0, count: 0, unavailableDays: 0 };
-                    const availableHours = maxWeeklyHours - (load.unavailableDays * 8);
-                    const utilization = availableHours > 0
-                        ? Math.min((load.hours / availableHours) * 100, 100)
+                    const load = teamWorkload[team.id] || { days: 0, count: 0, unavailableDays: 0 };
+                    const availableDays = maxWeeklyDays - load.unavailableDays;
+                    const utilization = availableDays > 0
+                        ? Math.min((load.days / availableDays) * 100, 100)
                         : 0;
 
                     const getStatusColor = () => {
@@ -99,9 +99,9 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                     };
 
                     const getStatusLabel = () => {
-                        if (load.unavailableDays > 0) return 'Niedostępna';
-                        if (utilization >= 90) return 'Przeciążona';
-                        if (utilization >= 70) return 'Zajęta';
+                        if (load.unavailableDays >= 5) return 'Niedostępna';
+                        if (utilization >= 90) return 'Pełna';
+                        if (utilization >= 60) return 'Zajęta';
                         return 'Dostępna';
                     };
 
@@ -165,9 +165,9 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                                     <p className="text-lg font-bold text-slate-900">{load.count}</p>
                                 </div>
                                 <div className="bg-slate-50 rounded p-2">
-                                    <p className="text-xs text-slate-500">Godziny</p>
+                                    <p className="text-xs text-slate-500">Dni robocze</p>
                                     <p className="text-lg font-bold text-slate-900">
-                                        {load.hours}h
+                                        {load.days}d
                                     </p>
                                 </div>
                             </div>
@@ -192,7 +192,7 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                                     />
                                 </div>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {load.hours}h / {availableHours}h dostępnych
+                                    {load.days}d / {availableDays}d dostępnych
                                 </p>
                             </div>
                         </div>
