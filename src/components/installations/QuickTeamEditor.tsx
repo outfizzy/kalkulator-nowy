@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { X, ChevronDown, Crown, UserPlus, UserMinus, Calendar, Users, Truck, Save, Shield, CheckCircle2 } from 'lucide-react';
 import type { InstallationTeam } from '../../types';
 import { InstallationTeamService } from '../../services/database/installation-team.service';
 
@@ -194,18 +195,18 @@ export const QuickTeamEditor: React.FC<QuickTeamEditorProps> = ({ isOpen, onClos
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-slate-50 to-white">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <span className="text-xl">⚡</span> Grupy Montażowe
+                            <Users className="w-5 h-5 text-indigo-600" /> Grupy Montażowe
                         </h2>
                         <p className="text-xs text-slate-500">Szybka edycja składów i liderów</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Week selector */}
                 <div className="px-4 py-2.5 border-b bg-amber-50/50 flex items-center gap-3">
-                    <span className="text-xs font-bold text-amber-800">📅 Tydzień:</span>
+                    <span className="text-xs font-bold text-amber-800 flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Tydzień:</span>
                     <input
                         type="date"
                         value={selectedWeek}
@@ -251,15 +252,13 @@ export const QuickTeamEditor: React.FC<QuickTeamEditorProps> = ({ isOpen, onClos
                                         </div>
                                         <div className="flex gap-1 mt-1 flex-wrap">
                                             {team.members.map(m => (
-                                                <span key={m.id} className={`text-[10px] px-1.5 py-0.5 rounded-full ${m.id === team.leaderId ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-600'}`}>
-                                                    {m.id === team.leaderId && '👑 '}{m.firstName} {m.lastName?.[0]}.
+                                                <span key={m.id} className={`text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${m.id === team.leaderId ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-600'}`}>
+                                                    {m.id === team.leaderId && <Crown className="w-2.5 h-2.5" />}{m.firstName} {m.lastName?.[0]}.
                                                 </span>
                                             ))}
                                         </div>
                                     </div>
-                                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
+                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                 </div>
 
                                 {/* Expanded panel */}
@@ -282,7 +281,7 @@ export const QuickTeamEditor: React.FC<QuickTeamEditorProps> = ({ isOpen, onClos
                                                             }`}
                                                             title={m.id === team.leaderId ? 'Lider' : 'Ustaw jako lidera'}
                                                         >
-                                                            👑
+                                                            <Crown className="w-3 h-3" />
                                                         </button>
                                                         <div className="flex-1 min-w-0">
                                                             <span className="text-sm font-medium text-slate-800">{m.firstName} {m.lastName}</span>
@@ -293,7 +292,7 @@ export const QuickTeamEditor: React.FC<QuickTeamEditorProps> = ({ isOpen, onClos
                                                             disabled={saving}
                                                             className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                                         >
-                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                            <UserMinus className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
                                                 ))}
@@ -312,7 +311,7 @@ export const QuickTeamEditor: React.FC<QuickTeamEditorProps> = ({ isOpen, onClos
                                                             disabled={saving}
                                                             className="text-[10px] px-2 py-1 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 active:bg-blue-200 transition-colors"
                                                         >
-                                                            + {w.first_name} {w.last_name?.[0]}.
+                                                            <UserPlus className="w-3 h-3 inline mr-0.5" />{w.first_name} {w.last_name?.[0]}.
                                                         </button>
                                                     ))}
                                                 </div>
@@ -326,12 +325,12 @@ export const QuickTeamEditor: React.FC<QuickTeamEditorProps> = ({ isOpen, onClos
                                                 disabled={saving}
                                                 className="flex-1 py-2 px-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors flex items-center justify-center gap-1"
                                             >
-                                                📅 Zapisz na tydzień {fmtDate(selectedWeek)}
+                                                <Save className="w-3.5 h-3.5" /> Zapisz na tydzień {fmtDate(selectedWeek)}
                                             </button>
                                         </div>
 
                                         {team.vehicle && (
-                                            <p className="text-[10px] text-slate-400 flex items-center gap-1">🚗 {team.vehicle}</p>
+                                            <p className="text-[10px] text-slate-400 flex items-center gap-1"><Truck className="w-3 h-3" /> {team.vehicle}</p>
                                         )}
                                     </div>
                                 )}

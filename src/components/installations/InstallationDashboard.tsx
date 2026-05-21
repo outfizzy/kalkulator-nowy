@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Users, Wrench, Zap } from 'lucide-react';
 import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
@@ -277,13 +278,13 @@ export const InstallationDashboard: React.FC = () => {
                             onClick={() => navigate('/admin/installers')}
                             className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 flex items-center gap-2 text-sm"
                         >
-                            🔧 Zarządzanie Ekipami
+                            <Wrench className="w-4 h-4 text-indigo-500" /> Zarządzanie Ekipami
                         </button>
                         <button
                             onClick={() => setIsTeamEditorOpen(true)}
                             className="px-4 py-2.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200 flex items-center gap-2 text-sm"
                         >
-                            ⚡ Grupy
+                            <Users className="w-4 h-4" /> Grupy
                         </button>
                         </>
                     )}
