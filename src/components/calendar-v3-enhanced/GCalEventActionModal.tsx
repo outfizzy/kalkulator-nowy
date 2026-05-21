@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { CalendarDays, MapPin, X, Link2, Pencil, UserSearch, Check, Search } from 'lucide-react';
 import { DatabaseService } from '../../services/database';
 import { CustomerSelector } from '../customers/CustomerSelector';
 import type { Contract, Customer } from '../../types';
@@ -118,8 +119,8 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
             product: parsed.product || event.summary || '',
             notes: [
                 event.description || '',
-                eventDate ? `📅 Data z Google: ${eventDate}` : '',
-                event.location ? `📍 ${event.location}` : ''
+                eventDate ? `Data z Google: ${eventDate}` : '',
+                event.location ? event.location : ''
             ].filter(Boolean).join('\n')
         });
 
@@ -193,10 +194,10 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                 productSummary: `${contract.product.modelId} ${contract.product.width}x${contract.product.projection} mm`,
                 notes: [
                     event.description || '',
-                    `📅 Z Google Calendar: ${event.summary}`
+                    `Z Google Calendar: ${event.summary}`
                 ].filter(Boolean).join('\n')
             });
-            toast.success('✅ Utworzono montaż z umowy (z GCal)');
+            toast.success('Utworzono montaż z umowy (z GCal)');
             onCreated();
             onClose();
         } catch (error) {
@@ -230,7 +231,7 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                 status: eventDate ? 'scheduled' : 'pending'
             });
 
-            toast.success('✅ Utworzono montaż (z Google Calendar)');
+            toast.success('Utworzono montaż (z Google Calendar)');
             onCreated();
             onClose();
         } catch (error) {
@@ -249,12 +250,10 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                 {/* Header with event info */}
                 <div className="p-4 bg-gradient-to-r from-sky-600 to-sky-500 text-white relative">
                     <button onClick={onClose} className="absolute top-3 right-3 text-white/70 hover:text-white">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="w-6 h-6" />
                     </button>
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">📅</span>
+                        <CalendarDays className="w-5 h-5" />
                         <span className="text-xs font-medium bg-white/20 px-2 py-0.5 rounded-full">Google Calendar</span>
                         {preSelectedTeamId && (
                             <span className="text-xs font-medium bg-emerald-400/30 px-2 py-0.5 rounded-full">→ Przypisz do ekipy</span>
@@ -264,12 +263,12 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                     <div className="flex flex-wrap gap-3 mt-2 text-sm text-white/80">
                         {eventDate && (
                             <span className="flex items-center gap-1">
-                                <span>📅</span> {eventDate}
+                                <CalendarDays className="w-3.5 h-3.5" /> {eventDate}
                             </span>
                         )}
                         {event.location && (
                             <span className="flex items-center gap-1 truncate max-w-[250px]">
-                                <span>📍</span> {event.location}
+                                <MapPin className="w-3.5 h-3.5" /> {event.location}
                             </span>
                         )}
                     </div>
@@ -287,14 +286,14 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                         className={`flex-1 py-2.5 text-sm font-medium transition-colors ${mode === 'contract'
                             ? 'text-sky-600 border-b-2 border-sky-600 bg-sky-50' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        🔗 Połącz z umową
+                        Łącz z umową
                     </button>
                     <button
                         onClick={() => setMode('manual')}
                         className={`flex-1 py-2.5 text-sm font-medium transition-colors ${mode === 'manual'
                             ? 'text-sky-600 border-b-2 border-sky-600 bg-sky-50' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        ✏️ Utwórz ręcznie
+                        Utwórz ręcznie
                     </button>
                 </div>
 
@@ -311,9 +310,7 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                                     className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm"
                                     autoFocus
                                 />
-                                <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
+                                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                             </div>
 
                             <div className="max-h-[300px] overflow-y-auto space-y-1.5">
@@ -363,7 +360,7 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                                     onClick={() => setShowCustomerSearch(true)}
                                     className="w-full py-2 border border-sky-200 bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                                 >
-                                    👤 Wyszukaj klienta z bazy
+                                    <UserSearch className="w-4 h-4" /> Wyszukaj klienta z bazy
                                 </button>
                             )}
 
@@ -376,7 +373,7 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                                 <>
                                     {form.customerId && (
                                         <div className="bg-green-50 border border-green-200 rounded-lg p-2 flex justify-between items-center">
-                                            <span className="text-sm text-green-800 font-medium">✅ Klient połączony</span>
+                                            <span className="text-sm text-green-800 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> Klient połączony</span>
                                             <button
                                                 onClick={() => setForm(prev => ({ ...prev, customerId: '' }))}
                                                 className="text-xs text-red-500 hover:text-red-700"
@@ -455,7 +452,7 @@ export const GCalEventActionModal: React.FC<GCalEventActionModalProps> = ({
                                         onClick={handleManualCreate}
                                         className="w-full py-2.5 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700 transition-colors text-sm"
                                     >
-                                        ✅ Utwórz montaż
+                                        Utwórz montaż
                                     </button>
                                 </>
                             )}

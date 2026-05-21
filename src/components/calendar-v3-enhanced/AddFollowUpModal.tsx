@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InstallationService } from '../../services/database/installation.service';
 import { ContractService } from '../../services/database/contract.service';
+import { RotateCw, Search } from 'lucide-react';
 import type { Installation } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -131,7 +132,7 @@ export const AddFollowUpModal: React.FC<AddFollowUpModalProps> = ({ isOpen, onCl
             >
                 {/* Header */}
                 <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
-                    <h2 className="text-lg font-bold text-slate-800">🔄 Dodaj dokończenie</h2>
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><RotateCw className="w-5 h-5 text-amber-500" /> Dodaj dokończenie</h2>
                     <p className="text-xs text-slate-500 mt-0.5">
                         Wybierz istniejący montaż lub dodaj ręcznie
                     </p>
@@ -170,9 +171,7 @@ export const AddFollowUpModal: React.FC<AddFollowUpModalProps> = ({ isOpen, onCl
                                     placeholder="Szukaj klienta lub numer umowy..."
                                     className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
                                 />
-                                <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
+                                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                             </div>
 
                             {/* Source List */}
@@ -290,7 +289,7 @@ export const AddFollowUpModal: React.FC<AddFollowUpModalProps> = ({ isOpen, onCl
                         disabled={loading || (mode === 'existing' && !selectedSource)}
                         className="flex-1 py-2.5 text-sm font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                        {loading ? 'Dodawanie...' : '🔄 Dodaj dokończenie'}
+                        {loading ? 'Dodawanie...' : 'Dodaj dokończenie'}
                     </button>
                 </div>
             </div>

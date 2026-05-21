@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { ClipboardList, X, RotateCw, Save } from 'lucide-react';
 import { InstallationService } from '../../services/database/installation.service';
 import type { Installation } from '../../types';
 
@@ -57,9 +58,9 @@ export const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
             });
 
             if (result.followUpsCreated > 0) {
-                toast.success(`✅ Raport zapisany! Utworzono ${result.followUpsCreated} dokończeń`);
+                toast.success(`Raport zapisany! Utworzono ${result.followUpsCreated} dokończeń`);
             } else {
-                toast.success('✅ Raport z montażu zapisany');
+                toast.success('Raport z montażu zapisany');
             }
 
             onSaved();
@@ -85,16 +86,14 @@ export const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
                     <div className="flex justify-between items-start">
                         <div>
                             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                📋 Raport z montażu
+                                <ClipboardList className="w-5 h-5 text-emerald-600" /> Raport z montażu
                             </h3>
                             <p className="text-sm text-slate-500 mt-0.5">
                                 {clientName} {installation.contractNumber && `• ${installation.contractNumber}`}
                             </p>
                         </div>
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
@@ -131,7 +130,7 @@ export const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
                                         key={index}
                                         className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg"
                                     >
-                                        <span className="text-amber-500 mt-0.5">🔄</span>
+                                        <RotateCw className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
                                         <div className="flex-1 min-w-0">
                                             <div className="font-medium text-sm text-amber-900">{item.name}</div>
                                             {item.description && (
@@ -142,9 +141,7 @@ export const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
                                             onClick={() => removeFollowUpItem(index)}
                                             className="text-amber-400 hover:text-red-500 p-0.5 flex-shrink-0"
                                         >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
+                                            <X className="w-4 h-4" />
                                         </button>
                                     </div>
                                 ))}
@@ -183,8 +180,8 @@ export const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
                 <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50 rounded-b-xl">
                     <div className="text-xs text-slate-500">
                         {followUpItems.length > 0 && (
-                            <span className="text-amber-600 font-medium">
-                                🔄 {followUpItems.length} dokończeń do utworzenia
+                            <span className="text-amber-600 font-medium flex items-center gap-1">
+                                <RotateCw className="w-3.5 h-3.5" /> {followUpItems.length} dokończeń do utworzenia
                             </span>
                         )}
                     </div>
@@ -200,7 +197,7 @@ export const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
                             disabled={saving}
                             className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm disabled:opacity-50"
                         >
-                            {saving ? 'Zapisywanie...' : '✅ Zapisz raport'}
+                            {saving ? 'Zapisywanie...' : 'Zapisz raport'}
                         </button>
                     </div>
                 </div>
