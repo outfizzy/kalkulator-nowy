@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { startOfWeek, addDays, format, isSameDay, isWeekend } from 'date-fns';
+import { startOfWeek, addDays, format, isSameDay, isWeekend, parseISO, isWithinInterval } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CalendarDays, MapPin, Ban, Loader2, Crown } from 'lucide-react';
 import { InstallationCardEnhanced } from '../InstallationCardEnhanced';
 import { GoogleCalendarService } from '../../../services/google-calendar.service';
 import type { Installation, InstallationTeam, TeamUnavailability } from '../../../types';
@@ -98,8 +99,8 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
             >
                 <div className="space-y-1">
                     {isUnavailable && dayInstallations.length === 0 && (
-                        <div className="text-[10px] text-slate-400 text-center py-2">
-                            ⛔ Niedostępna
+                        <div className="text-[10px] text-slate-400 text-center py-2 flex items-center justify-center gap-1">
+                            <Ban className="w-3 h-3" /> Niedostępna
                         </div>
                     )}
                     {dayInstallations.map(installation => {
@@ -193,8 +194,8 @@ const DraggableGCalEvent: React.FC<{
                 </span>
             </div>
             {event.location && (
-                <div className="truncate text-[9px] opacity-70">
-                    📍 {event.location}
+                <div className="truncate text-[9px] opacity-70 flex items-center gap-0.5">
+                    <MapPin className="w-2.5 h-2.5 flex-shrink-0" /> {event.location}
                 </div>
             )}
         </div>
@@ -359,13 +360,13 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                         style={{ gridTemplateColumns: '120px repeat(7, 1fr)' }}
                     >
                         <div className="px-2 py-2 border-r border-sky-200 bg-white sticky left-0 z-5 flex items-start gap-1.5">
-                            <span className="text-sm">📅</span>
+                            <CalendarDays className="w-4 h-4 text-sky-600 flex-shrink-0 mt-0.5" />
                             <div className="min-w-0">
                                 <div className="font-bold text-sky-700 text-[11px] truncate leading-tight">
                                     Google
                                 </div>
                                 <div className="text-[9px] text-sky-400">
-                                    {gcalLoading ? '⏳...' : `${gcalEvents.length} ev.`}
+                                    {gcalLoading ? <Loader2 className="w-3 h-3 animate-spin inline" /> : `${gcalEvents.length} ev.`}
                                 </div>
                             </div>
                         </div>
@@ -413,8 +414,13 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                                     {team.name}
                                 </div>
                                 {team.members && team.members.length > 0 && (
-                                    <div className="text-[9px] text-slate-400 truncate">
-                                        {team.members.join(', ')}
+                                    <div className="text-[9px] text-slate-400 truncate flex items-center gap-0.5 flex-wrap">
+                                        {team.members.map((m, i) => (
+                                            <span key={m.id || i} className={`${m.id === team.leaderId ? 'font-bold text-amber-600 flex items-center gap-0.5' : ''}`}>
+                                                {m.id === team.leaderId && <Crown className="w-2.5 h-2.5" />}
+                                                {m.firstName}{m.lastName ? ` ${m.lastName[0]}.` : ''}{i < team.members.length - 1 ? ',' : ''}
+                                            </span>
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -423,7 +429,11 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                         {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
                             const isUnavailable = unavailability.some(
-                                u => u.teamId === team.id && u.date === dateStr
+                                u => u.teamId === team.id && 
+                                    isWithinInterval(parseISO(dateStr), {
+                                        start: parseISO(u.startDate),
+                                        end: parseISO(u.endDate)
+                                    })
                             );
                             return (
                                 <DroppableDay
