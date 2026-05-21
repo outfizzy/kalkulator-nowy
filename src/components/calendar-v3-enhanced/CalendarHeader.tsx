@@ -1,6 +1,7 @@
 import React from 'react';
 import { format, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { PanelLeft, ChevronLeft, ChevronRight, Users, CalendarDays, RefreshCw } from 'lucide-react';
 
 type ViewMode = 'week' | 'month' | 'timeline' | 'map';
 
@@ -66,16 +67,12 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                             }`}
                         title="Backlog"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                        </svg>
+                        <PanelLeft className="w-5 h-5" />
                     </button>
 
                     {/* Prev / Today / Next */}
                     <button onClick={handlePrevious} className="p-1 rounded hover:bg-slate-100 text-slate-400">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                        </svg>
+                        <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
                     </button>
                     <button
                         onClick={() => onDateChange(new Date())}
@@ -84,9 +81,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                         Dziś
                     </button>
                     <button onClick={handleNext} className="p-1 rounded hover:bg-slate-100 text-slate-400">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                        </svg>
+                        <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
                     </button>
 
                     {/* Date label — no truncation */}
@@ -122,9 +117,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                             ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-100'}`}
                         title="Zespoły"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                        <Users className="w-4 h-4" />
                     </button>
 
                     {/* Google Calendar Toggle */}
@@ -137,7 +130,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                             }`}
                             title={showGoogleEvents ? 'Ukryj Google Calendar' : 'Pokaż Google Calendar'}
                         >
-                            <span className="text-sm">📅</span>
+                            <CalendarDays className="w-4 h-4" />
                             <span className="text-[10px] font-bold hidden sm:inline">Google</span>
                         </button>
                     )}
@@ -148,9 +141,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                         className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
                         title="Odśwież"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <RefreshCw className="w-4 h-4" />
                     </button>
                 </div>
             </div>

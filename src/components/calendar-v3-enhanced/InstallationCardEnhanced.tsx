@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Wrench, RotateCw, ClipboardList, CheckCircle2, MapPin, Phone, HardHat, Fuel, Hotel, Package, PackageCheck } from 'lucide-react';
 import type { Installation, InstallationTeam } from '../../types';
 import type { DailyForecast } from '../../services/weather.service';
 
@@ -76,21 +77,21 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
             {/* Badges row */}
             <div className="px-1.5 pt-1 flex items-center gap-0.5 flex-wrap">
                 {isService && (
-                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded">🔧 Serwis</span>
+                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded flex items-center gap-0.5"><Wrench className="w-2.5 h-2.5" /> Serwis</span>
                 )}
                 {isFollowUp && (
-                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 rounded">🔄 Dokończ.</span>
+                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 rounded flex items-center gap-0.5"><RotateCw className="w-2.5 h-2.5" /> Dokończ.</span>
                 )}
                 {needsReport && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onReportClick?.(installation); }}
                         className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1 rounded animate-pulse hover:bg-orange-200"
                     >
-                        📋 Raport
+                        <ClipboardList className="w-2.5 h-2.5 inline" /> Raport
                     </button>
                 )}
                 {installation.completionReport && (
-                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">✅</span>
+                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded flex items-center gap-0.5"><CheckCircle2 className="w-2.5 h-2.5" /></span>
                 )}
                 {weather && (
                     <span className={`ml-auto text-[9px] font-semibold px-1 rounded
@@ -110,8 +111,8 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                     {clientName}
                 </div>
                 {installation.client?.city && (
-                    <div className="text-[9px] text-slate-400 truncate leading-tight">
-                        📍 {installation.client.city}
+                    <div className="text-[9px] text-slate-400 truncate leading-tight flex items-center gap-0.5">
+                        <MapPin className="w-2.5 h-2.5" /> {installation.client.city}
                     </div>
                 )}
             </div>
@@ -141,9 +142,9 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                     <a
                         href={`tel:${installation.client.phone}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[9px] text-indigo-500 hover:underline"
+                        className="text-[9px] text-indigo-500 hover:underline flex items-center gap-0.5"
                     >
-                        📞 {installation.client.phone}
+                        <Phone className="w-2.5 h-2.5" /> {installation.client.phone}
                     </a>
                 </div>
             )}
@@ -153,9 +154,9 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                 const totalCost = (installation.hotelCost || 0) + (installation.consumablesCost || 0) + (installation.additionalCosts || 0);
                 return totalCost > 0 ? (
                     <div className="px-1.5 pb-0.5 flex items-center gap-1 flex-wrap">
-                        {(installation.additionalCosts || 0) > 0 && <span className="text-[8px] text-blue-600 bg-blue-50 px-1 rounded">👷 {installation.additionalCosts?.toFixed(0)}€</span>}
-                        {(installation.consumablesCost || 0) > 0 && <span className="text-[8px] text-amber-600 bg-amber-50 px-1 rounded">⛽ {installation.consumablesCost?.toFixed(0)}€</span>}
-                        {(installation.hotelCost || 0) > 0 && <span className="text-[8px] text-purple-600 bg-purple-50 px-1 rounded">🏨 {installation.hotelCost?.toFixed(0)}€</span>}
+                        {(installation.additionalCosts || 0) > 0 && <span className="text-[8px] text-blue-600 bg-blue-50 px-1 rounded flex items-center gap-0.5"><HardHat className="w-2 h-2" /> {installation.additionalCosts?.toFixed(0)}€</span>}
+                        {(installation.consumablesCost || 0) > 0 && <span className="text-[8px] text-amber-600 bg-amber-50 px-1 rounded flex items-center gap-0.5"><Fuel className="w-2 h-2" /> {installation.consumablesCost?.toFixed(0)}€</span>}
+                        {(installation.hotelCost || 0) > 0 && <span className="text-[8px] text-purple-600 bg-purple-50 px-1 rounded flex items-center gap-0.5"><Hotel className="w-2 h-2" /> {installation.hotelCost?.toFixed(0)}€</span>}
                         <span className="text-[8px] font-bold text-red-600 ml-auto">Σ {totalCost.toFixed(0)}€</span>
                     </div>
                 ) : null;
@@ -171,7 +172,11 @@ export const InstallationCardEnhanced: React.FC<InstallationCardEnhancedProps> =
                             installation.partsStatus === 'partial' ? 'text-amber-600 bg-amber-50' :
                             'text-red-500 bg-red-50'
                         }`}>
-                            {installation.partsStatus === 'all_delivered' ? '📦✓' : installation.partsStatus === 'partial' ? '📦…' : '📦✗'}
+                            {installation.partsStatus === 'all_delivered' 
+                                ? <span className="flex items-center gap-0.5"><PackageCheck className="w-2.5 h-2.5" />✓</span> 
+                                : installation.partsStatus === 'partial' 
+                                    ? <span className="flex items-center gap-0.5"><Package className="w-2.5 h-2.5" />…</span> 
+                                    : <span className="flex items-center gap-0.5"><Package className="w-2.5 h-2.5" />✗</span>}
                         </span>
                     )}
                 </div>

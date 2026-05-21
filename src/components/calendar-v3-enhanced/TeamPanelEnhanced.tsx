@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, isWithinInterval, parseISO } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { Crown, X, AlertTriangle } from 'lucide-react';
 import type { InstallationTeam, Installation, TeamUnavailability } from '../../types';
 
 interface TeamPanelEnhancedProps {
@@ -34,14 +35,19 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
             );
 
             const totalHours = teamInstallations.reduce((sum, inst) => {
-                return sum + (inst.estimatedDuration || 8);
+                return sum + ((inst.expectedDuration || 1) * 8);
             }, 0);
 
-            // Count unavailable days
-            const teamUnavail = unavailability.filter(
-                u => u.teamId === team.id &&
-                    new Date(u.date) >= weekStart &&
-                    new Date(u.date) <= weekEnd
+            // Count unavailable days in this week
+            const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+            const teamUnavail = weekDays.filter(day => 
+                unavailability.some(u => 
+                    u.teamId === team.id &&
+                    isWithinInterval(day, { 
+                        start: parseISO(u.startDate), 
+                        end: parseISO(u.endDate) 
+                    })
+                )
             );
 
             workload[team.id] = {
@@ -68,9 +74,7 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                         onClick={onClose}
                         className="p-1 hover:bg-slate-100 rounded"
                     >
-                        <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="w-5 h-5 text-slate-600" />
                     </button>
                 </div>
                 <p className="text-xs text-slate-500">
@@ -127,10 +131,15 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                                     <div className="flex flex-wrap gap-1">
                                         {team.members.map((member, idx) => (
                                             <span
-                                                key={idx}
-                                                className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded"
+                                                key={member.id || idx}
+                                                className={`px-2 py-0.5 text-xs rounded flex items-center gap-0.5 ${
+                                                    member.id === team.leaderId
+                                                        ? 'bg-amber-100 text-amber-800 font-bold'
+                                                        : 'bg-slate-100 text-slate-700'
+                                                }`}
                                             >
-                                                {member}
+                                                {member.id === team.leaderId && <Crown className="w-2.5 h-2.5" />}
+                                                {member.firstName} {member.lastName?.[0]}.
                                             </span>
                                         ))}
                                     </div>
@@ -141,9 +150,7 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                             {load.unavailableDays > 0 && (
                                 <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs">
                                     <div className="flex items-center gap-1 text-gray-700">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
+                                        <AlertTriangle className="w-3 h-3" />
                                         <span className="font-medium">
                                             Niedostępna {load.unavailableDays} {load.unavailableDays === 1 ? 'dzień' : 'dni'}
                                         </span>
