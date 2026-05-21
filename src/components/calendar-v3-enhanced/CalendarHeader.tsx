@@ -1,7 +1,7 @@
 import React from 'react';
 import { format, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { PanelLeft, ChevronLeft, ChevronRight, Users, CalendarDays, RefreshCw } from 'lucide-react';
+import { PanelLeft, ChevronLeft, ChevronRight, Users, CalendarDays, RefreshCw, Settings2 } from 'lucide-react';
 
 type ViewMode = 'week' | 'month' | 'timeline' | 'map';
 
@@ -15,6 +15,7 @@ interface CalendarHeaderProps {
     onToggleTeamPanel: () => void;
     onGoogleImport?: () => void;
     onGoogleAIImport?: () => void;
+    onEditTeams?: () => void;
     showGoogleEvents?: boolean;
     sidebarOpen: boolean;
     teamPanelOpen: boolean;
@@ -30,6 +31,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     onToggleTeamPanel,
     onGoogleImport,
     onGoogleAIImport,
+    onEditTeams,
     showGoogleEvents,
     sidebarOpen,
     teamPanelOpen
@@ -119,6 +121,18 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                     >
                         <Users className="w-4 h-4" />
                     </button>
+
+                    {/* Edit Teams */}
+                    {onEditTeams && (
+                        <button
+                            onClick={onEditTeams}
+                            className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 hover:text-amber-600 transition-all flex items-center gap-1"
+                            title="Edytuj grupy montażowe"
+                        >
+                            <Settings2 className="w-4 h-4" />
+                            <span className="text-[10px] font-bold hidden sm:inline">Grupy</span>
+                        </button>
+                    )}
 
                     {/* Google Calendar Toggle */}
                     {onGoogleImport && (

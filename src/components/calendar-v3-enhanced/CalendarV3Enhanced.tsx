@@ -8,6 +8,7 @@ import { CalendarGridEnhanced } from './CalendarGridEnhanced';
 import { CompletionReportModal } from './CompletionReportModal';
 import { GoogleCalendarImportPanel } from './GoogleCalendarImportPanel';
 import { GCalEventActionModal } from './GCalEventActionModal';
+import { QuickTeamEditor } from '../installations/QuickTeamEditor';
 import { InstallationService } from '../../services/database/installation.service';
 import type { Installation, Contract, ServiceTicket, InstallationTeam, TeamUnavailability } from '../../types';
 import { getWeatherForInstallations, type LocationForecast } from '../../services/weather.service';
@@ -46,6 +47,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
     const [showGoogleEvents, setShowGoogleEvents] = useState(false);
     const [gcalSelectedEvent, setGcalSelectedEvent] = useState<any>(null);
     const [gcalDropTarget, setGcalDropTarget] = useState<{ teamId: string; date: string } | null>(null);
+    const [teamEditorOpen, setTeamEditorOpen] = useState(false);
 
     // Fetch weather when week or installations change
     useEffect(() => {
@@ -165,6 +167,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                         onToggleTeamPanel={() => setTeamPanelOpen(!teamPanelOpen)}
                         onGoogleImport={() => setShowGoogleEvents(!showGoogleEvents)}
                         onGoogleAIImport={() => setGoogleImportOpen(true)}
+                        onEditTeams={() => setTeamEditorOpen(true)}
                         showGoogleEvents={showGoogleEvents}
                         sidebarOpen={sidebarOpen}
                         teamPanelOpen={teamPanelOpen}
@@ -228,6 +231,7 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                                     unavailability={unavailability}
                                     currentDate={currentDate}
                                     onClose={() => setTeamPanelOpen(false)}
+                                    onEditTeams={() => setTeamEditorOpen(true)}
                                 />
                             </div>
                         )}
@@ -281,6 +285,13 @@ export const CalendarV3Enhanced: React.FC<CalendarV3EnhancedProps> = ({
                 onCreated={onRefresh}
                 preSelectedTeamId={gcalDropTarget?.teamId}
                 preSelectedDate={gcalDropTarget?.date}
+            />
+
+            {/* Quick Team Editor */}
+            <QuickTeamEditor
+                isOpen={teamEditorOpen}
+                onClose={() => setTeamEditorOpen(false)}
+                onTeamsUpdated={onRefresh}
             />
         </>
     );

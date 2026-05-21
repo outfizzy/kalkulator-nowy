@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isWithinInterval, parseISO } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { Crown, X, AlertTriangle } from 'lucide-react';
+import { Crown, X, AlertTriangle, Settings2 } from 'lucide-react';
 import type { InstallationTeam, Installation, TeamUnavailability } from '../../types';
 
 interface TeamPanelEnhancedProps {
@@ -10,6 +10,7 @@ interface TeamPanelEnhancedProps {
     unavailability: TeamUnavailability[];
     currentDate: Date;
     onClose: () => void;
+    onEditTeams?: () => void;
 }
 
 export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
@@ -17,7 +18,8 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
     installations,
     unavailability,
     currentDate,
-    onClose
+    onClose,
+    onEditTeams
 }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -70,12 +72,24 @@ export const TeamPanelEnhanced: React.FC<TeamPanelEnhancedProps> = ({
                     <h2 className="text-lg font-bold text-slate-900">
                         Ekipy
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-1 hover:bg-slate-100 rounded"
-                    >
-                        <X className="w-5 h-5 text-slate-600" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        {onEditTeams && (
+                            <button
+                                onClick={onEditTeams}
+                                className="p-1.5 hover:bg-amber-50 rounded-lg text-amber-500 hover:text-amber-600 transition-colors flex items-center gap-1"
+                                title="Edytuj grupy"
+                            >
+                                <Settings2 className="w-4 h-4" />
+                                <span className="text-[10px] font-bold">Edytuj</span>
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="p-1 hover:bg-slate-100 rounded"
+                        >
+                            <X className="w-5 h-5 text-slate-600" />
+                        </button>
+                    </div>
                 </div>
                 <p className="text-xs text-slate-500">
                     Tydzień: {format(weekStart, 'd MMM', { locale: pl })} - {format(weekEnd, 'd MMM', { locale: pl })}
