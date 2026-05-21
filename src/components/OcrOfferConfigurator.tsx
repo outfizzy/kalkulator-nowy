@@ -44,14 +44,23 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const models = [
-    { id: 'trendstyle', name: 'Trendstyle', type: 'polycarbonate' },
-    { id: 'trendstyle_plus', name: 'Trendstyle+', type: 'polycarbonate' },
-    { id: 'topstyle', name: 'Topstyle', type: 'polycarbonate' },
-    { id: 'topstyle_xl', name: 'Topstyle XL', type: 'polycarbonate' },
-    { id: 'skystyle', name: 'Skystyle', type: 'glass' },
-    { id: 'ultrastyle', name: 'Ultrastyle', type: 'polycarbonate' },
-    { id: 'carport', name: 'Carport', type: 'polycarbonate' },
-    { id: 'orangestyle', name: 'Orangestyle', type: 'polycarbonate' }
+    { id: 'Orangeline', name: 'Orangestyle', hasPoly: true, hasGlass: true, image_url: '/images/models/orangeline.jpg' },
+    { id: 'Orangeline+', name: 'Orangestyle+', hasPoly: true, hasGlass: true, image_url: '/images/models/orangeline-plus.jpg' },
+    { id: 'Trendline', name: 'Trendstyle', hasPoly: true, hasGlass: true, image_url: '/images/models/trendline.jpg' },
+    { id: 'Trendline+', name: 'Trendstyle+', hasPoly: true, hasGlass: true, image_url: '/images/models/trendline-plus.jpg' },
+    { id: 'Topline', name: 'Topstyle', hasPoly: true, hasGlass: true, image_url: '/images/models/topline.jpg' },
+    { id: 'Topline XL', name: 'Topstyle XL', hasPoly: true, hasGlass: true, image_url: '/images/models/topline-xl.jpg' },
+    { id: 'Designline', name: 'Designstyle', hasPoly: false, hasGlass: true, image_url: '/images/models/designline.jpg' },
+    { id: 'Ultraline', name: 'Ultrastyle', hasPoly: false, hasGlass: true, image_url: '/images/models/ultraline.jpg' },
+    { id: 'Skyline', name: 'Skystyle', hasPoly: false, hasGlass: false, image_url: '/images/models/skyline.jpg' },
+    { id: 'Carport', name: 'Carport', hasPoly: false, hasGlass: false, image_url: '/images/models/carport.jpg' },
+    { id: 'TR10', name: 'Orangestyle 10', hasPoly: true, hasGlass: true, image_url: '/images/models/teranda-tr10.jpg' },
+    { id: 'TR15', name: 'Trendstyle 15', hasPoly: true, hasGlass: true, image_url: '/images/models/teranda-tr15.jpg' },
+    { id: 'TR20', name: 'Topstyle 20', hasPoly: true, hasGlass: true, image_url: '/images/models/teranda-tr20.jpg' },
+    { id: 'Pergola', name: 'Pergola', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola.jpg' },
+    { id: 'Pergola Deluxe', name: 'Pergola Deluxe', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-deluxe.jpg' },
+    { id: 'Pergola Luxe', name: 'Pergola Luxe (Manuell)', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
+    { id: 'Pergola Luxe Electric', name: 'Pergola Luxe (Elektrisch)', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
   ];
 
   const processImage = async (file: File) => {
@@ -214,31 +223,63 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
       {/* Visual Model Selection */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl">🖼️</span> Wybierz Model (do wizualizacji w ofercie)
+          <ImageIcon className="w-6 h-6 text-indigo-500" /> Wybierz Model (do wizualizacji w ofercie)
         </h3>
         <p className="text-sm text-slate-500 mb-6">
           Zaznacz model przypominający produkt z zewnętrznej oferty. Zostanie on wyświetlony klientowi w PDFie.
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {models.map(model => (
-            <div
-              key={model.id}
-              onClick={() => {
-                setModelId(model.id);
-                if (model.id === 'skystyle') setRoofType('glass');
-                else setRoofType('polycarbonate');
-              }}
-              className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${modelId === model.id
-                ? 'border-accent bg-accent/5 shadow-md'
-                : 'border-slate-100 hover:border-accent/30'
-                }`}
-            >
-              <div className={`w-3 h-3 rounded-full absolute top-3 right-3 ${modelId === model.id ? 'bg-accent' : 'bg-slate-200'}`} />
-              <h3 className="text-lg font-bold mb-1 text-slate-900">{model.name}</h3>
-              <p className="text-xs text-slate-500">{model.type === 'glass' ? 'Tylko Szkło VSG' : 'Poliwęglan / Szkło'}</p>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {models.map(model => {
+            const isSelected = modelId === model.id;
+            return (
+              <div
+                key={model.id}
+                onClick={() => {
+                  setModelId(model.id);
+                  if (model.hasGlass && !model.hasPoly) setRoofType('glass');
+                  else setRoofType('polycarbonate');
+                }}
+                className={`cursor-pointer border-2 rounded-xl overflow-hidden transition-all relative group ${isSelected
+                  ? 'border-accent ring-2 ring-accent/20 shadow-lg'
+                  : 'border-slate-100 hover:border-accent/40 hover:shadow-md'
+                  }`}
+              >
+                <div className="aspect-[4/3] bg-gradient-to-br from-slate-100 to-slate-50 relative overflow-hidden">
+                  <img
+                    src={model.image_url}
+                    alt={model.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon') as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                  <div className="fallback-icon absolute inset-0 items-center justify-center text-slate-300 hidden">
+                    <ImageIcon className="w-10 h-10" />
+                  </div>
+                  <div className={`absolute top-2 right-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected
+                    ? 'bg-accent border-accent'
+                    : 'bg-white/80 border-slate-300'}`}>
+                    {isSelected && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <div className="p-2.5">
+                  <h4 className="font-bold text-sm text-slate-900 leading-tight">{model.name}</h4>
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {model.hasGlass && <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Szkło</span>}
+                    {model.hasPoly && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Poliwęglan</span>}
+                    {!model.hasGlass && !model.hasPoly && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">Lamele</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

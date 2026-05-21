@@ -1,12 +1,34 @@
 import React, { useState } from 'react';
 import { Image, PenLine, ArrowRight } from 'lucide-react';
-import type { ProductConfig, ProductModel } from '../types';
-import catalogData from '../data/catalog.json';
+import type { ProductConfig } from '../types';
 
 interface ManualOfferConfiguratorProps {
     onComplete: (config: ProductConfig) => void;
     initialData?: ProductConfig;
 }
+
+// Full model list — synced with ProductConfiguratorV2 ROOF_MODELS
+const ALL_MODELS = [
+    { id: 'Orangeline', name: 'Orangestyle', hasPoly: true, hasGlass: true, image_url: '/images/models/orangeline.jpg' },
+    { id: 'Orangeline+', name: 'Orangestyle+', hasPoly: true, hasGlass: true, image_url: '/images/models/orangeline-plus.jpg' },
+    { id: 'Trendline', name: 'Trendstyle', hasPoly: true, hasGlass: true, image_url: '/images/models/trendline.jpg' },
+    { id: 'Trendline+', name: 'Trendstyle+', hasPoly: true, hasGlass: true, image_url: '/images/models/trendline-plus.jpg' },
+    { id: 'Topline', name: 'Topstyle', hasPoly: true, hasGlass: true, image_url: '/images/models/topline.jpg' },
+    { id: 'Topline XL', name: 'Topstyle XL', hasPoly: true, hasGlass: true, image_url: '/images/models/topline-xl.jpg' },
+    { id: 'Designline', name: 'Designstyle', hasPoly: false, hasGlass: true, image_url: '/images/models/designline.jpg' },
+    { id: 'Ultraline', name: 'Ultrastyle', hasPoly: false, hasGlass: true, image_url: '/images/models/ultraline.jpg' },
+    { id: 'Skyline', name: 'Skystyle', hasPoly: false, hasGlass: false, image_url: '/images/models/skyline.jpg' },
+    { id: 'Carport', name: 'Carport', hasPoly: false, hasGlass: false, image_url: '/images/models/carport.jpg' },
+    // Teranda
+    { id: 'TR10', name: 'Orangestyle 10', hasPoly: true, hasGlass: true, image_url: '/images/models/teranda-tr10.jpg' },
+    { id: 'TR15', name: 'Trendstyle 15', hasPoly: true, hasGlass: true, image_url: '/images/models/teranda-tr15.jpg' },
+    { id: 'TR20', name: 'Topstyle 20', hasPoly: true, hasGlass: true, image_url: '/images/models/teranda-tr20.jpg' },
+    // Pergola Luxe
+    { id: 'Pergola', name: 'Pergola', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola.jpg' },
+    { id: 'Pergola Deluxe', name: 'Pergola Deluxe', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-deluxe.jpg' },
+    { id: 'Pergola Luxe', name: 'Pergola Luxe (Manuell)', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
+    { id: 'Pergola Luxe Electric', name: 'Pergola Luxe (Elektrisch)', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
+];
 
 export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = ({
     onComplete,
@@ -20,8 +42,6 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
     const [description, setDescription] = useState(initialData?.manualDescription || '');
     const [price, setPrice] = useState<string>(initialData?.manualPrice?.toString() || '');
 
-    // Load models from catalog.json — single source of truth
-    const models = catalogData.models as unknown as ProductModel[];
 
     const handleSubmit = () => {
         if (!modelId) {
@@ -65,17 +85,15 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
                     Ten model zostanie pokazany klientowi na wizualizacji w ofercie. Nie wpływa on na cenę w trybie ręcznym.
                 </p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {models.map(model => {
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {ALL_MODELS.map(model => {
                         const isSelected = modelId === model.id;
-                        const hasGlass = model.roofTypes?.includes('glass');
-                        const hasPoly = model.roofTypes?.includes('polycarbonate');
                         return (
                             <div
                                 key={model.id}
                                 onClick={() => {
                                     setModelId(model.id);
-                                    if (hasGlass && !hasPoly) setRoofType('glass');
+                                    if (model.hasGlass && !model.hasPoly) setRoofType('glass');
                                     else setRoofType('polycarbonate');
                                 }}
                                 className={`cursor-pointer border-2 rounded-xl overflow-hidden transition-all relative group ${isSelected
@@ -85,18 +103,17 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
                             >
                                 {/* Image */}
                                 <div className="aspect-[4/3] bg-gradient-to-br from-slate-100 to-slate-50 relative overflow-hidden">
-                                    {model.image ? (
-                                        <img
-                                            src={model.image}
-                                            alt={model.name}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                            onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                            }}
-                                        />
-                                    ) : null}
-                                    <div className={`absolute inset-0 flex items-center justify-center text-slate-300 ${model.image ? 'hidden' : ''}`}>
+                                    <img
+                                        src={model.image_url}
+                                        alt={model.name}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon') as HTMLElement;
+                                            if (fallback) fallback.style.display = 'flex';
+                                        }}
+                                    />
+                                    <div className="fallback-icon absolute inset-0 items-center justify-center text-slate-300 hidden">
                                         <Image className="w-10 h-10" />
                                     </div>
                                     {/* Selection indicator */}
@@ -112,18 +129,18 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
                                 </div>
                                 {/* Info */}
                                 <div className="p-3">
-                                    <h4 className="font-bold text-sm text-slate-900">{model.name}</h4>
+                                    <h4 className="font-bold text-sm text-slate-900 leading-tight">{model.name}</h4>
                                     <div className="flex gap-1 mt-1.5 flex-wrap">
-                                        {hasGlass && (
+                                        {model.hasGlass && (
                                             <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Szkło</span>
                                         )}
-                                        {hasPoly && (
+                                        {model.hasPoly && (
                                             <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Poliwęglan</span>
                                         )}
+                                        {!model.hasGlass && !model.hasPoly && (
+                                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">Lamele</span>
+                                        )}
                                     </div>
-                                    {model.description && (
-                                        <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{model.description}</p>
-                                    )}
                                 </div>
                             </div>
                         );
