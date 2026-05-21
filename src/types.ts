@@ -599,11 +599,12 @@ export type InstallationStatus = 'pending' | 'scheduled' | 'confirmed' | 'comple
 export interface InstallationTeam {
     id: string;
     name: string;
+    leaderId?: string; // ID of permanent team leader member
     members: {
         id: string;
         firstName: string;
         lastName: string;
-        role?: string;
+        role?: 'leader' | 'member' | string;
         hourlyRate?: number;
         type?: 'user' | 'virtual';
     }[];

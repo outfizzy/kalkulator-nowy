@@ -17,6 +17,7 @@ import { toast } from 'react-hot-toast';
 import { DatabaseService } from '../../services/database';
 import { InstallationService } from '../../services/database/installation.service';
 import { FeedbackRequestWidget } from './FeedbackRequestWidget';
+import { QuickTeamEditor } from './QuickTeamEditor';
 import { useAuth } from '../../contexts/AuthContext';
 
 
@@ -38,6 +39,7 @@ export const InstallationDashboard: React.FC = () => {
     const [editingInstallation, setEditingInstallation] = useState<Installation | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+    const [isTeamEditorOpen, setIsTeamEditorOpen] = useState(false);
 
     // Filters & Grouping
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -270,12 +272,20 @@ export const InstallationDashboard: React.FC = () => {
                         Dodaj Montaż
                     </button>
                     {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                        <>
                         <button
                             onClick={() => navigate('/admin/installers')}
                             className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 flex items-center gap-2 text-sm"
                         >
                             🔧 Zarządzanie Ekipami
                         </button>
+                        <button
+                            onClick={() => setIsTeamEditorOpen(true)}
+                            className="px-4 py-2.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200 flex items-center gap-2 text-sm"
+                        >
+                            ⚡ Grupy
+                        </button>
+                        </>
                     )}
                     <button
                         onClick={() => setView('reports')}
@@ -497,6 +507,12 @@ export const InstallationDashboard: React.FC = () => {
                 isOpen={isManualModalOpen}
                 onClose={() => setIsManualModalOpen(false)}
                 onInstallationCreated={loadData}
+            />
+
+            <QuickTeamEditor
+                isOpen={isTeamEditorOpen}
+                onClose={() => setIsTeamEditorOpen(false)}
+                onTeamsUpdated={loadData}
             />
         </div >
     );

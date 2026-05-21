@@ -23,6 +23,7 @@ export const InstallationTeamService = {
         return data.map(row => ({
             id: row.id,
             name: row.name,
+            leaderId: row.leader_id || undefined,
             color: row.color,
             vehicle: row.vehicle,
             members: typeof row.members === 'string' ? JSON.parse(row.members) : row.members,
@@ -42,6 +43,7 @@ export const InstallationTeamService = {
                 color: team.color,
                 vehicle: team.vehicle,
                 members: team.members,
+                leader_id: team.leaderId || null,
                 is_active: true,
                 fuel_consumption: team.fuelConsumption,
                 vehicle_maintenance_rate: team.vehicleMaintenanceRate,
@@ -55,6 +57,7 @@ export const InstallationTeamService = {
         return {
             id: data.id,
             name: data.name,
+            leaderId: data.leader_id || undefined,
             color: data.color,
             vehicle: data.vehicle,
             members: typeof data.members === 'string' ? JSON.parse(data.members) : data.members,
@@ -75,6 +78,7 @@ export const InstallationTeamService = {
         if (updates.fuelConsumption !== undefined) dbUpdates.fuel_consumption = updates.fuelConsumption;
         if (updates.vehicleMaintenanceRate !== undefined) dbUpdates.vehicle_maintenance_rate = updates.vehicleMaintenanceRate;
         if (updates.workingDays !== undefined) dbUpdates.working_days = updates.workingDays;
+        if (updates.leaderId !== undefined) dbUpdates.leader_id = updates.leaderId || null;
 
         const client = getSupabaseClient();
         const { error } = await client
