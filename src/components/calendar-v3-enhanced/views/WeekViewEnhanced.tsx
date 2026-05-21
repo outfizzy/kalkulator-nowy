@@ -83,14 +83,14 @@ const DroppableDay: React.FC<DroppableDayProps> = ({
     return (
         <div
             ref={setNodeRef}
-            className={`min-h-[120px] border-r border-b border-slate-100 p-1 transition-colors overflow-hidden
+            className={`min-h-[100px] border-r border-b border-slate-100 p-1 transition-all duration-150 overflow-hidden
                 ${isOver
-                    ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-300'
+                    ? 'bg-indigo-50/80 ring-2 ring-inset ring-indigo-400 shadow-inner'
                     : isUnavailable
-                        ? 'bg-slate-50'
+                        ? 'bg-gradient-to-b from-slate-50 to-slate-100/50'
                         : isWeekendDay
-                            ? 'bg-gray-50/50'
-                            : 'bg-white hover:bg-slate-50/30'
+                            ? 'bg-slate-50/40'
+                            : 'bg-white hover:bg-indigo-50/20'
                 }`}
         >
             <SortableContext
@@ -312,10 +312,10 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
         <div className="h-full flex flex-col overflow-hidden">
             {/* Header */}
             <div
-                className="grid border-b-2 border-slate-200 bg-slate-50 sticky top-0 z-10"
+                className="grid border-b-2 border-slate-200 bg-gradient-to-b from-slate-50 to-white sticky top-0 z-10"
                 style={{ gridTemplateColumns: '120px repeat(7, 1fr)' }}
             >
-                <div className="px-2 py-2 border-r border-slate-200 flex items-center">
+                <div className="px-2 py-2.5 border-r border-slate-200 flex items-end">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ekipa</span>
                 </div>
                 {weekDays.map(day => {
@@ -327,24 +327,25 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                         <div
                             key={day.toISOString()}
                             className={`py-1.5 px-1 border-r border-slate-200 text-center
-                                ${isToday
-                                    ? 'bg-indigo-600 text-white'
-                                    : isWeekendDay
-                                        ? 'text-slate-400'
-                                        : 'text-slate-600'
-                                }`}
+                                ${isWeekendDay ? 'bg-slate-50/50' : ''}`}
                         >
-                            <div className="text-[10px] uppercase font-semibold tracking-wide">
+                            <div className={`text-[10px] uppercase font-semibold tracking-wide
+                                ${isToday ? 'text-indigo-600' : isWeekendDay ? 'text-slate-400' : 'text-slate-500'}`}>
                                 {format(day, 'EEEEEE', { locale: pl })}
                             </div>
-                            <div className="text-base font-bold leading-tight">
+                            <div className={`text-base font-bold leading-tight inline-flex items-center justify-center
+                                ${isToday 
+                                    ? 'w-8 h-8 rounded-full bg-indigo-600 text-white mx-auto' 
+                                    : isWeekendDay ? 'text-slate-400' : 'text-slate-800'}`}>
                                 {format(day, 'd')}
                             </div>
                             {count > 0 && (
-                                <span className={`inline-block text-[9px] font-bold px-1.5 rounded-full
-                                    ${isToday ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>
-                                    {count}
-                                </span>
+                                <div className="mt-0.5">
+                                    <span className={`inline-block text-[9px] font-bold px-1.5 rounded-full
+                                        ${isToday ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        {count} mont.
+                                    </span>
+                                </div>
                             )}
                         </div>
                     );
@@ -404,21 +405,20 @@ export const WeekViewEnhanced: React.FC<WeekViewEnhancedProps> = ({
                         className="grid border-b border-slate-100"
                         style={{ gridTemplateColumns: '120px repeat(7, 1fr)' }}
                     >
-                        <div className="px-2 py-2 border-r border-slate-200 bg-white sticky left-0 z-5 flex items-start gap-1.5">
-                            <div
-                                className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
-                                style={{ backgroundColor: team.color }}
-                            />
-                            <div className="min-w-0">
+                        <div 
+                            className="px-2 py-2 border-r border-slate-200 bg-white sticky left-0 z-5 flex items-start gap-2"
+                            style={{ borderLeft: `3px solid ${team.color || '#6366f1'}` }}
+                        >
+                            <div className="min-w-0 flex-1">
                                 <div className="font-bold text-slate-800 text-[11px] truncate leading-tight">
                                     {team.name}
                                 </div>
                                 {team.members && team.members.length > 0 && (
-                                    <div className="text-[9px] text-slate-400 truncate flex items-center gap-0.5 flex-wrap">
+                                    <div className="text-[9px] text-slate-400 truncate mt-0.5">
                                         {team.members.map((m, i) => (
-                                            <span key={m.id || i} className={`${m.id === team.leaderId ? 'font-bold text-amber-600 flex items-center gap-0.5' : ''}`}>
-                                                {m.id === team.leaderId && <Crown className="w-2.5 h-2.5" />}
-                                                {m.firstName}{m.lastName ? ` ${m.lastName[0]}.` : ''}{i < team.members.length - 1 ? ',' : ''}
+                                            <span key={m.id || i} className={`${m.id === team.leaderId ? 'font-bold text-amber-600' : ''}`}>
+                                                {m.id === team.leaderId && '★ '}
+                                                {m.firstName}{m.lastName ? ` ${m.lastName[0]}.` : ''}{i < team.members.length - 1 ? ', ' : ''}
                                             </span>
                                         ))}
                                     </div>

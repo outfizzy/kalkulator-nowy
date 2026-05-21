@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
+import { MapPin, Check, Clock, Package, Droplets, Zap, Eye, Wrench, Hammer, ClipboardList, RotateCw } from 'lucide-react';
 import type { Contract, ServiceTicket, Installation } from '../../types';
 
 type Priority = 'urgent' | 'ready' | 'pending' | 'future';
@@ -102,9 +103,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                     </div>
                     <div className="space-y-1 text-xs text-slate-600 mb-2">
                         <div className="flex items-start gap-1">
-                            <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            </svg>
+                            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0 text-slate-400" />
                             <div className="flex flex-col">
                                 <span className="font-medium text-slate-700">
                                     {clientData.address || 'Brak ulicy'}
@@ -119,16 +118,12 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                     {/* Supply Status */}
                     {isDelivered ? (
                         <div className="mt-2 p-1.5 rounded text-xs flex items-center gap-1.5 bg-green-100 text-green-800 border border-green-200">
-                            <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                            <Check className="w-4 h-4 text-green-600" />
                             <div className="font-bold">Towar na miejscu</div>
                         </div>
                     ) : (hasOrderedItems || someOrdered) ? (
                         <div className="mt-2 p-1.5 rounded text-xs flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <Clock className="w-3.5 h-3.5" />
                             <div>
                                 <div className="font-semibold">W trakcie realizacji</div>
                                 <div className="text-[10px] opacity-75">
@@ -138,9 +133,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                         </div>
                     ) : (
                         <div className="mt-2 p-1.5 rounded text-xs flex items-center gap-1.5 bg-slate-100 text-slate-500 border border-slate-200">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
+                            <Package className="w-3.5 h-3.5" />
                             <div>Brak zamówienia</div>
                         </div>
                     )}
@@ -148,13 +141,13 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
             );
         } else if (item.type === 'service') {
             const ticket = item.data as ServiceTicket;
-            const typeLabels: Record<string, { label: string; icon: string; color: string }> = {
-                leak: { label: 'Nieszczelność', icon: '💧', color: 'bg-blue-100 text-blue-700' },
-                electrical: { label: 'Elektryka', icon: '⚡', color: 'bg-yellow-100 text-yellow-700' },
-                visual: { label: 'Wizualne', icon: '👁️', color: 'bg-purple-100 text-purple-700' },
-                mechanical: { label: 'Mechaniczne', icon: '🔧', color: 'bg-slate-100 text-slate-700' },
-                repair: { label: 'Naprawa', icon: '🔨', color: 'bg-orange-100 text-orange-700' },
-                other: { label: 'Inne', icon: '📋', color: 'bg-slate-100 text-slate-600' },
+            const typeLabels: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                leak: { label: 'Nieszczelność', icon: <Droplets className="w-3 h-3" />, color: 'bg-blue-100 text-blue-700' },
+                electrical: { label: 'Elektryka', icon: <Zap className="w-3 h-3" />, color: 'bg-yellow-100 text-yellow-700' },
+                visual: { label: 'Wizualne', icon: <Eye className="w-3 h-3" />, color: 'bg-purple-100 text-purple-700' },
+                mechanical: { label: 'Mechaniczne', icon: <Wrench className="w-3 h-3" />, color: 'bg-slate-100 text-slate-700' },
+                repair: { label: 'Naprawa', icon: <Hammer className="w-3 h-3" />, color: 'bg-orange-100 text-orange-700' },
+                other: { label: 'Inne', icon: <ClipboardList className="w-3 h-3" />, color: 'bg-slate-100 text-slate-600' },
             };
             const priorityLabels: Record<string, { label: string; color: string }> = {
                 critical: { label: 'Krytyczny', color: 'bg-red-100 text-red-700 border-red-200' },
@@ -185,9 +178,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                             </h4>
                             {clientData.city && (
                                 <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
-                                    <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    </svg>
+                                    <MapPin className="w-3 h-3 flex-shrink-0" />
                                     <span className="truncate">{clientData.postalCode ? `${clientData.postalCode} ` : ''}{clientData.city}</span>
                                 </div>
                             )}
@@ -199,7 +190,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                     {/* Type + Priority badges */}
                     <div className="flex items-center gap-1.5 mb-2">
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 ${typeInfo.color}`}>
-                            <span className="text-[10px]">{typeInfo.icon}</span> {typeInfo.label}
+                            {typeInfo.icon} {typeInfo.label}
                         </span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${prioInfo.color}`}>
                             {prioInfo.label}
@@ -235,15 +226,13 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                                 {installation.contractNumber || ''}
                             </p>
                         </div>
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded">
-                            🔄 Dokończ.
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded flex items-center gap-0.5">
+                            <RotateCw className="w-3 h-3" /> Dokończ.
                         </span>
                     </div>
                     <div className="space-y-1 text-xs text-slate-600">
                         <div className="flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            </svg>
+                            <MapPin className="w-3 h-3 text-slate-400" />
                             <span>{clientData.city}</span>
                         </div>
                     </div>
@@ -289,9 +278,7 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
                     </div>
                     <div className="space-y-1 text-xs text-slate-600">
                         <div className="flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            </svg>
+                            <MapPin className="w-3 h-3 text-slate-400" />
                             <span>{clientData.city}</span>
                         </div>
                         <p className="line-clamp-1">{installation.productSummary}</p>
@@ -301,14 +288,20 @@ export const BacklogCard: React.FC<BacklogCardProps> = ({ item, priority }) => {
         }
     };
 
+    const accentColor = item.type === 'contract' ? '#3b82f6' 
+        : item.type === 'service' ? '#8b5cf6' 
+        : item.type === 'followup' ? '#f59e0b' 
+        : '#22c55e';
+
     return (
         <div
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className={`p-3 bg-white border rounded-lg cursor-move transition-all ${isDragging
-                ? 'opacity-50 scale-95 shadow-lg'
-                : 'hover:shadow-md hover:border-accent'
+            style={{ borderLeft: `3px solid ${accentColor}` }}
+            className={`p-3 bg-white border rounded-xl cursor-move transition-all ${isDragging
+                ? 'opacity-40 scale-95 shadow-xl rotate-1'
+                : 'hover:shadow-lg hover:-translate-y-0.5'
                 } ${priority === 'urgent'
                     ? 'border-red-200'
                     : priority === 'ready'
