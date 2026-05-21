@@ -30,61 +30,21 @@ export const GoogleCalendarService = {
 
     /**
      * Sync an installation to Google Calendar (create or update)
-     * Fire-and-forget: never throws
+     * ⛔ DISABLED — read-only mode: app only reads from Google Calendar, never writes back
      */
     async syncInstallation(installation: Installation, googleEventId?: string | null): Promise<string | null> {
-        if (!installation.scheduledDate) return null;
-
-        try {
-            const res = await fetch('/api/google-calendar/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    installation: {
-                        id: installation.id,
-                        client: installation.client,
-                        contractNumber: installation.contractNumber,
-                        productSummary: installation.productSummary,
-                        status: installation.status,
-                        scheduledDate: installation.scheduledDate,
-                        expectedDuration: installation.expectedDuration || 1,
-                        sourceType: installation.sourceType,
-                        title: installation.title,
-                        notes: installation.notes,
-                    },
-                    googleEventId: googleEventId || null,
-                }),
-            });
-
-            if (!res.ok) {
-                console.warn('[GCal] Sync failed:', await res.text());
-                return null;
-            }
-
-            const data = await res.json();
-            return data.eventId || null;
-        } catch (err) {
-            console.warn('[GCal] Sync error (non-blocking):', err);
-            return null;
-        }
+        // Write operations disabled — Google Calendar is read-only source
+        console.log('[GCal] syncInstallation DISABLED (read-only mode)');
+        return googleEventId || null;
     },
 
     /**
      * Delete a Google Calendar event
-     * Fire-and-forget: never throws
+     * ⛔ DISABLED — read-only mode: app only reads from Google Calendar, never writes back
      */
     async deleteEvent(googleEventId: string): Promise<void> {
-        if (!googleEventId) return;
-
-        try {
-            await fetch('/api/google-calendar/sync', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ googleEventId }),
-            });
-        } catch (err) {
-            console.warn('[GCal] Delete error (non-blocking):', err);
-        }
+        // Write operations disabled — Google Calendar is read-only source
+        console.log('[GCal] deleteEvent DISABLED (read-only mode)');
     },
 
     /**
