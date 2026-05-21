@@ -99,6 +99,9 @@ const TECH_SPECS: Record<string, {
     'TR10':         { minWidth: 2000, maxWidth: 7000, minDepth: 1000, maxDepth: 3500, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
     'TR15':         { minWidth: 2060, maxWidth: 12060, minDepth: 1000, maxDepth: 5000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
     'TR20':         { minWidth: 3060, maxWidth: 12060, minDepth: 1000, maxDepth: 6000, maxHeight: 3000, glassFall: '5-15°', keilmassMin: null, options: [] },
+    // Pergola
+    'Pergola':              { minWidth: 3000, maxWidth: 7000, minDepth: 3000, maxDepth: 5000, maxHeight: 3000, glassFall: '—', keilmassMin: null, options: [] },
+    'Pergola Deluxe':       { minWidth: 3000, maxWidth: 7000, minDepth: 3000, maxDepth: 5000, maxHeight: 3000, glassFall: '—', keilmassMin: null, options: [] },
     // Pergola Luxe (Mirpol) — Bioclimatic louvered pergola
     'Pergola Luxe':         { minWidth: 3000, maxWidth: 7800, minDepth: 3000, maxDepth: 4000, maxHeight: 2300, glassFall: '—', keilmassMin: null, options: ['LED-Beleuchtung', 'Vertikalmarkise', 'Lamellenwand', 'Glasschiebetür'] },
     'Pergola Luxe Electric': { minWidth: 3000, maxWidth: 4000, minDepth: 3000, maxDepth: 4000, maxHeight: 2300, glassFall: '—', keilmassMin: null, options: ['LED-Beleuchtung (integriert)', 'Vertikalmarkise', 'Lamellenwand', 'Glasschiebetür'] },
@@ -146,6 +149,9 @@ const ROOF_MODELS: RoofModel[] = [
     { id: 'TR10', name: 'Orangestyle 10', description: 'Einstiegsprofil • max. 7.000mm • VSG 44.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr10.jpg' },
     { id: 'TR15', name: 'Trendstyle 15', description: 'Standard Profil • max. 12.060mm • VSG 44.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr15.jpg' },
     { id: 'TR20', name: 'Topstyle 20', description: 'Premium Profil • max. 12.060mm • VSG 55.2', hasPoly: true, hasGlass: true, hasFreestanding: false, image_url: '/images/models/teranda-tr20.jpg' },
+    // --- Pergola ---
+    { id: 'Pergola', name: 'Pergola', description: 'Freistehende Pergola • Aluminium', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola.jpg' },
+    { id: 'Pergola Deluxe', name: 'Pergola Deluxe', description: 'Premium Pergola • verstärkte Konstruktion', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-deluxe.jpg' },
     // --- Pergola Luxe (Mirpol) ---
     { id: 'Pergola Luxe', name: 'Pergola Luxe (Manuell)', description: 'Bioklimatisch - Manuell drehbare Alu-Lamellen - Freistehend', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
     { id: 'Pergola Luxe Electric', name: 'Pergola Luxe (Elektrisch)', description: 'Bioklimatisch - Somfy Motor + LED - Fernbedienung - Freistehend', hasPoly: false, hasGlass: false, hasFreestanding: true, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
