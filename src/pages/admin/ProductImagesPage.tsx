@@ -1,17 +1,17 @@
 /**
  * Product Images Admin Page — with Upload to Supabase Storage
  * Allows admin to upload/replace model images and gallery photos
- * Images are stored in Supabase Storage bucket "product-images"
- * and URLs are saved to app_settings table for persistence
+ * Supports adding custom models beyond the default list
+ * Fully responsive (mobile-first)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { MODEL_IMAGES, MODEL_GALLERY, getModelDisplayName } from '../../config/modelImages';
 
-// All models from the calculator
-const ALL_MODELS = [
+// Default models from the calculator
+const DEFAULT_MODELS = [
     { id: 'Orangeline', name: 'Orangestyle' },
     { id: 'Orangeline+', name: 'Orangestyle+' },
     { id: 'Trendline', name: 'Trendstyle' },
@@ -22,51 +22,78 @@ const ALL_MODELS = [
     { id: 'Ultraline', name: 'Ultrastyle' },
     { id: 'Skyline', name: 'Skystyle' },
     { id: 'Carport', name: 'Carport' },
-    { id: 'TR10', name: 'Orangestyle 10' },
-    { id: 'TR15', name: 'Trendstyle 15' },
-    { id: 'TR20', name: 'Topstyle 20' },
+    { id: 'TR10', name: 'Teranda TR10' },
+    { id: 'TR15', name: 'Teranda TR15' },
+    { id: 'TR20', name: 'Teranda TR20' },
+    { id: 'Pergola', name: 'Pergola' },
+    { id: 'Pergola Deluxe', name: 'Pergola Deluxe' },
     { id: 'Pergola Luxe', name: 'Pergola Luxe (Manuell)' },
     { id: 'Pergola Luxe Electric', name: 'Pergola Luxe (Elektrisch)' },
 ];
 
 const STORAGE_BUCKET = 'product-images';
 const SETTINGS_KEY = 'model_image_overrides';
+const CUSTOM_MODELS_KEY = 'custom_product_models';
 
-// Type for stored image overrides
 interface ImageOverrides {
     [modelId: string]: {
-        hero?: string;       // Primary image URL
-        gallery?: string[];  // Gallery image URLs
+        hero?: string;
+        gallery?: string[];
     };
+}
+
+interface ModelEntry {
+    id: string;
+    name: string;
+    isCustom?: boolean;
 }
 
 export function ProductImagesPage() {
     const [overrides, setOverrides] = useState<ImageOverrides>({});
+    const [customModels, setCustomModels] = useState<ModelEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [uploading, setUploading] = useState<string | null>(null); // modelId being uploaded
+    const [uploading, setUploading] = useState<string | null>(null);
     const [editingModel, setEditingModel] = useState<string | null>(null);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [newModelId, setNewModelId] = useState('');
+    const [newModelName, setNewModelName] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
 
-    // Load overrides from app_settings
+    // Combine default + custom models
+    const allModels: ModelEntry[] = [
+        ...DEFAULT_MODELS,
+        ...customModels.map(m => ({ ...m, isCustom: true })),
+    ];
+
     useEffect(() => {
-        loadOverrides();
+        loadData();
     }, []);
 
-    const loadOverrides = async () => {
+    const loadData = async () => {
         try {
-            const { data } = await supabase
+            // Load image overrides
+            const { data: ovData } = await supabase
                 .from('app_settings')
                 .select('value')
                 .eq('key', SETTINGS_KEY)
                 .single();
-
-            if (data?.value) {
-                setOverrides(typeof data.value === 'string' ? JSON.parse(data.value) : data.value);
+            if (ovData?.value) {
+                setOverrides(typeof ovData.value === 'string' ? JSON.parse(ovData.value) : ovData.value);
             }
-        } catch (err) {
-            // Table or key might not exist yet — that's OK
-            console.log('No image overrides found, using defaults');
+
+            // Load custom models
+            const { data: cmData } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', CUSTOM_MODELS_KEY)
+                .single();
+            if (cmData?.value) {
+                const parsed = typeof cmData.value === 'string' ? JSON.parse(cmData.value) : cmData.value;
+                if (Array.isArray(parsed)) setCustomModels(parsed);
+            }
+        } catch {
+            console.log('No overrides/custom models found');
         } finally {
             setLoading(false);
         }
@@ -74,24 +101,30 @@ export function ProductImagesPage() {
 
     const saveOverrides = async (newOverrides: ImageOverrides) => {
         try {
-            // Try upsert
-            const { error } = await supabase
-                .from('app_settings')
-                .upsert({
-                    key: SETTINGS_KEY,
-                    value: newOverrides,
-                    updated_at: new Date().toISOString(),
-                }, { onConflict: 'key' });
-
-            if (error) throw error;
+            await supabase.from('app_settings').upsert({
+                key: SETTINGS_KEY,
+                value: newOverrides,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'key' });
             setOverrides(newOverrides);
         } catch (err: any) {
-            console.error('Save overrides error:', err);
-            toast.error('Błąd zapisu ustawień');
+            toast.error('Błąd zapisu');
         }
     };
 
-    // Ensure storage bucket exists
+    const saveCustomModels = async (models: ModelEntry[]) => {
+        try {
+            await supabase.from('app_settings').upsert({
+                key: CUSTOM_MODELS_KEY,
+                value: models,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'key' });
+            setCustomModels(models);
+        } catch (err: any) {
+            toast.error('Błąd zapisu modeli');
+        }
+    };
+
     const ensureBucket = async () => {
         try {
             const { data: buckets } = await supabase.storage.listBuckets();
@@ -99,182 +132,182 @@ export function ProductImagesPage() {
                 await supabase.storage.createBucket(STORAGE_BUCKET, {
                     public: true,
                     allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-                    fileSizeLimit: 5 * 1024 * 1024, // 5MB
+                    fileSizeLimit: 5 * 1024 * 1024,
                 });
             }
-        } catch (err) {
-            // Bucket likely already exists
-        }
+        } catch { /* bucket exists */ }
     };
 
     const uploadFile = async (file: File, modelId: string, type: 'hero' | 'gallery'): Promise<string | null> => {
         await ensureBucket();
-
         const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
         const safeName = modelId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-        const timestamp = Date.now();
-        const filePath = type === 'hero'
-            ? `models/${safeName}/hero_${timestamp}.${ext}`
-            : `models/${safeName}/gallery_${timestamp}.${ext}`;
+        const ts = Date.now();
+        const filePath = `models/${safeName}/${type}_${ts}.${ext}`;
 
-        const { data, error } = await supabase.storage
-            .from(STORAGE_BUCKET)
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: true,
-            });
+        const { data, error } = await supabase.storage.from(STORAGE_BUCKET).upload(filePath, file, { cacheControl: '3600', upsert: true });
+        if (error) { toast.error(`Upload: ${error.message}`); return null; }
 
-        if (error) {
-            console.error('Upload error:', error);
-            toast.error(`Błąd uploadu: ${error.message}`);
-            return null;
-        }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(data.path);
-
+        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
         return urlData.publicUrl;
     };
 
     const handleHeroUpload = async (modelId: string, file: File) => {
         setUploading(modelId);
-        const toastId = toast.loading('Wysyłanie zdjęcia...');
-
+        const tid = toast.loading('Wysyłanie...');
         try {
             const url = await uploadFile(file, modelId, 'hero');
             if (url) {
-                const newOverrides = {
-                    ...overrides,
-                    [modelId]: {
-                        ...overrides[modelId],
-                        hero: url,
-                    }
-                };
-                await saveOverrides(newOverrides);
-                toast.success('Zdjęcie główne zaktualizowane!', { id: toastId });
-            } else {
-                toast.error('Nie udało się przesłać', { id: toastId });
-            }
-        } catch (err) {
-            toast.error('Błąd uploadu', { id: toastId });
-        } finally {
-            setUploading(null);
-        }
+                await saveOverrides({ ...overrides, [modelId]: { ...overrides[modelId], hero: url } });
+                toast.success('Zdjęcie zmienione!', { id: tid });
+            } else toast.error('Błąd', { id: tid });
+        } catch { toast.error('Błąd', { id: tid }); }
+        finally { setUploading(null); }
     };
 
     const handleGalleryUpload = async (modelId: string, files: FileList) => {
         setUploading(modelId);
-        const toastId = toast.loading(`Wysyłanie ${files.length} zdjęć...`);
-
+        const tid = toast.loading(`Wysyłanie ${files.length} zdjęć...`);
         try {
             const urls: string[] = [];
             for (const file of Array.from(files)) {
                 const url = await uploadFile(file, modelId, 'gallery');
                 if (url) urls.push(url);
             }
-
             if (urls.length > 0) {
                 const existing = overrides[modelId]?.gallery || [];
-                const newOverrides = {
-                    ...overrides,
-                    [modelId]: {
-                        ...overrides[modelId],
-                        gallery: [...existing, ...urls],
-                    }
-                };
-                await saveOverrides(newOverrides);
-                toast.success(`Dodano ${urls.length} zdjęć do galerii!`, { id: toastId });
+                await saveOverrides({ ...overrides, [modelId]: { ...overrides[modelId], gallery: [...existing, ...urls] } });
+                toast.success(`Dodano ${urls.length} zdjęć!`, { id: tid });
             }
-        } catch (err) {
-            toast.error('Błąd uploadu galerii', { id: toastId });
-        } finally {
-            setUploading(null);
-        }
+        } catch { toast.error('Błąd', { id: tid }); }
+        finally { setUploading(null); }
     };
 
     const removeGalleryImage = async (modelId: string, imageUrl: string) => {
         const existing = overrides[modelId]?.gallery || [];
-        const newGallery = existing.filter(u => u !== imageUrl);
-        const newOverrides = {
-            ...overrides,
-            [modelId]: {
-                ...overrides[modelId],
-                gallery: newGallery,
-            }
-        };
-        await saveOverrides(newOverrides);
-        toast.success('Zdjęcie usunięte z galerii');
+        await saveOverrides({ ...overrides, [modelId]: { ...overrides[modelId], gallery: existing.filter(u => u !== imageUrl) } });
+        toast.success('Usunięto');
     };
 
     const removeHeroOverride = async (modelId: string) => {
-        const newOverrides = { ...overrides };
-        if (newOverrides[modelId]) {
-            delete newOverrides[modelId].hero;
-            if (!newOverrides[modelId].gallery?.length) {
-                delete newOverrides[modelId];
-            }
+        const nw = { ...overrides };
+        if (nw[modelId]) { delete nw[modelId].hero; if (!nw[modelId].gallery?.length) delete nw[modelId]; }
+        await saveOverrides(nw);
+        toast.success('Przywrócono domyślne');
+    };
+
+    const handleAddModel = async () => {
+        if (!newModelId.trim() || !newModelName.trim()) {
+            toast.error('Podaj ID i nazwę modelu');
+            return;
         }
-        await saveOverrides(newOverrides);
-        toast.success('Przywrócono domyślne zdjęcie');
+        if (allModels.some(m => m.id.toLowerCase() === newModelId.trim().toLowerCase())) {
+            toast.error('Model o tym ID już istnieje');
+            return;
+        }
+        const entry: ModelEntry = { id: newModelId.trim(), name: newModelName.trim() };
+        await saveCustomModels([...customModels, entry]);
+        setNewModelId('');
+        setNewModelName('');
+        setShowAddForm(false);
+        toast.success(`Dodano model: ${entry.name}`);
     };
 
-    // Get effective image for a model (override > static config)
-    const getEffectiveImage = (modelId: string): string | undefined => {
-        return overrides[modelId]?.hero || MODEL_IMAGES[modelId];
+    const handleRemoveModel = async (modelId: string) => {
+        if (!confirm(`Usunąć model "${modelId}"?`)) return;
+        await saveCustomModels(customModels.filter(m => m.id !== modelId));
+        // Also remove overrides for this model
+        const nw = { ...overrides };
+        delete nw[modelId];
+        await saveOverrides(nw);
+        if (editingModel === modelId) setEditingModel(null);
+        toast.success('Model usunięty');
     };
 
+    const getEffectiveImage = (modelId: string): string | undefined => overrides[modelId]?.hero || MODEL_IMAGES[modelId];
     const getEffectiveGallery = (modelId: string): string[] => {
-        const overrideGallery = overrides[modelId]?.gallery;
-        if (overrideGallery && overrideGallery.length > 0) return overrideGallery;
+        const og = overrides[modelId]?.gallery;
+        if (og && og.length > 0) return og;
         return MODEL_GALLERY[modelId] || [];
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent" />
-            </div>
-        );
-    }
+    if (loading) return (
+        <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent" />
+        </div>
+    );
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-6">
+            {/* Header — responsive */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <svg className="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <svg className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         Zdjęcia Produktów
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                        Kliknij na model, aby zmienić zdjęcie główne lub dodać zdjęcia do galerii oferty
+                    <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                        Kliknij na model aby zmienić zdjęcie
                     </p>
                 </div>
-                <div className="text-xs text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg">
-                    {ALL_MODELS.length} modeli • {Object.keys(overrides).length} z własnymi zdjęciami
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] sm:text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">
+                        {allModels.length} modeli
+                    </span>
+                    <button
+                        onClick={() => setShowAddForm(!showAddForm)}
+                        className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                        Dodaj model
+                    </button>
                 </div>
             </div>
 
-            {/* Info Box */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/50 rounded-xl p-4 flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {/* Add Model Form */}
+            {showAddForm && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 animate-in slide-in-from-top duration-200">
+                    <h3 className="font-bold text-blue-800 text-sm mb-3">Dodaj nowy model</h3>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-blue-600 uppercase mb-1 block">ID modelu (wewnętrzne)</label>
+                            <input
+                                value={newModelId}
+                                onChange={e => setNewModelId(e.target.value)}
+                                placeholder="np. Bosco400"
+                                className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-blue-600 uppercase mb-1 block">Nazwa wyświetlana</label>
+                            <input
+                                value={newModelName}
+                                onChange={e => setNewModelName(e.target.value)}
+                                placeholder="np. Bosco Terrassenüberdachung"
+                                className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                            />
+                        </div>
+                        <div className="flex gap-2 sm:items-end">
+                            <button
+                                onClick={handleAddModel}
+                                className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+                            >
+                                Dodaj
+                            </button>
+                            <button
+                                onClick={() => { setShowAddForm(false); setNewModelId(''); setNewModelName(''); }}
+                                className="px-3 py-2 text-slate-500 hover:text-slate-700 text-sm"
+                            >
+                                Anuluj
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div className="text-sm text-blue-800">
-                    <p className="font-semibold mb-1">Jak to działa:</p>
-                    <ul className="space-y-0.5 text-blue-700">
-                        <li>• <strong>Zdjęcie główne</strong> — wyświetla się w kalkulatorze (wybór modelu) i w ofercie interaktywnej</li>
-                        <li>• <strong>Galeria</strong> — dodatkowe zdjęcia w interaktywnej ofercie (slider na górze)</li>
-                        <li>• Zdjęcia uploadowane zastępują domyślne</li>
-                    </ul>
-                </div>
-            </div>
+            )}
 
-            {/* Models Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {ALL_MODELS.map(model => {
+            {/* Models Grid — responsive: 1 col mobile, 2 tablet, 3-4 desktop */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                {allModels.map(model => {
                     const heroUrl = getEffectiveImage(model.id);
                     const hasOverride = !!overrides[model.id]?.hero;
                     const gallery = getEffectiveGallery(model.id);
@@ -284,123 +317,109 @@ export function ProductImagesPage() {
                     return (
                         <div
                             key={model.id}
-                            className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-all ${isEditing ? 'border-blue-400 ring-2 ring-blue-100 shadow-lg' : 'border-slate-200 hover:shadow-md hover:border-slate-300'}`}
+                            className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-all ${
+                                isEditing
+                                    ? 'border-blue-400 ring-2 ring-blue-100 shadow-lg col-span-2 sm:col-span-1'
+                                    : 'border-slate-200 hover:shadow-md active:shadow-md'
+                            }`}
                         >
-                            {/* Image Area */}
-                            <div className="relative aspect-[4/3] bg-slate-100 group cursor-pointer"
-                                onClick={() => {
-                                    if (!isEditing) {
-                                        setEditingModel(model.id);
-                                    } else {
-                                        fileInputRef.current?.click();
-                                    }
-                                }}
+                            {/* Image */}
+                            <div
+                                className="relative aspect-[4/3] bg-slate-100 cursor-pointer group"
+                                onClick={() => setEditingModel(isEditing ? null : model.id)}
                             >
                                 {heroUrl ? (
-                                    <img
-                                        src={heroUrl}
-                                        alt={model.name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
-                                        }}
-                                    />
+                                    <img src={heroUrl} alt={model.name} className="w-full h-full object-cover"
+                                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                                 ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                                        <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                                        <svg className="w-8 h-8 sm:w-10 sm:h-10 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
-                                        <span className="text-xs font-medium">Brak zdjęcia</span>
+                                        <span className="text-[10px] font-medium">Brak zdjęcia</span>
                                     </div>
                                 )}
 
-                                {/* Upload overlay */}
-                                {isEditing && (
-                                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <svg className="w-8 h-8 text-white mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                        </svg>
-                                        <span className="text-white text-xs font-bold">Zmień zdjęcie</span>
-                                    </div>
-                                )}
-
-                                {/* Status badges */}
-                                <div className="absolute top-2 right-2 flex gap-1">
+                                {/* Badges */}
+                                <div className="absolute top-1.5 right-1.5 flex gap-1">
+                                    {model.isCustom && (
+                                        <span className="bg-purple-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full">WŁASNY</span>
+                                    )}
                                     {hasOverride && (
-                                        <span className="bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">WŁASNE</span>
+                                        <span className="bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full">CUSTOM</span>
                                     )}
                                     {gallery.length > 0 && (
-                                        <span className="bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{gallery.length} zdjęć</span>
+                                        <span className="bg-blue-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full">{gallery.length}</span>
                                     )}
                                 </div>
 
+                                {/* Upload spinner */}
                                 {isUploading && (
                                     <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent" />
+                                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent" />
+                                    </div>
+                                )}
+
+                                {/* Tap hint on mobile */}
+                                {!isEditing && (
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 group-active:bg-black/20 transition-colors flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-80 group-active:opacity-80 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Model Name & Actions */}
-                            <div className="p-3 border-t">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-sm font-bold text-slate-800">{model.name}</h3>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">{model.id}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setEditingModel(isEditing ? null : model.id)}
-                                        className={`p-1.5 rounded-lg transition-colors ${isEditing ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                        </svg>
-                                    </button>
-                                </div>
+                            {/* Name */}
+                            <div className="px-2.5 py-2 sm:px-3 sm:py-2.5 border-t">
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-800 truncate">{model.name}</h3>
+                                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate">{model.id}</p>
 
-                                {/* Expanded Edit Panel */}
+                                {/* Edit Panel */}
                                 {isEditing && (
-                                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                                        {/* Upload hero */}
+                                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-2">
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="w-full py-2 px-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
+                                            className="w-full py-2.5 px-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-100 active:bg-blue-200 transition-colors flex items-center justify-center gap-1.5"
                                         >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                                             Zmień zdjęcie główne
                                         </button>
 
-                                        {/* Upload gallery */}
                                         <button
                                             onClick={() => galleryInputRef.current?.click()}
-                                            className="w-full py-2 px-3 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5"
+                                            className="w-full py-2.5 px-3 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 active:bg-indigo-200 transition-colors flex items-center justify-center gap-1.5"
                                         >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
-                                            Dodaj do galerii oferty
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
+                                            Dodaj do galerii
                                         </button>
 
-                                        {/* Reset */}
                                         {hasOverride && (
-                                            <button
-                                                onClick={() => removeHeroOverride(model.id)}
-                                                className="w-full py-1.5 px-3 text-red-600 rounded-lg text-[10px] font-medium hover:bg-red-50 transition-colors"
-                                            >
+                                            <button onClick={() => removeHeroOverride(model.id)}
+                                                className="w-full py-1.5 text-red-500 text-[10px] font-medium hover:bg-red-50 rounded-lg transition-colors">
                                                 Przywróć domyślne
                                             </button>
                                         )}
 
-                                        {/* Gallery preview */}
+                                        {model.isCustom && (
+                                            <button onClick={() => handleRemoveModel(model.id)}
+                                                className="w-full py-1.5 text-red-600 text-[10px] font-bold hover:bg-red-50 rounded-lg transition-colors border border-red-200">
+                                                🗑 Usuń model
+                                            </button>
+                                        )}
+
+                                        {/* Gallery thumbnails */}
                                         {gallery.length > 0 && (
-                                            <div className="pt-2">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1.5">Galeria ({gallery.length})</p>
-                                                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                            <div className="pt-1.5">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Galeria ({gallery.length})</p>
+                                                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
                                                     {gallery.map((url, idx) => (
-                                                        <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-slate-200 group/thumb">
+                                                        <div key={idx} className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden shrink-0 border border-slate-200 group/thumb">
                                                             <img src={url} alt="" className="w-full h-full object-cover" />
                                                             {overrides[model.id]?.gallery?.includes(url) && (
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); removeGalleryImage(model.id, url); }}
-                                                                    className="absolute inset-0 bg-red-500/60 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                                                                    onClick={e => { e.stopPropagation(); removeGalleryImage(model.id, url); }}
+                                                                    className="absolute inset-0 bg-red-500/60 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 active:opacity-100 transition-opacity"
                                                                 >
                                                                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                                                 </button>
@@ -414,32 +433,13 @@ export function ProductImagesPage() {
                                 )}
                             </div>
 
-                            {/* Hidden file inputs — per model */}
+                            {/* Hidden file inputs */}
                             {isEditing && (
                                 <>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleHeroUpload(model.id, file);
-                                            e.target.value = '';
-                                        }}
-                                    />
-                                    <input
-                                        ref={galleryInputRef}
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        multiple
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            const files = e.target.files;
-                                            if (files && files.length > 0) handleGalleryUpload(model.id, files);
-                                            e.target.value = '';
-                                        }}
-                                    />
+                                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                                        onChange={e => { const f = e.target.files?.[0]; if (f) handleHeroUpload(model.id, f); e.target.value = ''; }} />
+                                    <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
+                                        onChange={e => { const fs = e.target.files; if (fs?.length) handleGalleryUpload(model.id, fs); e.target.value = ''; }} />
                                 </>
                             )}
                         </div>
