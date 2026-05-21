@@ -8,14 +8,12 @@ import { RealizationGallery } from './RealizationGallery';
 import { AddRealizationModal } from './AddRealizationModal';
 import type { Realization, RealizationPhoto } from '../../services/database/realization.service';
 import type { Installation, InstallationTeam } from '../../types';
-import { supabase } from '../../lib/supabase';
+
 import { toast } from 'react-hot-toast';
 import {
     MapPin, Plus, Filter, Search, X, Camera, Calendar, Package, Trash2,
-    List, Map as MapIcon, ArrowUpDown, Image, Upload, ChevronRight,
-    Navigation, Eye, FileText, ExternalLink, Ruler
+    List, Map as MapIcon, ArrowUpDown, Upload, FileText, Ruler
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 // Fix default Leaflet icon
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -145,14 +143,17 @@ export const PortfolioDashboard: React.FC = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [reals, allInst, allTeams] = await Promise.all([
-                DatabaseService.getRealizations(),
-                DatabaseService.getInstallations(),
-                DatabaseService.getTeams()
-            ]);
+            // Load each source independently — if one fails, others still work
+            let reals: Realization[] = [];
+            let allInst: Installation[] = [];
+            let allTeams: InstallationTeam[] = [];
+
+            try { reals = await DatabaseService.getRealizations(); } catch (e) { console.warn('[Portfolio] getRealizations failed:', e); }
+            try { allInst = await DatabaseService.getInstallations(); } catch (e) { console.warn('[Portfolio] getInstallations failed:', e); }
+            try { allTeams = await DatabaseService.getTeams(); } catch (e) { console.warn('[Portfolio] getTeams failed:', e); }
 
             setRealizations(reals);
-            const completed = allInst.filter(i => i.status === 'completed' && i.client.coordinates);
+            const completed = allInst.filter(i => i.status === 'completed' && i.client?.coordinates);
             setInstallations(completed);
             setTeams(allTeams);
         } catch (error) {
