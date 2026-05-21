@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import type { ProductConfig } from '../types';
+import { Image, PenLine, ArrowRight } from 'lucide-react';
+import type { ProductConfig, ProductModel } from '../types';
+import catalogData from '../data/catalog.json';
 
 interface ManualOfferConfiguratorProps {
     onComplete: (config: ProductConfig) => void;
@@ -18,17 +20,8 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
     const [description, setDescription] = useState(initialData?.manualDescription || '');
     const [price, setPrice] = useState<string>(initialData?.manualPrice?.toString() || '');
 
-    // List of models for visualization selection
-    const models = [
-        { id: 'trendstyle', name: 'Trendstyle', type: 'polycarbonate' },
-        { id: 'trendstyle_plus', name: 'Trendstyle+', type: 'polycarbonate' },
-        { id: 'topstyle', name: 'Topstyle', type: 'polycarbonate' },
-        { id: 'topstyle_xl', name: 'Topstyle XL', type: 'polycarbonate' },
-        { id: 'skystyle', name: 'Skystyle', type: 'glass' },
-        { id: 'ultrastyle', name: 'Ultrastyle', type: 'polycarbonate' },
-        { id: 'carport', name: 'Carport', type: 'polycarbonate' },
-        { id: 'orangestyle', name: 'Orangestyle', type: 'polycarbonate' }
-    ];
+    // Load models from catalog.json — single source of truth
+    const models = catalogData.models as unknown as ProductModel[];
 
     const handleSubmit = () => {
         if (!modelId) {
@@ -66,38 +59,82 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
             {/* 1. Model Selection (Visuals only) */}
             <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="text-2xl">🖼️</span> Wybierz Model (do wizualizacji)
+                    <Image className="w-6 h-6 text-indigo-500" /> Wybierz Model (do wizualizacji)
                 </h3>
                 <p className="text-sm text-slate-500 mb-6">
                     Ten model zostanie pokazany klientowi na wizualizacji w ofercie. Nie wpływa on na cenę w trybie ręcznym.
                 </p>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {models.map(model => (
-                        <div
-                            key={model.id}
-                            onClick={() => {
-                                setModelId(model.id);
-                                if (model.id === 'skystyle') setRoofType('glass');
-                                else setRoofType('polycarbonate');
-                            }}
-                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all relative ${modelId === model.id
-                                ? 'border-accent bg-accent/5 shadow-md'
-                                : 'border-slate-100 hover:border-accent/30'
-                                }`}
-                        >
-                            <div className={`w-3 h-3 rounded-full absolute top-3 right-3 ${modelId === model.id ? 'bg-accent' : 'bg-slate-200'}`} />
-                            <h3 className="text-lg font-bold mb-1 text-slate-900">{model.name}</h3>
-                            <p className="text-xs text-slate-500">{model.type === 'glass' ? 'Tylko Szkło VSG' : 'Poliwęglan / Szkło'}</p>
-                        </div>
-                    ))}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {models.map(model => {
+                        const isSelected = modelId === model.id;
+                        const hasGlass = model.roofTypes?.includes('glass');
+                        const hasPoly = model.roofTypes?.includes('polycarbonate');
+                        return (
+                            <div
+                                key={model.id}
+                                onClick={() => {
+                                    setModelId(model.id);
+                                    if (hasGlass && !hasPoly) setRoofType('glass');
+                                    else setRoofType('polycarbonate');
+                                }}
+                                className={`cursor-pointer border-2 rounded-xl overflow-hidden transition-all relative group ${isSelected
+                                    ? 'border-accent ring-2 ring-accent/20 shadow-lg'
+                                    : 'border-slate-100 hover:border-accent/40 hover:shadow-md'
+                                    }`}
+                            >
+                                {/* Image */}
+                                <div className="aspect-[4/3] bg-gradient-to-br from-slate-100 to-slate-50 relative overflow-hidden">
+                                    {model.image ? (
+                                        <img
+                                            src={model.image}
+                                            alt={model.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                            }}
+                                        />
+                                    ) : null}
+                                    <div className={`absolute inset-0 flex items-center justify-center text-slate-300 ${model.image ? 'hidden' : ''}`}>
+                                        <Image className="w-10 h-10" />
+                                    </div>
+                                    {/* Selection indicator */}
+                                    <div className={`absolute top-2 right-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected
+                                        ? 'bg-accent border-accent'
+                                        : 'bg-white/80 border-slate-300'}`}>
+                                        {isSelected && (
+                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Info */}
+                                <div className="p-3">
+                                    <h4 className="font-bold text-sm text-slate-900">{model.name}</h4>
+                                    <div className="flex gap-1 mt-1.5 flex-wrap">
+                                        {hasGlass && (
+                                            <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Szkło</span>
+                                        )}
+                                        {hasPoly && (
+                                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Poliwęglan</span>
+                                        )}
+                                    </div>
+                                    {model.description && (
+                                        <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{model.description}</p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </section>
 
             {/* 2. Manual Inputs */}
             <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="text-2xl">✍️</span> Opis i Cena (Ręcznie)
+                    <PenLine className="w-6 h-6 text-indigo-500" /> Opis i Cena (Ręcznie)
                 </h3>
 
                 <div className="space-y-6">
@@ -108,7 +145,7 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
                             onChange={(e) => setDescription(e.target.value)}
                             rows={8}
                             className="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-accent focus:border-accent outline-none font-mono text-sm"
-                            placeholder="Wpisz tutaj pełną treść oferty, która ma się wyświetlić klientowi.&#10;Np:&#10;- Zadaszenie Trendstyle 4000x3000mm&#10;- Kolor RAL 7016&#10;- Oświetlenie LED (6 punktów)&#10;- Montaż w cenie"
+                            placeholder={"Wpisz tutaj pełną treść oferty, która ma się wyświetlić klientowi.\nNp:\n- Zadaszenie Trendstyle 4000x3000mm\n- Kolor RAL 7016\n- Oświetlenie LED (6 punktów)\n- Montaż w cenie"}
                         />
                         <p className="text-xs text-slate-500 mt-2">
                             To pole zastąpi standardową tabelę techniczną w podglądzie oferty dla klienta.
@@ -135,9 +172,9 @@ export const ManualOfferConfigurator: React.FC<ManualOfferConfiguratorProps> = (
             <div className="flex justify-end pt-4">
                 <button
                     onClick={handleSubmit}
-                    className="px-8 py-4 bg-accent text-white rounded-xl font-bold text-lg shadow-xl shadow-accent/20 hover:bg-accent/90 transition-all transform hover:-translate-y-0.5"
+                    className="px-8 py-4 bg-accent text-white rounded-xl font-bold text-lg shadow-xl shadow-accent/20 hover:bg-accent/90 transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
                 >
-                    Zatwierdź Ofertę Ręczną ➜
+                    Zatwierdź Ofertę Ręczną <ArrowRight className="w-5 h-5" />
                 </button>
             </div>
         </div>
