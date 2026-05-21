@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Eye, FileText, MessageSquare, Calendar, CheckCircle2,
-    MousePointerClick, Download, ArrowUpRight, ChevronDown, Bell
+    MousePointerClick, Download, ArrowUpRight, ChevronDown, Bell, ExternalLink
 } from 'lucide-react';
 
 interface OfferActivity {
@@ -284,43 +284,32 @@ export const OfferActivityWidget: React.FC = () => {
                             const config = EVENT_CONFIG[activity.eventType] || DEFAULT_EVENT;
                             const isHighPriority = ['offer_accept', 'measurement_request', 'message_sent'].includes(activity.eventType);
 
-                            return (
-                                <div
-                                    key={activity.id}
-                                    className={`flex items-start gap-3 px-4 sm:px-5 py-3 hover:bg-slate-50/50 transition-colors ${isHighPriority ? 'bg-slate-50/30' : ''}`}
-                                >
+                            const content = (
+                                <>
                                     <div className={`p-1.5 rounded-lg ${config.bgColor} ${config.color} shrink-0 mt-0.5`}>
                                         {config.icon}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-xs font-bold ${config.color}`}>
+                                        {/* Client name — big & prominent */}
+                                        {activity.clientName && (
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-sm font-bold text-slate-800 truncate">
+                                                    {activity.clientName}
+                                                </span>
+                                                {activity.leadId && (
+                                                    <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
+                                                )}
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`text-[11px] font-semibold ${config.color}`}>
                                                 {config.label}
                                             </span>
                                             {isHighPriority && (
                                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                                             )}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                            {activity.clientName && (
-                                                <>
-                                                    {activity.leadId ? (
-                                                        <Link
-                                                            to={`/leads/${activity.leadId}`}
-                                                            className="text-xs font-medium text-slate-700 hover:text-blue-600 transition-colors"
-                                                        >
-                                                            {activity.clientName}
-                                                        </Link>
-                                                    ) : (
-                                                        <span className="text-xs font-medium text-slate-700">{activity.clientName}</span>
-                                                    )}
-                                                    {activity.offerName && (
-                                                        <span className="text-[10px] text-slate-400">• {activity.offerName}</span>
-                                                    )}
-                                                </>
-                                            )}
-                                            {!activity.clientName && activity.offerName && (
-                                                <span className="text-xs text-slate-500">{activity.offerName}</span>
+                                            {activity.offerName && (
+                                                <span className="text-[10px] text-slate-400">• {activity.offerName}</span>
                                             )}
                                         </div>
                                         {/* Extra detail for specific events */}
@@ -336,6 +325,24 @@ export const OfferActivityWidget: React.FC = () => {
                                     <span className="text-[10px] text-slate-400 font-mono shrink-0 mt-1">
                                         {timeAgo(activity.createdAt)}
                                     </span>
+                                </>
+                            );
+
+                            // Wrap in Link if leadId exists, otherwise plain div
+                            return activity.leadId ? (
+                                <Link
+                                    key={activity.id}
+                                    to={`/leads/${activity.leadId}`}
+                                    className={`flex items-start gap-3 px-4 sm:px-5 py-3 hover:bg-blue-50/50 transition-colors cursor-pointer group ${isHighPriority ? 'bg-amber-50/20' : ''}`}
+                                >
+                                    {content}
+                                </Link>
+                            ) : (
+                                <div
+                                    key={activity.id}
+                                    className={`flex items-start gap-3 px-4 sm:px-5 py-3 ${isHighPriority ? 'bg-amber-50/20' : ''}`}
+                                >
+                                    {content}
                                 </div>
                             );
                         })}
