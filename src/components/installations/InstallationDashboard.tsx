@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Wrench, Zap } from 'lucide-react';
+import { Users, Wrench, Plus, BarChart3, MapPin, CalendarRange, Map, FileText, Loader2 } from 'lucide-react';
 import { geocodeAddress } from '../../utils/geocoding';
 import { InstallationMap } from './InstallationMap';
 import { InstallationDetailsModal } from './InstallationDetailsModal';
@@ -257,19 +257,17 @@ export const InstallationDashboard: React.FC = () => {
     return (
         <div className="space-y-4 pb-20">
             {/* ── Header ── */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Planowanie Montaży</h1>
-                    <p className="text-slate-500 mt-1 text-sm">Zarządzaj harmonogramem i zespołami montażowymi</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Planowanie Montaży</h1>
+                    <p className="text-slate-500 mt-0.5 text-sm">Harmonogram i zespóły montażowe</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <button
                         onClick={() => setIsManualModalOpen(true)}
                         className="group px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 text-sm"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
+                        <Plus className="w-4 h-4" />
                         Dodaj Montaż
                     </button>
                     {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
@@ -292,9 +290,7 @@ export const InstallationDashboard: React.FC = () => {
                         onClick={() => setView('reports')}
                         className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 flex items-center gap-2 text-sm"
                     >
-                        <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <BarChart3 className="w-4 h-4 text-purple-500" />
                         Raporty
                     </button>
                     <button
@@ -303,12 +299,9 @@ export const InstallationDashboard: React.FC = () => {
                         className={`px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 flex items-center gap-2 text-sm ${isGeocoding ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isGeocoding ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                            <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
                         ) : (
-                            <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
+                            <MapPin className="w-4 h-4 text-blue-500" />
                         )}
                         {isGeocoding ? 'Geokodowanie...' : 'Uzupełnij Mapę'}
                     </button>
@@ -320,21 +313,25 @@ export const InstallationDashboard: React.FC = () => {
                 {/* View Tabs */}
                 <div className="bg-slate-100 p-1 rounded-lg flex gap-0.5">
                     {[
-                        { id: 'calendarV3', label: '🗓️ Kalendarz' },
-                        { id: 'list', label: '📍 Mapa/Lista' },
-                        { id: 'reports', label: '📈 Raporty' },
-                        { id: 'contracts', label: '📝 Umowy' }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setView(tab.id as typeof view)}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ${view === tab.id
-                                ? 'bg-white shadow-sm text-slate-900'
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                        { id: 'calendarV3', label: 'Kalendarz', icon: CalendarRange },
+                        { id: 'list', label: 'Mapa/Lista', icon: Map },
+                        { id: 'reports', label: 'Raporty', icon: BarChart3 },
+                        { id: 'contracts', label: 'Umowy', icon: FileText }
+                    ].map(tab => {
+                        const Icon = tab.icon;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setView(tab.id as typeof view)}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 flex items-center gap-1.5 ${view === tab.id
+                                    ? 'bg-white shadow-sm text-slate-900'
+                                    : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}`}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                                {tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* Separator */}
