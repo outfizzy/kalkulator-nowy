@@ -6,6 +6,10 @@ import {
   Trash2, Image as ImageIcon, RotateCcw, Package
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 interface ScannedItem {
   name: string;
@@ -63,7 +67,102 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
     { id: 'Pergola Luxe Electric', name: 'Pergola Luxe (Elektrisch)', hasPoly: false, hasGlass: false, image_url: '/images/models/pergola-luxe/pergola-luxe-anthracite.jpg' },
   ];
 
+  // Convert a single PDF page to a data URL image
+  const pdfPageToImage = async (page: any, scale: number = 2.0): Promise<string> => {
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas.toDataURL('image/jpeg', 0.85);
+  };
+
+  // Process a PDF file — convert all pages to images and send them all to AI
+  const processPdf = async (file: File) => {
+    setError('');
+    setStep('scanning');
+    setImagePreview(null);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pageCount = pdf.numPages;
+
+      toast.success(`PDF: ${pageCount} stron — konwertuję...`);
+
+      const pageImages: string[] = [];
+      for (let i = 1; i <= pageCount; i++) {
+        const page = await pdf.getPage(i);
+        const img = await pdfPageToImage(page);
+        pageImages.push(img);
+      }
+
+      // Show first page as preview
+      setImagePreview(pageImages[0]);
+
+      // Send ALL pages to AI
+      const { data, error: fnError } = await supabase.functions.invoke('scan-invoice', {
+        body: { images: pageImages }
+      });
+
+      if (fnError) throw new Error(fnError.message || 'Scan failed');
+      if (data?.error) throw new Error(data.error);
+
+      const items: ScannedItem[] = (data.items || []).map((item: any) => {
+        const qty = item.quantity || 1;
+        const itemTotal = item.totalPrice ?? item.total ?? item.price ?? 0;
+        const unitPrice = qty > 0 ? itemTotal / qty : itemTotal;
+        return {
+          name: item.name || '',
+          quantity: qty,
+          unit: item.unit || 'szt',
+          price: Math.round(unitPrice * 100) / 100,
+          total: Math.round(itemTotal * 100) / 100,
+        };
+      });
+
+      if (data.globalCosts && Array.isArray(data.globalCosts)) {
+        for (const gc of data.globalCosts) {
+          if (gc.price && gc.price > 0) {
+            items.push({
+              name: gc.name || 'Versand & Verpackung',
+              quantity: 1,
+              unit: 'szt',
+              price: Math.round((gc.price || 0) * 100) / 100,
+              total: Math.round((gc.price || 0) * 100) / 100,
+            });
+          }
+        }
+      }
+
+      setScannedItems(items);
+
+      if (data.invoiceTotal && data.invoiceTotal > 0) {
+        setInvoiceTotal(data.invoiceTotal);
+      } else {
+        setInvoiceTotal(items.reduce((s: number, i: ScannedItem) => s + i.total, 0));
+      }
+
+      const autoDesc = items.map(i => `- ${i.name} (${i.quantity} ${i.unit})`).join('\n');
+      setDescription(`Zadaszenie wg specyfikacji:\n${autoDesc}\n- Montaż w cenie`);
+
+      setStep('review');
+      toast.success(`Pomyślnie przeanalizowano ${pageCount}-stronicowy PDF!`);
+    } catch (err: any) {
+      console.error('[PDF Scanner] Error:', err);
+      setError(err.message || 'Błąd skanowania PDF');
+      setStep('upload');
+      toast.error('Błąd skanowania PDF');
+    }
+  };
+
   const processImage = async (file: File) => {
+    // Handle PDF files
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      return processPdf(file);
+    }
+
     setError('');
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -81,7 +180,6 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
 
         const items: ScannedItem[] = (data.items || []).map((item: any) => {
           const qty = item.quantity || 1;
-          // AI returns totalPrice (sum for this item). Derive unit price.
           const itemTotal = item.totalPrice ?? item.total ?? item.price ?? 0;
           const unitPrice = qty > 0 ? itemTotal / qty : itemTotal;
           return {
@@ -93,7 +191,6 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
           };
         });
 
-        // Add global costs (transport, packaging) as separate line items
         if (data.globalCosts && Array.isArray(data.globalCosts)) {
           for (const gc of data.globalCosts) {
             if (gc.price && gc.price > 0) {
@@ -110,15 +207,12 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
 
         setScannedItems(items);
 
-        // Capture invoiceTotal (Gesamtpreis netto) from AI — this is the purchase cost
         if (data.invoiceTotal && data.invoiceTotal > 0) {
           setInvoiceTotal(data.invoiceTotal);
         } else {
-          // Fallback: sum of items
           setInvoiceTotal(items.reduce((s: number, i: ScannedItem) => s + i.total, 0));
         }
         
-        // Auto-generate description for client
         const autoDesc = items.map(i => `- ${i.name} (${i.quantity} ${i.unit})`).join('\n');
         setDescription(`Zadaszenie wg specyfikacji:\n${autoDesc}\n- Montaż w cenie`);
 
@@ -142,8 +236,11 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) processImage(file);
-    else if (file) toast.error('Obsługiwane są tylko pliki graficzne (JPG, PNG). Zrób zrzut ekranu PDFa.');
+    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) {
+      processImage(file);
+    } else if (file) {
+      toast.error('Obsługiwane formaty: JPG, PNG, PDF');
+    }
   };
 
   const updateItem = (idx: number, field: keyof ScannedItem, value: any) => {
@@ -305,8 +402,8 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
             <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
               <ImageIcon className="w-8 h-8 text-indigo-500" />
             </div>
-            <h4 className="text-lg font-bold text-slate-700 mb-2">Przeciągnij zrzut ekranu oferty / zdjęcie</h4>
-            <p className="text-sm text-slate-500 mb-6">lub kliknij aby wybrać plik graficzny (JPG, PNG). Jeśli masz PDF, zrób zrzut ekranu tabeli.</p>
+            <h4 className="text-lg font-bold text-slate-700 mb-2">Przeciągnij zrzut ekranu oferty, zdjęcie lub PDF</h4>
+            <p className="text-sm text-slate-500 mb-6">JPG, PNG lub PDF (wielostronicowy) — AI przeanalizuje wszystkie strony</p>
             <div className="flex justify-center gap-3">
               <button
                 onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
@@ -318,7 +415,7 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
           </div>
         )}
 
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={handleFileChange} />
 
         {step === 'scanning' && (
           <div className="p-8 text-center">

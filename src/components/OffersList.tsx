@@ -382,6 +382,8 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                         const statusConf = STATUS_CONFIG[offer.status] || STATUS_CONFIG.draft;
                         const hasContract = contracts.some(c => c.offerId === offer.id);
                         const isExpanded = expandedActions === offer.id;
+                        const variants: any[] = (offer as any)?.variants || [];
+                        const hasVariants = variants.length > 0;
 
                         return (
                             <div
@@ -447,6 +449,12 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                                 {offer.product?.color && (
                                                     <div className="text-[10px] text-slate-400 mt-0.5">{offer.product.color}</div>
                                                 )}
+                                                {/* Variant badge */}
+                                                {hasVariants && (
+                                                    <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-200">
+                                                        📋 {variants.length} wariant{variants.length === 1 ? '' : variants.length < 5 ? 'y' : 'ów'}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Price */}
@@ -494,8 +502,49 @@ export const OffersList: React.FC<OffersListProps> = ({ offers: propOffers, onDe
                                         )}
                                     </div>
 
+                                    {/* Variant cards row */}
+                                    {hasVariants && (
+                                        <div className="mt-3 pt-3 border-t border-slate-100">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">📋 Warianty oferty</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {variants.map((v: any, idx: number) => (
+                                                    <div key={v.id || idx} className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-slate-50 to-white rounded-lg border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all group">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-xs font-bold text-slate-800">{v.label || `Wariant ${idx + 1}`}</div>
+                                                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                                                {v.modelName && <span>{v.modelName}</span>}
+                                                                {v.width > 0 && v.projection > 0 && <span>{v.width}×{v.projection}</span>}
+                                                                {v.pricing?.sellingPriceGross && (
+                                                                    <span className="font-semibold text-emerald-600">{formatPrice(Number(v.pricing.sellingPriceGross))}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            {/* Open variant in interactive view */}
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); offer.publicToken && window.open(`/p/offer/${offer.publicToken}`, '_blank'); }}
+                                                                className="p-1 text-slate-400 hover:text-indigo-600 transition-colors" title="Otwórz wariant"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                            </button>
+                                                            {/* Print variant PDF */}
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); offer.publicToken && window.open(`/print/offer/${offer.publicToken}?variant=${idx}`, '_blank'); }}
+                                                                className="p-1 text-slate-400 hover:text-red-600 transition-colors" title={`PDF: ${v.label || `Wariant ${idx + 1}`}`}
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* ROW 3: Actions */}
-                                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                                    <div className={`${hasVariants ? 'mt-2 pt-2' : 'mt-3 pt-3'} border-t border-slate-100 flex flex-wrap items-center gap-2`}>
                                         {/* Status change */}
                                         <select
                                             value={offer.status}

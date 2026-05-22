@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
     Sparkles, ClipboardCheck, Phone, Mail, CalendarDays, CheckCircle2,
     MessageCircle, Trophy, XCircle, Building2, Check, CalendarPlus,
@@ -956,8 +956,11 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
     const [dbFormIds, setDbFormIds] = useState<Set<string>>(new Set());
     useEffect(() => {
-        // Only run background check for formularz-status leads that aren't already detected
-        const formLeads = leads.filter(l => l.status === 'formularz' && !instantFormIds.has(l.id));
+        // Check both formularz AND formularz_sent leads for completed forms
+        const formLeads = leads.filter(l =>
+            (l.status === 'formularz' || l.status === 'formularz_sent') &&
+            !instantFormIds.has(l.id)
+        );
         if (formLeads.length === 0) return;
 
         const checkMissedSyncs = async () => {
@@ -980,6 +983,67 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         dbFormIds.forEach(id => merged.add(id));
         return merged;
     }, [instantFormIds, dbFormIds]);
+
+    // AUTO-MOVE: leads in 'formularz_sent' with completed form → move to 'formularz'
+    // REVERSE: leads in 'formularz' without completed form → move back to 'formularz_sent'
+    const autoMovedRef = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        // Forward: formularz_sent → formularz (form completed)
+        const leadsToMoveForward = leads.filter(l =>
+            l.status === 'formularz_sent' &&
+            completedFormLeadIds.has(l.id) &&
+            !autoMovedRef.current.has(l.id)
+        );
+
+        // Reverse: formularz → formularz_sent (form NOT completed, was probably manually placed)
+        const leadsToMoveBack = leads.filter(l =>
+            l.status === 'formularz' &&
+            !completedFormLeadIds.has(l.id) &&
+            !autoMovedRef.current.has(`back-${l.id}`)
+        );
+
+        if (leadsToMoveForward.length === 0 && leadsToMoveBack.length === 0) return;
+
+        const moveLeads = async () => {
+            let movedForward = 0;
+            let movedBack = 0;
+
+            for (const lead of leadsToMoveForward) {
+                try {
+                    autoMovedRef.current.add(lead.id);
+                    await DatabaseService.updateLead(lead.id, { status: 'formularz' as any });
+                    console.log(`[AutoMove] Lead ${lead.id} moved formularz_sent → formularz (form completed)`);
+                    movedForward++;
+                } catch (e) {
+                    console.error('[AutoMove] Failed:', e);
+                    autoMovedRef.current.delete(lead.id);
+                }
+            }
+
+            for (const lead of leadsToMoveBack) {
+                try {
+                    autoMovedRef.current.add(`back-${lead.id}`);
+                    await DatabaseService.updateLead(lead.id, { status: 'formularz_sent' as any });
+                    console.log(`[AutoMove] Lead ${lead.id} moved formularz → formularz_sent (form NOT completed)`);
+                    movedBack++;
+                } catch (e) {
+                    console.error('[AutoMove] Failed:', e);
+                    autoMovedRef.current.delete(`back-${lead.id}`);
+                }
+            }
+
+            if (movedForward > 0) {
+                toast.success(`📋 ${movedForward} lead${movedForward > 1 ? 'ów' : ''} przeniesion${movedForward > 1 ? 'ych' : 'y'} do "Formularz wypełniony"`);
+            }
+            if (movedBack > 0) {
+                toast.success(`📤 ${movedBack} lead${movedBack > 1 ? 'ów' : ''} cofnięt${movedBack > 1 ? 'ych' : 'y'} do "Formularz wysłany" (brak wypełnienia)`);
+            }
+            if (movedForward > 0 || movedBack > 0) {
+                onLeadUpdate();
+            }
+        };
+        moveLeads();
+    }, [completedFormLeadIds, leads]);
 
     // Track offer view status + customer interactions for offer_sent/negotiation leads
     const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({});
