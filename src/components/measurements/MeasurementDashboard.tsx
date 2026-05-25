@@ -24,45 +24,39 @@ export const MeasurementDashboard: React.FC = () => {
     const [availableOffersForCustomer, setAvailableOffersForCustomer] = useState<Offer[]>([]);
     // Sales rep filter for admin/manager
     const [salesReps, setSalesReps] = useState<User[]>([]);
-    const [selectedSalesRepId, setSelectedSalesRepId] = useState<string>('all');
+    const [selectedSalesRepId, setSelectedSalesRepId] = useState<string>(
+        (currentUser?.role === 'admin' || currentUser?.role === 'manager') ? 'all' : (currentUser?.id || 'all')
+    );
 
-    // Load sales reps for admin/manager filter
+    // Load sales reps for filter (all roles can filter)
     useEffect(() => {
         const loadSalesReps = async () => {
-            if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
-                try {
-                    const allUsers = await DatabaseService.getAllUsers();
-                    // Filter to sales reps and managers (active users who can have measurements)
-                    const reps = allUsers.filter(u =>
-                        (u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin') &&
-                        u.status === 'active'
-                    );
-                    setSalesReps(reps);
-                } catch (error) {
-                    console.error('Error loading sales reps:', error);
-                }
+            try {
+                const allUsers = await DatabaseService.getAllUsers();
+                // Filter to sales reps and managers (active users who can have measurements)
+                const reps = allUsers.filter(u =>
+                    (u.role === 'sales_rep' || u.role === 'sales_rep_pl' || u.role === 'manager' || u.role === 'admin') &&
+                    u.status === 'active'
+                );
+                setSalesReps(reps);
+            } catch (error) {
+                console.error('Error loading sales reps:', error);
             }
         };
         loadSalesReps();
-    }, [currentUser?.role]);
+    }, []);
 
     const loadMeasurements = React.useCallback(async () => {
         try {
             if (measurements.length === 0) setLoading(true);
             let data: Measurement[];
 
-            if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
-                // Admin/Manager can see all measurements or filter by sales rep
-                const allMeasurements = await DatabaseService.getMeasurements();
-                if (selectedSalesRepId === 'all') {
-                    data = allMeasurements;
-                } else {
-                    data = allMeasurements.filter(m => m.salesRepId === selectedSalesRepId);
-                }
-            } else if (currentUser?.id) {
-                data = await DatabaseService.getMeasurementsBySalesRep(currentUser.id);
+            // All roles: load all measurements, filter client-side
+            const allMeasurements = await DatabaseService.getMeasurements();
+            if (selectedSalesRepId === 'all') {
+                data = allMeasurements;
             } else {
-                data = [];
+                data = allMeasurements.filter(m => m.salesRepId === selectedSalesRepId);
             }
 
             setMeasurements(data);
@@ -208,8 +202,8 @@ export const MeasurementDashboard: React.FC = () => {
                     <p className="text-slate-500 mt-1">Zarządzaj pomiarami i trasami handlowców</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    {/* Sales Rep Filter - only for admin/manager */}
-                    {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && salesReps.length > 0 && (
+                    {/* Sales Rep Filter - for all users */}
+                    {salesReps.length > 0 && (
                         <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
                             <Users className="w-4 h-4 text-blue-600" />
                             <select
@@ -268,11 +262,7 @@ export const MeasurementDashboard: React.FC = () => {
                 measurements={measurements}
                 onEdit={setEditingMeasurement}
                 onDragDrop={handleDragDrop}
-                viewingUserId={
-                    (currentUser?.role === 'admin' || currentUser?.role === 'manager')
-                        ? (selectedSalesRepId !== 'all' ? selectedSalesRepId : undefined)
-                        : currentUser?.id
-                }
+                viewingUserId={selectedSalesRepId !== 'all' ? selectedSalesRepId : undefined}
             />
 
             {/* Add/Edit Modal */}
