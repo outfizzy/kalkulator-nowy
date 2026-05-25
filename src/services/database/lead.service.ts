@@ -162,21 +162,26 @@ export const LeadService = {
         // --- Auto-Assignment: When moving out of 'new' with no owner, assign current user ---
         // But NOT for admins/managers — they shouldn't be auto-assigned
         if (updates.status && updates.status !== 'new' && updates.assignedTo === undefined) {
-            // Check if lead currently has no owner
-            const { data: currentLead } = await supabase
-                .from('leads')
-                .select('assigned_to, status')
-                .eq('id', id)
-                .single();
+            try {
+                // Check if lead currently has no owner
+                const { data: currentLead } = await supabase
+                    .from('leads')
+                    .select('assigned_to, status')
+                    .eq('id', id)
+                    .single();
 
-            if (currentLead && !currentLead.assigned_to) {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                    if (!['admin', 'manager'].includes(prof?.role || '')) {
-                        dbUpdates.assigned_to = user.id;
+                if (currentLead && !currentLead.assigned_to && supabase?.auth) {
+                    const { data: authData } = await supabase.auth.getUser();
+                    const user = authData?.user;
+                    if (user) {
+                        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                        if (!['admin', 'manager'].includes(prof?.role || '')) {
+                            dbUpdates.assigned_to = user.id;
+                        }
                     }
                 }
+            } catch (autoAssignErr) {
+                console.warn('[updateLead] Auto-assignment skipped due to error:', autoAssignErr);
             }
         }
 
