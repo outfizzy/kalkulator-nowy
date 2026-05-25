@@ -111,6 +111,13 @@ export const LeadsList: React.FC = () => {
         loadData();
     }, []);
 
+    // Set default assignee filter for sales representatives to prevent clutter
+    useEffect(() => {
+        if (currentUser && (currentUser.role === 'sales_rep' || currentUser.role === 'sales_rep_pl')) {
+            setFilterAssignee(currentUser.id);
+        }
+    }, [currentUser]);
+
     // Track which leads have completed configurator forms — derived from already-loaded data (zero queries)
     useEffect(() => {
         const completed = new Set<string>();

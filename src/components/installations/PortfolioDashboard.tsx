@@ -112,6 +112,7 @@ export const PortfolioDashboard: React.FC = () => {
 
     // Selection & nearby panel
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+    const [selectedGalleryItemId, setSelectedGalleryItemId] = useState<string | null>(null);
 
     // Photo upload
     const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
@@ -206,11 +207,11 @@ export const PortfolioDashboard: React.FC = () => {
             if (!client) return;
             items.push({
                 id: `c-${c.id}`,
-                address: client.address || client.street,
+                address: client.address || [client.street, client.houseNumber || client.house_number].filter(Boolean).join(' ') || undefined,
                 city: client.city,
-                postalCode: client.postalCode || client.zip,
-                lat: client.coordinates?.lat,
-                lng: client.coordinates?.lng
+                postalCode: client.postalCode || client.zip || client.postal_code,
+                lat: client.lat || client.coordinates?.lat || undefined,
+                lng: client.lng || client.coordinates?.lng || undefined
             });
         });
 
@@ -251,7 +252,7 @@ export const PortfolioDashboard: React.FC = () => {
         // 1. From realizations table
         realizations.forEach(r => {
             const geo = geoCoords.get(`r-${r.id}`) || (r.latitude && r.longitude ? { lat: r.latitude, lng: r.longitude } : null);
-            if (geo) {
+            if (geo && geo.lat && geo.lng && geo.lat !== 0 && geo.lng !== 0) {
                 const relatedContract = r.contract_id ? contracts.find(c => c.id === r.contract_id) : null;
                 
                 items.push({
@@ -284,7 +285,7 @@ export const PortfolioDashboard: React.FC = () => {
         installations.forEach(inst => {
             if (realizationContractIds.has(inst.contractId)) return;
             const geo = geoCoords.get(`i-${inst.id}`);
-            if (!geo) return;
+            if (!geo || !geo.lat || !geo.lng || geo.lat === 0 || geo.lng === 0) return;
 
             installationOfferIds.add(inst.offerId || '');
 
@@ -319,7 +320,7 @@ export const PortfolioDashboard: React.FC = () => {
             if (!client) return;
 
             const geo = geoCoords.get(`c-${contract.id}`);
-            if (!geo) return;
+            if (!geo || !geo.lat || !geo.lng || geo.lat === 0 || geo.lng === 0) return;
 
             const clientName = [client.firstName, client.lastName].filter(Boolean).join(' ') || client.company || '';
             const productDesc = contract.product
@@ -400,6 +401,7 @@ export const PortfolioDashboard: React.FC = () => {
 
     // Selected item + nearby items
     const selectedItem = useMemo(() => filteredItems.find(i => i.id === selectedItemId) || null, [filteredItems, selectedItemId]);
+    const selectedGalleryItem = useMemo(() => allMapItems.find(i => i.id === selectedGalleryItemId) || null, [allMapItems, selectedGalleryItemId]);
 
     const nearbyItems = useMemo(() => {
         if (!selectedItem) return [];
@@ -453,7 +455,7 @@ export const PortfolioDashboard: React.FC = () => {
     // Info Window content builder
     const buildItemPopupHtml = useCallback((item: MapItem): string => {
         const color = PRODUCT_COLORS[item.product_type] || '#6B7280';
-        const sourceLabel = item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu';
+        const sourceLabel = item.source === 'manual' ? '✍️ Dodana ręcznie' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu';
         
         let photosHtml = '';
         if (item.photos.length > 0) {
@@ -866,7 +868,7 @@ export const PortfolioDashboard: React.FC = () => {
                     <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
                         className="w-full p-2 border border-slate-300 rounded-lg text-sm">
                         <option value="all">Wszystkie</option>
-                        <option value="manual">Manualne</option>
+                        <option value="manual">Dodana ręcznie</option>
                         <option value="installation">Z montażu</option>
                         <option value="contract">Z umów</option>
                     </select>
@@ -954,9 +956,9 @@ export const PortfolioDashboard: React.FC = () => {
                 onChange={(e) => { if (e.target.files && e.target.files.length > 0) handlePhotoUpload(e.target.files); e.target.value = ''; }} />
 
             {/* Main content area */}
-            <div className="flex-1 flex gap-3 min-h-[500px]">
+            <div className="flex-grow flex flex-col lg:flex-row gap-3 min-h-[500px]">
                 {/* Main view (map or list) */}
-                <div className={`${selectedItemId ? 'flex-1' : 'w-full'} bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden transition-all`}>
+                <div className={`${(selectedItemId && viewMode === 'map') ? 'flex-1' : 'w-full'} bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden transition-all`}>
                     {isLoading ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
                             <div className="text-center">
@@ -1015,7 +1017,7 @@ export const PortfolioDashboard: React.FC = () => {
                                         <div className="flex justify-between items-start mb-1">
                                             <h4 className="font-bold text-sm text-slate-800 truncate pr-2" title={selectedItem.title}>{selectedItem.title}</h4>
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${selectedItem.source === 'manual' ? 'bg-purple-50 text-purple-600' : selectedItem.source === 'contract' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                {selectedItem.source === 'manual' ? 'Manualne' : selectedItem.source === 'contract' ? 'Z umowy' : 'Z montażu'}
+                                                {selectedItem.source === 'manual' ? 'Dodana ręcznie' : selectedItem.source === 'contract' ? 'Z umowy' : 'Z montażu'}
                                             </span>
                                         </div>
 
@@ -1087,7 +1089,7 @@ export const PortfolioDashboard: React.FC = () => {
                         </div>
                     ) : (
                         /* ========== LIST VIEW ========== */
-                        <div className="overflow-y-auto h-full p-4 max-h-[600px]">
+                        <div className="absolute inset-0 overflow-y-auto p-4">
                             {filteredItems.length === 0 ? (
                                 <div className="text-center py-12 text-slate-400">
                                     <MapPin className="w-12 h-12 mx-auto mb-3 text-slate-300" />
@@ -1097,11 +1099,11 @@ export const PortfolioDashboard: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {filteredItems.map(item => {
                                         const coverPhoto = item.photos.find(p => p.is_cover) || item.photos[0];
-                                        const isSelected = selectedItemId === item.id;
+                                        const isSelected = selectedGalleryItemId === item.id;
                                         return (
                                             <div key={item.id}
-                                                onClick={() => setSelectedItemId(isSelected ? null : item.id)}
-                                                className={`bg-white rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg group ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-200 shadow-lg' : 'border-slate-100 hover:border-slate-200'}`}>
+                                                onClick={() => setSelectedGalleryItemId(item.id)}
+                                                className={`flex flex-col bg-white rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg group ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-200 shadow-lg' : 'border-slate-100 hover:border-slate-200'}`}>
                                                 {/* Image */}
                                                 <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-50 relative overflow-hidden">
                                                     {coverPhoto ? (
@@ -1136,33 +1138,35 @@ export const PortfolioDashboard: React.FC = () => {
                                                 </div>
 
                                                 {/* Info */}
-                                                <div className="p-3">
-                                                    <h4 className="font-bold text-sm text-slate-800 leading-tight truncate">{item.title}</h4>
+                                                <div className="p-3 flex-grow flex flex-col justify-between">
+                                                    <div>
+                                                        <h4 className="font-bold text-sm text-slate-800 leading-tight truncate">{item.title}</h4>
 
-                                                    {/* Contract number — prominent */}
-                                                    {item.contract_number && (
-                                                        <div className="flex items-center gap-1 mt-1 text-indigo-600 text-xs font-semibold">
-                                                            <FileText className="w-3 h-3" /> {item.contract_number}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Client */}
-                                                    {item.client_name && (
-                                                        <div className="text-xs text-slate-600 mt-0.5 font-medium">👤 {item.client_name}</div>
-                                                    )}
-
-                                                    {/* Address + Date */}
-                                                    <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
-                                                        <span className="truncate">{[item.postal_code, item.city].filter(Boolean).join(' ')}</span>
-                                                        {item.completion_date && (
-                                                            <span>{new Date(item.completion_date).toLocaleDateString('pl-PL')}</span>
+                                                        {/* Contract number — prominent */}
+                                                        {item.contract_number && (
+                                                            <div className="flex items-center gap-1 mt-1 text-indigo-600 text-xs font-semibold">
+                                                                <FileText className="w-3 h-3" /> {item.contract_number}
+                                                            </div>
                                                         )}
+
+                                                        {/* Client */}
+                                                        {item.client_name && (
+                                                            <div className="text-xs text-slate-600 mt-0.5 font-medium">👤 {item.client_name}</div>
+                                                        )}
+
+                                                        {/* Address + Date */}
+                                                        <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
+                                                            <span className="truncate">{[item.postal_code, item.city].filter(Boolean).join(' ')}</span>
+                                                            {item.completion_date && (
+                                                                <span>{new Date(item.completion_date).toLocaleDateString('pl-PL')}</span>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     {/* Source & Map Actions */}
                                                     <div className="mt-2 flex items-center justify-between gap-2">
                                                         <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${item.source === 'manual' ? 'bg-purple-50 text-purple-600' : item.source === 'contract' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                            {item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
+                                                            {item.source === 'manual' ? '✍️ Dodana ręcznie' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
                                                         </span>
                                                         <button
                                                             onClick={(e) => {
@@ -1186,7 +1190,7 @@ export const PortfolioDashboard: React.FC = () => {
                 </div>
 
                 {/* ========== SIDE PANEL — Selected Realization Details & Gallery ========== */}
-                {selectedItem && (
+                {selectedItem && viewMode === 'map' && (
                     <div className="w-80 bg-white rounded-xl border border-slate-200 shadow-sm overflow-y-auto flex-shrink-0 flex flex-col hidden lg:flex max-h-[600px]">
                         {/* Selected item header */}
                         <div className="p-4 border-b border-slate-100">
@@ -1352,6 +1356,217 @@ export const PortfolioDashboard: React.FC = () => {
                     realization={selectedEditRealization}
                     onSuccess={loadData}
                 />
+            )}
+
+            {/* ========== GALLERY & DETAILS MODAL FOR LIST VIEW ========== */}
+            {selectedGalleryItem && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setSelectedGalleryItemId(null)}>
+                    <div 
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50">
+                            <div className="flex items-center gap-3">
+                                <span 
+                                    className="px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                                    style={{ backgroundColor: PRODUCT_COLORS[selectedGalleryItem.product_type] || '#6B7280' }}
+                                >
+                                    {selectedGalleryItem.product_type}
+                                </span>
+                                <h3 className="text-base font-bold text-slate-800 truncate max-w-[200px] sm:max-w-md">
+                                    {selectedGalleryItem.title}
+                                </h3>
+                            </div>
+                            <button onClick={() => setSelectedGalleryItemId(null)} className="p-2 hover:bg-slate-200/60 rounded-lg transition-colors">
+                                <X className="w-5 h-5 text-slate-500" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Left side: Photos */}
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Camera className="w-3.5 h-3.5 text-emerald-500" /> Galeria zdjęć ({selectedGalleryItem.photos.length})
+                                </h4>
+                                {selectedGalleryItem.photos.length > 0 ? (
+                                    <RealizationGallery photos={selectedGalleryItem.photos} title={selectedGalleryItem.title} />
+                                ) : (
+                                    <div className="bg-slate-50 rounded-xl p-8 text-center border-2 border-dashed border-slate-200 flex flex-col items-center justify-center min-h-[200px]">
+                                        <Camera className="w-10 h-10 text-slate-300 mb-2" />
+                                        <p className="text-sm font-medium text-slate-500">Brak zdjęć w tym portfolio</p>
+                                        <p className="text-xs text-slate-400 mt-1">Dodaj zdjęcia z telefonu lub komputera</p>
+                                    </div>
+                                )}
+
+                                {/* Upload button inside modal */}
+                                <button
+                                    onClick={() => { setUploadingItemId(selectedGalleryItem.id); photoInputRef.current?.click(); }}
+                                    disabled={isUploading}
+                                    className="w-full py-2.5 text-sm font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isUploading && uploadingItemId === selectedGalleryItem.id ? (
+                                        <><div className="w-4 h-4 border-2 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" /> Wgrywanie...</>
+                                    ) : (
+                                        <><Upload className="w-4 h-4" /> Dodaj zdjęcia z telefonu / aparatu</>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Right side: Details & Actions */}
+                            <div className="flex flex-col justify-between space-y-6">
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                        Szczegóły realizacji
+                                    </h4>
+
+                                    <div className="bg-slate-50 rounded-xl p-4 space-y-3.5">
+                                        {selectedGalleryItem.contract_number && (
+                                            <div className="flex items-start gap-2.5">
+                                                <span className="text-slate-400 mt-0.5"><FileText className="w-4 h-4 text-indigo-500" /></span>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-400 font-medium">Numer umowy</div>
+                                                    <div className="text-sm font-semibold text-indigo-600">{selectedGalleryItem.contract_number}</div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedGalleryItem.client_name && (
+                                            <div className="flex items-start gap-2.5">
+                                                <span className="text-slate-400 mt-0.5">👤</span>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-400 font-medium">Klient</div>
+                                                    <div className="text-sm font-semibold text-slate-700">{selectedGalleryItem.client_name}</div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {(selectedGalleryItem.client_phone || selectedGalleryItem.client_email) && (
+                                            <div className="flex items-start gap-2.5 border-t border-slate-200/60 pt-3">
+                                                <span className="text-slate-400 mt-0.5">📞</span>
+                                                <div className="flex-1 space-y-1.5">
+                                                    <div className="text-[10px] text-slate-400 font-medium">Kontakt</div>
+                                                    {selectedGalleryItem.client_phone && (
+                                                        <div>
+                                                            <a href={`tel:${selectedGalleryItem.client_phone}`} className="text-sm font-semibold text-indigo-600 hover:underline">
+                                                                {selectedGalleryItem.client_phone}
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                    {selectedGalleryItem.client_email && (
+                                                        <div>
+                                                            <a href={`mailto:${selectedGalleryItem.client_email}`} className="text-sm text-indigo-600 hover:underline">
+                                                                {selectedGalleryItem.client_email}
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedGalleryItem.address && (
+                                            <div className="flex items-start gap-2.5 border-t border-slate-200/60 pt-3">
+                                                <span className="text-slate-400 mt-0.5"><MapPin className="w-4 h-4 text-emerald-500" /></span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-[10px] text-slate-400 font-medium">Lokalizacja</div>
+                                                    <div className="text-sm font-medium text-slate-700">
+                                                        {[selectedGalleryItem.address, selectedGalleryItem.postal_code, selectedGalleryItem.city].filter(Boolean).join(', ')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedGalleryItem.completion_date && (
+                                            <div className="flex items-start gap-2.5 border-t border-slate-200/60 pt-3">
+                                                <span className="text-slate-400 mt-0.5">📅</span>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-400 font-medium">Data realizacji</div>
+                                                    <div className="text-sm font-medium text-slate-700">
+                                                        {new Date(selectedGalleryItem.completion_date).toLocaleDateString('pl-PL', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-start gap-2.5 border-t border-slate-200/60 pt-3">
+                                            <span className="text-slate-400 mt-0.5">ℹ️</span>
+                                            <div>
+                                                <div className="text-[10px] text-slate-400 font-medium">Źródło wpisu</div>
+                                                <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded ${
+                                                    selectedGalleryItem.source === 'manual' 
+                                                        ? 'bg-purple-100 text-purple-700' 
+                                                        : selectedGalleryItem.source === 'contract' 
+                                                            ? 'bg-indigo-100 text-indigo-700' 
+                                                            : 'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                    {selectedGalleryItem.source === 'manual' ? '✍️ Dodana ręcznie' : selectedGalleryItem.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Actions Panel */}
+                                <div className="space-y-2 pt-4 border-t border-slate-100">
+                                    <div className="flex gap-3">
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${selectedGalleryItem.lat},${selectedGalleryItem.lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                                        >
+                                            🗺️ Nawiguj w Mapach Google
+                                        </a>
+                                        <button
+                                            onClick={() => {
+                                                const fullAddress = [selectedGalleryItem.address, selectedGalleryItem.postal_code, selectedGalleryItem.city].filter(Boolean).join(', ');
+                                                navigator.clipboard.writeText(fullAddress);
+                                                toast.success('Adres skopiowany do schowka');
+                                            }}
+                                            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1"
+                                            title="Kopiuj adres"
+                                        >
+                                            📋 Kopiuj
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        {selectedGalleryItem.realization_id && (
+                                            <button
+                                                onClick={() => {
+                                                    const real = realizations.find(r => r.id === selectedGalleryItem.realization_id);
+                                                    if (real) {
+                                                        setSelectedEditRealization(real);
+                                                        setShowEditModal(true);
+                                                        setSelectedGalleryItemId(null);
+                                                    }
+                                                }}
+                                                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-indigo-200"
+                                            >
+                                                📝 Edytuj szczegóły
+                                            </button>
+                                        )}
+
+                                        {selectedGalleryItem.realization_id && selectedGalleryItem.source === 'manual' && (
+                                            <button
+                                                onClick={async () => {
+                                                    if (selectedGalleryItem.realization_id) {
+                                                        await handleDeleteRealization(selectedGalleryItem.realization_id);
+                                                        setSelectedGalleryItemId(null);
+                                                    }
+                                                }}
+                                                className="py-2.5 px-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                🗑️ Usuń
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

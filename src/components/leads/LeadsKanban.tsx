@@ -1259,10 +1259,10 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
     // === MINI-DASHBOARD ===
     const pipelineStats = useMemo(() => {
-        // New leads = early funnel only
-        const newLeads = leads.filter(l => ['new', 'formularz_sent', 'formularz', 'contacted'].includes(l.status));
-        // Advanced = past the contact stage
-        const advancedLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
+        // New leads = early funnel only (aligned with LeadsList.tsx)
+        const newLeads = leads.filter(l => ['new', 'formularz_sent', 'formularz'].includes(l.status));
+        // Advanced = past the contact stage (including contacted, aligned with LeadsList.tsx)
+        const advancedLeads = leads.filter(l => ['contacted', 'offer_sent', 'contact_after_offer', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
         const wonLeads = leads.filter(l => l.status === 'won');
         const lostLeads = leads.filter(l => l.status === 'lost');
 
