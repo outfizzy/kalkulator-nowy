@@ -131,6 +131,7 @@ import AdsManagerPage from './pages/AdsManagerPage';
 
 // Lazy load heavy components to avoid module evaluation crashes
 const ProductConfiguratorV2 = React.lazy(() => import('./components/calculator_v2/ProductConfiguratorV2').then(m => ({ default: m.ProductConfiguratorV2 })));
+const ConfiguratorTrainerPage = React.lazy(() => import('./components/admin/ConfiguratorTrainer').then(m => ({ default: m.ConfiguratorTrainerPage })));
 
 // Protected Route component
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactElement, allowedRoles?: string[] }) {
@@ -304,6 +305,13 @@ function App() {
               {/* Blog PL (zadaszto.pl) */}
               <Route path="/blog-pl" element={<ProtectedRoute allowedRoles={['admin', 'sales_rep_pl']}><BlogPLPage /></ProtectedRoute>} />
               <Route path="/ads-manager" element={<ProtectedRoute allowedRoles={['admin']}><AdsManagerPage /></ProtectedRoute>} />
+              <Route path="/admin/configurator-trainer" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>}>
+                    <ConfiguratorTrainerPage />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
             </Route>
 
             {/* Partner Protected Routes - Redirect to B2B */}

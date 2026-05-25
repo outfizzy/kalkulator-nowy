@@ -296,6 +296,7 @@ export const Layout: React.FC = () => {
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/fuel-logs" label="Dziennik paliwa" icon="clipboard" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/failures" label="Zgłoszenia usterek" icon="tools" />}
                                 {isAdmin() && <NavLink to="/admin/pulse" label="Puls Firmy" icon="dashboard" />}
+                                {isAdmin() && <NavLink to="/admin/configurator-trainer" label="🤖 AI Configurator" icon="settings" />}
                             </>)}
                         </div>
                     )}

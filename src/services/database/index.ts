@@ -1,10 +1,12 @@
 import { ActivityService } from './activity.service';
 import { CommunicationService } from './communication.service';
+import { ConfiguratorTrainerService } from './configurator-trainer.service';
 import { ContractService } from './contract.service';
 import { CustomerService } from './customer.service';
 import { FinanceService } from './finance.service';
 import { InstallationService } from './installation.service';
 import { InventoryService } from './inventory.service';
+import { JobQueueService } from './job-queue.service';
 import { LeadService } from './lead.service';
 import { LeadAutoAssignService } from './lead-auto-assign.service';
 import { MeasurementService } from './measurement.service';
@@ -24,11 +26,13 @@ import { UserService } from './user.service';
 export const DatabaseService = {
     ...ActivityService,
     ...CommunicationService,
+    ...ConfiguratorTrainerService,
     ...ContractService,
     ...CustomerService,
     ...FinanceService,
     ...InstallationService,
     ...InventoryService,
+    ...JobQueueService,
     ...LeadService,
     ...MeasurementService,
     ...NoteService,
@@ -71,3 +75,5 @@ export * from './user.service';
 export * from './user.service';
 export * from './email-template.service';
 export * from './lead-auto-assign.service';
+export * from './job-queue.service';
+export * from './configurator-trainer.service';
