@@ -225,7 +225,7 @@ export const Layout: React.FC = () => {
                     </div>
 
                     {/* ── REALIZACJA & LOGISTYKA ── */}
-                    {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
+                    {(true /* Kalendarz pomiarów for all */ || hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
                         <div className="space-y-1">
                             <button onClick={() => toggleSection('realizacja')} className="w-full flex items-center justify-between px-4 py-1 group cursor-pointer">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Realizacja & Logistyka</span>
@@ -233,6 +233,7 @@ export const Layout: React.FC = () => {
                             </button>
                             {expandedSections.realizacja && (<>
                                 {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz montaży" icon="map" />}
+                                <NavLink to="/measurements" label="Kalendarz pomiarów" icon="calendar" />
                                 {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Protokoły pomiarowe" icon="clipboard" />}
                                 {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/advance-payments" label="Rozliczenia zaliczek" icon="clipboard" />}
@@ -427,10 +428,11 @@ export const Layout: React.FC = () => {
                             </div>
 
                             {/* REALIZACJA */}
-                            {(hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
+                            {(true /* Kalendarz pomiarów for all */ || hasPermission('installations_calendar') || hasPermission('measurement_reports') || hasPermission('contracts_list') || hasPermission('logistics') || hasPermission('service_module')) && (
                                 <div className="space-y-1">
                                     <div className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Realizacja</div>
                                     {hasPermission('installations_calendar') && <NavLink to="/installations" label="Kalendarz Montaży" icon="map" onClick={() => setMobileMenuOpen(false)} />}
+                                    <NavLink to="/measurements" label="Kalendarz pomiarów" icon="calendar" onClick={() => setMobileMenuOpen(false)} />
                                     {hasPermission('measurement_reports') && <NavLink to="/reports/measurements" label="Raporty Pomiarowe" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('contracts_list') && <NavLink to="/contracts" label="Umowy" icon="contracts" onClick={() => setMobileMenuOpen(false)} />}
                                     {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/advance-payments" label="💰 Zaliczki" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
