@@ -6,11 +6,11 @@ import {
   Trash2, Image as ImageIcon, RotateCcw, Package
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { pdfjs } from 'react-pdf';
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure pdf.js worker — use local import to avoid version mismatch
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Configure pdf.js worker — use react-pdf's bundled pdfjs to avoid version mismatch
+pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 interface ScannedItem {
   name: string;
@@ -87,7 +87,7 @@ export const OcrOfferConfigurator: React.FC<OcrOfferConfiguratorProps> = ({
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
       const pageCount = pdf.numPages;
 
       toast.success(`PDF: ${pageCount} stron — konwertuję...`);
