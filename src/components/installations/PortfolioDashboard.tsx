@@ -134,6 +134,7 @@ export const PortfolioDashboard: React.FC = () => {
     const polylinesRef = useRef<google.maps.Polyline[]>([]);
     const hqMarkerRef = useRef<google.maps.Marker | null>(null);
     const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+    const searchCircleRef = useRef<google.maps.Circle | null>(null);
     const [isMapReady, setIsMapReady] = useState(false);
 
     // Geocoding Cache State
@@ -561,31 +562,59 @@ export const PortfolioDashboard: React.FC = () => {
             hqMarkerRef.current.setMap(null);
             hqMarkerRef.current = null;
         }
+        if (searchCircleRef.current) {
+            searchCircleRef.current.setMap(null);
+            searchCircleRef.current = null;
+        }
 
         const bounds = new google.maps.LatLngBounds();
         let hasMarkers = false;
 
-        // 1. Add HQ Marker
+        // 1. Add HQ Marker (styled with custom pulsing blue icon)
+        const hqSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="rgba(59, 130, 246, 0.25)" />
+                <circle cx="20" cy="20" r="10" fill="#3B82F6" stroke="white" stroke-width="2.5" />
+                <path d="M16 22 L16 19 L24 19 L24 22 M15 18 L20 13 L25 18" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        `;
         const hqMarker = new google.maps.Marker({
             position: { lat: 51.9516, lng: 14.7118 },
             map,
             icon: {
-                url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><text x="15" y="24" font-size="24" text-anchor="middle">🏢</text></svg>'),
-                scaledSize: new google.maps.Size(30, 30),
-                anchor: new google.maps.Point(15, 15)
+                url: 'data:image/svg+xml,' + encodeURIComponent(hqSvg.trim()),
+                scaledSize: new google.maps.Size(40, 40),
+                anchor: new google.maps.Point(20, 20)
             },
             zIndex: 1000,
             title: 'Baza Firmy (Gubin)'
         });
         hqMarker.addListener('click', () => {
             if (infoWindowRef.current) {
-                infoWindowRef.current.setContent('<div style="padding:6px;font-family:sans-serif;"><h3 style="margin:0 0 2px 0;font-size:13px;font-weight:bold;">Baza Firmy</h3><p style="margin:0;font-size:11px;color:#64748b;">Gubin 66-620</p></div>');
+                infoWindowRef.current.setContent('<div style="padding:8px;font-family:system-ui,-apple-system,sans-serif;"><h3 style="margin:0 0 2px 0;font-size:12px;font-weight:bold;color:#1e293b;">🏢 Baza Firmy</h3><p style="margin:0;font-size:10px;color:#64748b;">Gubin 66-620, Polska</p></div>');
                 infoWindowRef.current.open(map, hqMarker);
             }
         });
         hqMarkerRef.current = hqMarker;
         bounds.extend({ lat: 51.9516, lng: 14.7118 });
         hasMarkers = true;
+
+        // Draw search boundary circle
+        if (searchCenter) {
+            const circle = new google.maps.Circle({
+                map,
+                center: searchCenter,
+                radius: searchRadius * 1000, // km to meters
+                fillColor: '#3B82F6',
+                fillOpacity: 0.08,
+                strokeColor: '#3B82F6',
+                strokeOpacity: 0.35,
+                strokeWeight: 1.5,
+                clickable: false
+            });
+            searchCircleRef.current = circle;
+            bounds.extend(searchCenter);
+        }
 
         // 2. Add Realization Markers
         filteredItems.forEach(item => {
@@ -658,7 +687,22 @@ export const PortfolioDashboard: React.FC = () => {
                 google.maps.event.removeListener(listener);
             });
         }
-    }, [filteredItems, selectedItemId, viewMode, isMapReady, selectedItem, nearbyItems, buildItemPopupHtml]);
+
+        return () => {
+            markersRef.current.forEach(m => m.setMap(null));
+            markersRef.current = [];
+            polylinesRef.current.forEach(p => p.setMap(null));
+            polylinesRef.current = [];
+            if (hqMarkerRef.current) {
+                hqMarkerRef.current.setMap(null);
+                hqMarkerRef.current = null;
+            }
+            if (searchCircleRef.current) {
+                searchCircleRef.current.setMap(null);
+                searchCircleRef.current = null;
+            }
+        };
+    }, [filteredItems, selectedItemId, viewMode, isMapReady, selectedItem, nearbyItems, buildItemPopupHtml, searchCenter, searchRadius]);
 
     const handleSearch = async () => {
         if (!searchLocation) { setSearchCenter(null); return; }
@@ -929,6 +973,111 @@ export const PortfolioDashboard: React.FC = () => {
                                     {filteredItems.filter(i => i.photos.length > 0).length} ze zdjęciami
                                 </div>
                             </div>
+
+                            {/* Floating Selected Realization Summary Card */}
+                            {selectedItem && (
+                                <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/60 z-[10] overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
+                                    {/* Cover image or fallback */}
+                                    <div className="h-32 bg-slate-100 relative">
+                                        {selectedItem.photos.length > 0 ? (
+                                            <img 
+                                                src={selectedItem.photos.find(p => p.is_cover)?.url || selectedItem.photos[0].url} 
+                                                alt={selectedItem.title} 
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-br from-indigo-50 to-slate-100 flex items-center justify-center text-slate-400">
+                                                <Camera className="w-8 h-8 opacity-40" />
+                                            </div>
+                                        )}
+                                        {/* Product badge */}
+                                        <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm"
+                                            style={{ backgroundColor: PRODUCT_COLORS[selectedItem.product_type] || '#6B7280' }}>
+                                            {selectedItem.product_type}
+                                        </span>
+                                        {/* Close button */}
+                                        <button 
+                                            onClick={() => setSelectedItemId(null)}
+                                            className="absolute top-3 right-3 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+
+                                    {/* Card body */}
+                                    <div className="p-4">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="font-bold text-sm text-slate-800 truncate pr-2" title={selectedItem.title}>{selectedItem.title}</h4>
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${selectedItem.source === 'manual' ? 'bg-purple-50 text-purple-600' : selectedItem.source === 'contract' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                {selectedItem.source === 'manual' ? 'Manualne' : selectedItem.source === 'contract' ? 'Z umowy' : 'Z montażu'}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1 text-xs text-slate-600 mb-3.5">
+                                            {selectedItem.client_name && (
+                                                <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                                                    <span className="w-4 text-center">👤</span>
+                                                    <span className="truncate">{selectedItem.client_name}</span>
+                                                </div>
+                                            )}
+                                            {selectedItem.contract_number && (
+                                                <div className="flex items-center gap-1.5 font-semibold text-indigo-600">
+                                                    <span className="w-4 text-center">📄</span>
+                                                    <span>{selectedItem.contract_number}</span>
+                                                </div>
+                                            )}
+                                            {selectedItem.address && (
+                                                <div className="flex items-center gap-1.5 text-slate-500">
+                                                    <span className="w-4 text-center">📍</span>
+                                                    <span className="truncate" title={[selectedItem.address, selectedItem.postal_code, selectedItem.city].filter(Boolean).join(', ')}>
+                                                        {[selectedItem.address, selectedItem.postal_code, selectedItem.city].filter(Boolean).join(', ')}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {(selectedItem.client_phone || selectedItem.client_email) && (
+                                                <div className="flex items-center gap-3 pt-1 border-t border-slate-100 mt-2 text-[10px]">
+                                                    {selectedItem.client_phone && (
+                                                        <a href={`tel:${selectedItem.client_phone}`} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold">
+                                                            📞 Zadzwoń
+                                                        </a>
+                                                    )}
+                                                    {selectedItem.client_email && (
+                                                        <a href={`mailto:${selectedItem.client_email}`} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold">
+                                                            ✉️ Napisz e-mail
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex gap-2">
+                                            <a 
+                                                href={`https://www.google.com/maps/search/?api=1&query=${selectedItem.lat},${selectedItem.lng}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                🗺️ Nawiguj
+                                            </a>
+                                            <button 
+                                                onClick={() => {
+                                                    const real = realizations.find(r => r.id === selectedItem.realization_id);
+                                                    if (real) {
+                                                        setSelectedEditRealization(real);
+                                                        setShowEditModal(true);
+                                                    } else {
+                                                        toast.error('Tylko zapisane realizacje mogą być edytowane');
+                                                    }
+                                                }}
+                                                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-1 shadow-md shadow-indigo-200"
+                                            >
+                                                📝 Szczegóły / Galeria
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         /* ========== LIST VIEW ========== */
@@ -1004,11 +1153,21 @@ export const PortfolioDashboard: React.FC = () => {
                                                         )}
                                                     </div>
 
-                                                    {/* Source badge */}
-                                                    <div className="mt-2 flex items-center gap-2">
+                                                    {/* Source & Map Actions */}
+                                                    <div className="mt-2 flex items-center justify-between gap-2">
                                                         <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${item.source === 'manual' ? 'bg-purple-50 text-purple-600' : item.source === 'contract' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
                                                             {item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
                                                         </span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setViewMode('map');
+                                                                setSelectedItemId(item.id);
+                                                            }}
+                                                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded px-2 py-0.5 transition-colors flex items-center gap-1 shrink-0"
+                                                        >
+                                                            <MapIcon className="w-2.5 h-2.5" /> Pokaż na mapie
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
