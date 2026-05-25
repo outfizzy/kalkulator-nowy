@@ -27,6 +27,8 @@ interface MapItem {
     address?: string | null;
     postal_code?: string | null;
     client_name?: string | null;
+    client_phone?: string | null;
+    client_email?: string | null;
     contract_number?: string | null;
     contract_id?: string | null;
     photos: RealizationPhoto[];
@@ -123,6 +125,7 @@ export const PortfolioDashboard: React.FC = () => {
     const [searchRadius, setSearchRadius] = useState(20);
     const [isSearching, setIsSearching] = useState(false);
     const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
+    const [textSearchQuery, setTextSearchQuery] = useState('');
 
     // Google Maps Refs
     const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -247,6 +250,8 @@ export const PortfolioDashboard: React.FC = () => {
         realizations.forEach(r => {
             const geo = geoCoords.get(`r-${r.id}`) || (r.latitude && r.longitude ? { lat: r.latitude, lng: r.longitude } : null);
             if (geo) {
+                const relatedContract = r.contract_id ? contracts.find(c => c.id === r.contract_id) : null;
+                
                 items.push({
                     id: `r-${r.id}`,
                     lat: geo.lat,
@@ -258,7 +263,9 @@ export const PortfolioDashboard: React.FC = () => {
                     address: r.address,
                     postal_code: r.postal_code,
                     client_name: r.client_name,
-                    contract_number: null,
+                    client_phone: relatedContract?.client?.phone || null,
+                    client_email: relatedContract?.client?.email || null,
+                    contract_number: relatedContract?.contractNumber || null,
                     contract_id: r.contract_id,
                     photos: r.photos,
                     completion_date: r.completion_date,
@@ -290,6 +297,8 @@ export const PortfolioDashboard: React.FC = () => {
                 address: inst.client.address,
                 postal_code: inst.client.postalCode,
                 client_name: `${inst.client.firstName || ''} ${inst.client.lastName || ''}`.trim(),
+                client_phone: inst.client.phone || null,
+                client_email: inst.client.email || null,
                 contract_number: inst.contractNumber || null,
                 contract_id: inst.contractId || null,
                 photos: (inst.photoUrls || []).map(url => ({ url, is_cover: false })),
@@ -326,6 +335,8 @@ export const PortfolioDashboard: React.FC = () => {
                 address: client.address || client.street || null,
                 postal_code: client.postalCode || null,
                 client_name: clientName,
+                client_phone: client.phone || null,
+                client_email: client.email || null,
                 contract_number: contract.contractNumber || null,
                 contract_id: contract.id,
                 photos: [],
@@ -346,6 +357,18 @@ export const PortfolioDashboard: React.FC = () => {
         }
         if (filterSource !== 'all') {
             items = items.filter(i => i.source === filterSource);
+        }
+
+        // Live text filter
+        if (textSearchQuery.trim()) {
+            const query = textSearchQuery.toLowerCase().trim();
+            items = items.filter(i => 
+                (i.title && i.title.toLowerCase().includes(query)) ||
+                (i.client_name && i.client_name.toLowerCase().includes(query)) ||
+                (i.contract_number && i.contract_number.toLowerCase().includes(query)) ||
+                (i.city && i.city.toLowerCase().includes(query)) ||
+                (i.address && i.address.toLowerCase().includes(query))
+            );
         }
 
         // Radius search
@@ -371,7 +394,7 @@ export const PortfolioDashboard: React.FC = () => {
         }
 
         return sorted;
-    }, [allMapItems, filterProductType, filterSource, searchCenter, searchRadius, sortMode]);
+    }, [allMapItems, filterProductType, filterSource, textSearchQuery, searchCenter, searchRadius, sortMode]);
 
     // Selected item + nearby items
     const selectedItem = useMemo(() => filteredItems.find(i => i.id === selectedItemId) || null, [filteredItems, selectedItemId]);
@@ -451,6 +474,9 @@ export const PortfolioDashboard: React.FC = () => {
             `;
         }
 
+        const fullAddress = [item.address, item.postal_code, item.city].filter(Boolean).join(', ');
+        const encodedAddress = encodeURIComponent(fullAddress);
+
         return `
             <div style="min-width:240px;max-width:280px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;padding:4px;">
                 <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:4px;">
@@ -465,9 +491,19 @@ export const PortfolioDashboard: React.FC = () => {
                 
                 <div style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.4;">
                     ${item.client_name ? `<div style="font-weight:500;color:#334155;">👤 ${item.client_name}</div>` : ''}
-                    ${item.contract_number ? `<div style="font-weight:600;color:#4f46e5;">📄 ${item.contract_number}</div>` : ''}
-                    ${item.address ? `<div style="margin-top:1px;">📍 ${[item.address, item.postal_code, item.city].filter(Boolean).join(', ')}</div>` : ''}
-                    ${item.completion_date ? `<div style="margin-top:1px;">📅 ${new Date(item.completion_date).toLocaleDateString('pl-PL')}</div>` : ''}
+                    ${item.client_phone ? `<div style="margin-top:1px;">📞 <a href="tel:${item.client_phone}" style="color:#3B82F6;text-decoration:none;font-weight:500;">${item.client_phone}</a></div>` : ''}
+                    ${item.client_email ? `<div style="margin-top:1px;">✉️ <a href="mailto:${item.client_email}" style="color:#3B82F6;text-decoration:none;">${item.client_email}</a></div>` : ''}
+                    ${item.contract_number ? `<div style="font-weight:600;color:#4f46e5;margin-top:2px;">📄 ${item.contract_number}</div>` : ''}
+                    ${item.address ? `
+                        <div style="margin-top:1px;display:flex;align-items:center;gap:4px;">
+                            <span style="flex:1;min-width:0;">📍 ${fullAddress}</span>
+                            <button onclick="window.__portfolioCopyAddress&&window.__portfolioCopyAddress('${encodedAddress}')" 
+                                    style="padding:1px 4px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:9px;" title="Kopiuj adres">
+                                📋
+                            </button>
+                        </div>
+                    ` : ''}
+                    ${item.completion_date ? `<div style="margin-top:2px;">📅 ${new Date(item.completion_date).toLocaleDateString('pl-PL')}</div>` : ''}
                 </div>
 
                 ${photosHtml}
@@ -477,6 +513,10 @@ export const PortfolioDashboard: React.FC = () => {
                             style="flex:1;padding:6px 0;background:#4f46e5;color:white;border:none;border-radius:6px;font-size:10px;font-weight:bold;cursor:pointer;transition:all;">
                         Szczegóły / Galeria
                     </button>
+                    <a href="https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}" target="_blank" rel="noopener noreferrer"
+                       style="padding:6px 8px;background:#f1f5f9;color:#475569;border-radius:6px;font-size:10px;font-weight:bold;text-decoration:none;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;">
+                        🗺️ Nawiguj
+                    </a>
                     <button onclick="window.__portfolioUploadPhotos&&window.__portfolioUploadPhotos('${item.id}')" 
                             style="padding:6px 10px;background:#10b981;color:white;border:none;border-radius:6px;font-size:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:2px;">
                         📷 +
@@ -495,9 +535,15 @@ export const PortfolioDashboard: React.FC = () => {
             setUploadingItemId(itemId);
             photoInputRef.current?.click();
         };
+        (window as any).__portfolioCopyAddress = (encodedAddress: string) => {
+            const address = decodeURIComponent(encodedAddress);
+            navigator.clipboard.writeText(address);
+            toast.success('Adres skopiowany do schowka!');
+        };
         return () => {
             delete (window as any).__portfolioSelectRealization;
             delete (window as any).__portfolioUploadPhotos;
+            delete (window as any).__portfolioCopyAddress;
         };
     }, []);
 
@@ -591,8 +637,21 @@ export const PortfolioDashboard: React.FC = () => {
             });
         }
 
-        // Fit map bounds
-        if (hasMarkers && filteredItems.length > 0) {
+        // Fit map bounds OR center on selected item
+        if (selectedItem) {
+            const selectedIdx = filteredItems.findIndex(i => i.id === selectedItemId);
+            if (selectedIdx !== -1 && markersRef.current[selectedIdx]) {
+                const marker = markersRef.current[selectedIdx];
+                map.panTo({ lat: selectedItem.lat, lng: selectedItem.lng });
+                if ((map.getZoom() || 6) < 11) {
+                    map.setZoom(11);
+                }
+                if (infoWindowRef.current) {
+                    infoWindowRef.current.setContent(buildItemPopupHtml(selectedItem));
+                    infoWindowRef.current.open({ anchor: marker, map });
+                }
+            }
+        } else if (hasMarkers && filteredItems.length > 0) {
             map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
             const listener = map.addListener('idle', () => {
                 if ((map.getZoom() || 6) > 12) map.setZoom(12);
@@ -779,7 +838,15 @@ export const PortfolioDashboard: React.FC = () => {
 
                 <div className="flex-1 min-w-0 w-full">
                     <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                        <Search className="w-3 h-3" /> Szukaj w okolicy
+                        <Search className="w-3 h-3 text-indigo-500" /> Szybki filtr
+                    </label>
+                    <input type="text" value={textSearchQuery} onChange={(e) => setTextSearchQuery(e.target.value)}
+                        placeholder="Klient, miasto, nr umowy, model..." className="w-full p-2 border border-slate-300 rounded-lg text-sm" />
+                </div>
+
+                <div className="flex-1 min-w-0 w-full">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-emerald-500" /> Szukaj w okolicy (GPS)
                     </label>
                     <input type="text" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)}
                         placeholder="Kod pocztowy / miasto" className="w-full p-2 border border-slate-300 rounded-lg text-sm"
@@ -797,9 +864,9 @@ export const PortfolioDashboard: React.FC = () => {
                     {isSearching ? '...' : '🔍 Szukaj'}
                 </button>
 
-                {searchCenter && (
-                    <button onClick={() => { setSearchCenter(null); setSearchLocation(''); }}
-                        className="text-slate-400 hover:text-red-500 p-2 transition-colors" title="Wyczyść">
+                {(searchCenter || textSearchQuery) && (
+                    <button onClick={() => { setSearchCenter(null); setSearchLocation(''); setTextSearchQuery(''); }}
+                        className="text-slate-400 hover:text-red-500 p-2 transition-colors flex-shrink-0" title="Wyczyść wszystkie filtry">
                         <X className="w-4 h-4" />
                     </button>
                 )}
@@ -990,12 +1057,51 @@ export const PortfolioDashboard: React.FC = () => {
                             {selectedItem.client_name && (
                                 <div className="text-xs text-slate-600 mt-0.5">👤 {selectedItem.client_name}</div>
                             )}
-                            {selectedItem.address && (
-                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                                    <MapPin className="w-2.5 h-2.5" />
-                                    {[selectedItem.address, selectedItem.postal_code, selectedItem.city].filter(Boolean).join(', ')}
+                            {selectedItem.client_phone && (
+                                <div className="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
+                                    <span>📞</span>
+                                    <a href={`tel:${selectedItem.client_phone}`} className="text-indigo-600 hover:underline font-semibold">
+                                        {selectedItem.client_phone}
+                                    </a>
                                 </div>
                             )}
+                            {selectedItem.client_email && (
+                                <div className="text-xs text-slate-600 mt-0.5 flex items-center gap-1.5">
+                                    <span>✉️</span>
+                                    <a href={`mailto:${selectedItem.client_email}`} className="text-indigo-600 hover:underline">
+                                        {selectedItem.client_email}
+                                    </a>
+                                </div>
+                            )}
+                            {selectedItem.address && (
+                                <div className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+                                    <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                    <span className="truncate">{[selectedItem.address, selectedItem.postal_code, selectedItem.city].filter(Boolean).join(', ')}</span>
+                                </div>
+                            )}
+
+                            {/* Action navigation and copy buttons */}
+                            <div className="flex gap-1.5 mt-3">
+                                <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${selectedItem.lat},${selectedItem.lng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 py-1.5 text-[10px] font-bold text-slate-700 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-all flex items-center justify-center gap-1"
+                                >
+                                    🗺️ Nawiguj w Mapach
+                                </a>
+                                <button
+                                    onClick={() => {
+                                        const fullAddress = [selectedItem.address, selectedItem.postal_code, selectedItem.city].filter(Boolean).join(', ');
+                                        navigator.clipboard.writeText(fullAddress);
+                                        toast.success('Adres skopiowany do schowka');
+                                    }}
+                                    className="px-3 py-1.5 text-[10px] font-bold text-slate-700 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-all flex items-center justify-center gap-1"
+                                    title="Kopiuj pełny adres"
+                                >
+                                    📋 Kopiuj
+                                </button>
+                            </div>
 
                             {/* Upload photos button */}
                             <button
