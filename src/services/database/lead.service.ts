@@ -584,6 +584,10 @@ export const LeadService = {
             lostBy: data.lost_by || undefined,
             lostByName: lostByName || undefined,
             lostAt: data.lost_at ? new Date(data.lost_at) : undefined,
+            // Won fields
+            wonReason: data.won_reason,
+            wonValue: data.won_value,
+            wonAt: data.won_at ? new Date(data.won_at) : undefined,
             // Fair Module Data Mapping
             fairId: data.fair_id,
             fairPhotos: data.fair_photos || [],
