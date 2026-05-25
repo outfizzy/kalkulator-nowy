@@ -135,6 +135,7 @@ export const PortfolioDashboard: React.FC = () => {
     const hqMarkerRef = useRef<google.maps.Marker | null>(null);
     const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
     const searchCircleRef = useRef<google.maps.Circle | null>(null);
+    const lastFittedItemsRef = useRef<string>('');
     const [isMapReady, setIsMapReady] = useState(false);
 
     // Geocoding Cache State
@@ -425,6 +426,7 @@ export const PortfolioDashboard: React.FC = () => {
                 const map = new google.maps.Map(mapContainerRef.current, {
                     center: { lat: 51.5, lng: 11.5 }, // Central Germany
                     zoom: 6,
+                    minZoom: 6, // Prevent zooming out further than Germany
                     mapTypeControl: true,
                     fullscreenControl: true,
                     streetViewControl: false,
@@ -667,6 +669,9 @@ export const PortfolioDashboard: React.FC = () => {
         }
 
         // Fit map bounds OR center on selected item
+        const filteredItemsKey = filteredItems.map(i => i.id).join(',');
+        const filtersChanged = lastFittedItemsRef.current !== filteredItemsKey;
+
         if (selectedItem) {
             const selectedIdx = filteredItems.findIndex(i => i.id === selectedItemId);
             if (selectedIdx !== -1 && markersRef.current[selectedIdx]) {
@@ -680,12 +685,13 @@ export const PortfolioDashboard: React.FC = () => {
                     infoWindowRef.current.open({ anchor: marker, map });
                 }
             }
-        } else if (hasMarkers && filteredItems.length > 0) {
+        } else if (hasMarkers && filteredItems.length > 0 && (filtersChanged || !lastFittedItemsRef.current)) {
             map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
             const listener = map.addListener('idle', () => {
                 if ((map.getZoom() || 6) > 12) map.setZoom(12);
                 google.maps.event.removeListener(listener);
             });
+            lastFittedItemsRef.current = filteredItemsKey;
         }
 
         return () => {
