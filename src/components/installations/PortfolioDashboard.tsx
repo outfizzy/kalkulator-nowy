@@ -422,7 +422,7 @@ export const PortfolioDashboard: React.FC = () => {
         return () => {
             mapRef.current = null;
         };
-    }, []);
+    }, [isLoading, viewMode]);
 
     // Info Window content builder
     const buildItemPopupHtml = useCallback((item: MapItem): string => {
