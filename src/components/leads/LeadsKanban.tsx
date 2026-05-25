@@ -965,11 +965,12 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
         const checkMissedSyncs = async () => {
             const leadIds = formLeads.map(l => l.id);
+            // Check both status='completed' AND completed_at not null (some forms have completed_at but status='viewed')
             const { data } = await supabase
                 .from('lead_configurations')
                 .select('lead_id')
                 .in('lead_id', leadIds)
-                .eq('status', 'completed');
+                .or('status.eq.completed,completed_at.not.is.null');
 
             if (data && data.length > 0) {
                 setDbFormIds(new Set(data.map((r: any) => r.lead_id).filter(Boolean)));
