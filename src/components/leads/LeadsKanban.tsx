@@ -986,63 +986,65 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
     // AUTO-MOVE: leads in 'formularz_sent' with completed form → move to 'formularz'
     // REVERSE: leads in 'formularz' without completed form → move back to 'formularz_sent'
-    const autoMovedRef = useRef<Set<string>>(new Set());
+    const autoMoveRunningRef = useRef(false);
     useEffect(() => {
+        if (autoMoveRunningRef.current) return; // Prevent concurrent runs
+
         // Forward: formularz_sent → formularz (form completed)
-        const leadsToMoveForward = leads.filter(l =>
-            l.status === 'formularz_sent' &&
-            completedFormLeadIds.has(l.id) &&
-            !autoMovedRef.current.has(l.id)
-        );
+        const forwardIds = leads
+            .filter(l => l.status === 'formularz_sent' && completedFormLeadIds.has(l.id))
+            .map(l => l.id);
 
-        // Reverse: formularz → formularz_sent (form NOT completed, was probably manually placed)
-        const leadsToMoveBack = leads.filter(l =>
-            l.status === 'formularz' &&
-            !completedFormLeadIds.has(l.id) &&
-            !autoMovedRef.current.has(`back-${l.id}`)
-        );
+        // Reverse: formularz → formularz_sent (form NOT completed)
+        const backIds = leads
+            .filter(l => l.status === 'formularz' && !completedFormLeadIds.has(l.id))
+            .map(l => l.id);
 
-        if (leadsToMoveForward.length === 0 && leadsToMoveBack.length === 0) return;
+        if (forwardIds.length === 0 && backIds.length === 0) return;
 
-        const moveLeads = async () => {
-            let movedForward = 0;
-            let movedBack = 0;
+        autoMoveRunningRef.current = true;
 
-            for (const lead of leadsToMoveForward) {
-                try {
-                    autoMovedRef.current.add(lead.id);
-                    await DatabaseService.updateLead(lead.id, { status: 'formularz' as any });
-                    console.log(`[AutoMove] Lead ${lead.id} moved formularz_sent → formularz (form completed)`);
-                    movedForward++;
-                } catch (e) {
-                    console.error('[AutoMove] Failed:', e);
-                    autoMovedRef.current.delete(lead.id);
+        const bulkMove = async () => {
+            let changed = false;
+
+            // Bulk forward move: formularz_sent → formularz
+            if (forwardIds.length > 0) {
+                console.log(`[AutoMove] Moving ${forwardIds.length} leads: formularz_sent → formularz`);
+                const { error } = await supabase
+                    .from('leads')
+                    .update({ status: 'formularz', updated_at: new Date().toISOString() })
+                    .in('id', forwardIds);
+
+                if (error) {
+                    console.error('[AutoMove] Bulk forward failed:', error);
+                } else {
+                    toast.success(`📋 ${forwardIds.length} lead${forwardIds.length > 1 ? 'ów' : ''} przeniesion${forwardIds.length > 1 ? 'ych' : 'y'} do "Formularz wypełniony"`);
+                    changed = true;
                 }
             }
 
-            for (const lead of leadsToMoveBack) {
-                try {
-                    autoMovedRef.current.add(`back-${lead.id}`);
-                    await DatabaseService.updateLead(lead.id, { status: 'formularz_sent' as any });
-                    console.log(`[AutoMove] Lead ${lead.id} moved formularz → formularz_sent (form NOT completed)`);
-                    movedBack++;
-                } catch (e) {
-                    console.error('[AutoMove] Failed:', e);
-                    autoMovedRef.current.delete(`back-${lead.id}`);
+            // Bulk reverse move: formularz → formularz_sent
+            if (backIds.length > 0) {
+                console.log(`[AutoMove] Moving ${backIds.length} leads: formularz → formularz_sent`);
+                const { error } = await supabase
+                    .from('leads')
+                    .update({ status: 'formularz_sent', updated_at: new Date().toISOString() })
+                    .in('id', backIds);
+
+                if (error) {
+                    console.error('[AutoMove] Bulk reverse failed:', error);
+                } else {
+                    toast.success(`📤 ${backIds.length} lead${backIds.length > 1 ? 'ów' : ''} cofnięt${backIds.length > 1 ? 'ych' : 'y'} do "Formularz wysłany"`);
+                    changed = true;
                 }
             }
 
-            if (movedForward > 0) {
-                toast.success(`📋 ${movedForward} lead${movedForward > 1 ? 'ów' : ''} przeniesion${movedForward > 1 ? 'ych' : 'y'} do "Formularz wypełniony"`);
-            }
-            if (movedBack > 0) {
-                toast.success(`📤 ${movedBack} lead${movedBack > 1 ? 'ów' : ''} cofnięt${movedBack > 1 ? 'ych' : 'y'} do "Formularz wysłany" (brak wypełnienia)`);
-            }
-            if (movedForward > 0 || movedBack > 0) {
+            autoMoveRunningRef.current = false;
+            if (changed) {
                 onLeadUpdate();
             }
         };
-        moveLeads();
+        bulkMove();
     }, [completedFormLeadIds, leads]);
 
     // Track offer view status + customer interactions for offer_sent/negotiation leads
