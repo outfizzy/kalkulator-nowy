@@ -1,25 +1,19 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import { DatabaseService } from '../../services/database';
 import { geocodeAddress } from '../../utils/geocoding';
+import { loadGoogleMapsAPI, batchGeocodeForMap } from '../../services/map-geocoding.service';
 import { RealizationGallery } from './RealizationGallery';
 import { AddRealizationModal } from './AddRealizationModal';
+import { EditRealizationModal } from './EditRealizationModal';
 import type { Realization, RealizationPhoto } from '../../services/database/realization.service';
 import type { Installation, InstallationTeam } from '../../types';
 
 import { toast } from 'react-hot-toast';
 import {
     MapPin, Plus, Filter, Search, X, Camera, Calendar, Package, Trash2,
-    List, Map as MapIcon, ArrowUpDown, Upload, FileText, Ruler
+    List, Map as MapIcon, ArrowUpDown, Upload, FileText, Ruler, Edit, Star
 } from 'lucide-react';
-
-// Fix default Leaflet icon
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-const DefaultIcon = L.icon({ iconUrl: icon, shadowUrl: iconShadow, iconSize: [25, 41], iconAnchor: [12, 41] });
-L.Marker.prototype.options.icon = DefaultIcon;
+import { supabase } from '../../services/database/base.service';
 
 // ---- Types ----
 interface MapItem {
@@ -51,18 +45,6 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ---- Map Bounds ----
-const MapBounds: React.FC<{ items: MapItem[] }> = ({ items }) => {
-    const map = useMap();
-    useEffect(() => {
-        if (items.length > 0) {
-            const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
-        }
-    }, [items, map]);
-    return null;
-};
-
 // ---- Product type colors ----
 const PRODUCT_COLORS: Record<string, string> = {
     'Terrassenüberdachung': '#10B981',
@@ -76,30 +58,28 @@ const PRODUCT_COLORS: Record<string, string> = {
     'Sonstiges': '#6B7280',
 };
 
-const createMarkerIcon = (productType: string, hasPhotos: boolean, isSelected: boolean = false) => {
+// SVG marker icon generator for Google Maps
+const createGoogleMarkerIcon = (productType: string, hasPhotos: boolean, isSelected: boolean = false): google.maps.Icon => {
     const color = PRODUCT_COLORS[productType] || '#6B7280';
-    const size = isSelected ? 28 : 20;
-    const photoIndicator = hasPhotos
-        ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;background:#F59E0B;border-radius:50%;border:2px solid white;display:flex;align-items:center;justify-content:center;font-size:6px;">📷</div>`
-        : '';
-
-    return L.divIcon({
-        className: 'custom-portfolio-marker',
-        html: `<div style="position:relative;">
-            <div style="
-                background: ${color};
-                width: ${size}px;
-                height: ${size}px;
-                border-radius: 50%;
-                border: ${isSelected ? '4px' : '3px'} solid ${isSelected ? '#1e293b' : 'white'};
-                box-shadow: 0 2px 8px rgba(0,0,0,${isSelected ? '0.5' : '0.3'});
-                ${isSelected ? 'animation: pulse 1.5s infinite;' : ''}
-            "></div>
-            ${photoIndicator}
-        </div>`,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    const size = isSelected ? 26 : 18;
+    const strokeWidth = isSelected ? 4 : 2.5;
+    const strokeColor = isSelected ? '#1e293b' : '#ffffff';
+    
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${size + 10}" height="${size + 10}" viewBox="0 0 ${size + 10} ${size + 10}">
+            <circle cx="${(size + 10) / 2}" cy="${(size + 10) / 2}" r="${size / 2}" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
+            ${hasPhotos ? `
+                <circle cx="${size + 4}" cy="6" r="5" fill="#F59E0B" stroke="white" stroke-width="1"/>
+                <text x="${size + 4}" y="8.5" font-size="7" font-weight="bold" font-family="system-ui" text-anchor="middle" fill="white">📷</text>
+            ` : ''}
+        </svg>
+    `;
+    
+    return {
+        url: `data:image/svg+xml,${encodeURIComponent(svg.trim())}`,
+        scaledSize: new google.maps.Size(size + 10, size + 10),
+        anchor: new google.maps.Point((size + 10) / 2, (size + 10) / 2)
+    };
 };
 
 // ---- Sort options ----
@@ -119,6 +99,10 @@ export const PortfolioDashboard: React.FC = () => {
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    
+    // Edit Modal State
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedEditRealization, setSelectedEditRealization] = useState<Realization | null>(null);
 
     // View mode
     const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
@@ -140,6 +124,19 @@ export const PortfolioDashboard: React.FC = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
 
+    // Google Maps Refs
+    const mapContainerRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<google.maps.Map | null>(null);
+    const markersRef = useRef<google.maps.Marker[]>([]);
+    const polylinesRef = useRef<google.maps.Polyline[]>([]);
+    const hqMarkerRef = useRef<google.maps.Marker | null>(null);
+    const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+    const [isMapReady, setIsMapReady] = useState(false);
+
+    // Geocoding Cache State
+    const [geoCoords, setGeoCoords] = useState<Map<string, { lat: number; lng: number }>>(new Map());
+    const [geoProgress, setGeoProgress] = useState<{ done: number; total: number } | null>(null);
+
     // Load data
     const loadData = async () => {
         setIsLoading(true);
@@ -155,9 +152,9 @@ export const PortfolioDashboard: React.FC = () => {
             try { allTeams = await DatabaseService.getTeams(); } catch (e) { console.warn('[Portfolio] getTeams failed:', e); }
 
             setRealizations(reals);
-            // ALL installations with coordinates (not just completed)
-            const withCoords = allInst.filter(i => i.client?.coordinates);
-            setInstallations(withCoords);
+            // ALL installations with coordinates or client data
+            const validInst = allInst.filter(i => i.client);
+            setInstallations(validInst);
             setContracts(allContracts);
             setTeams(allTeams);
         } catch (error) {
@@ -170,17 +167,90 @@ export const PortfolioDashboard: React.FC = () => {
 
     useEffect(() => { void loadData(); }, []);
 
-    // Merge all data sources into MapItem[]
+    // 1. Build geocodable items for realizations/installations/contracts that lack lat/lng
+    const allGeoItems = useMemo(() => {
+        const items: Array<{ id: string; address?: string; city?: string; postalCode?: string; lat?: number; lng?: number }> = [];
+
+        // Realizations
+        realizations.forEach(r => {
+            items.push({
+                id: `r-${r.id}`,
+                address: r.address || undefined,
+                city: r.city || undefined,
+                postalCode: r.postal_code || undefined,
+                lat: r.latitude || undefined,
+                lng: r.longitude || undefined
+            });
+        });
+
+        // Installations
+        installations.forEach(inst => {
+            items.push({
+                id: `i-${inst.id}`,
+                address: inst.client?.address,
+                city: inst.client?.city,
+                postalCode: inst.client?.postalCode,
+                lat: inst.client?.coordinates?.lat || (inst as any).client?.lat,
+                lng: inst.client?.coordinates?.lng || (inst as any).client?.lng
+            });
+        });
+
+        // Contracts
+        contracts.forEach(c => {
+            const client = c.client;
+            if (!client) return;
+            items.push({
+                id: `c-${c.id}`,
+                address: client.address || client.street,
+                city: client.city,
+                postalCode: client.postalCode || client.zip,
+                lat: client.coordinates?.lat,
+                lng: client.coordinates?.lng
+            });
+        });
+
+        return items;
+    }, [realizations, installations, contracts]);
+
+    // 2. Background precision geocoding via Google Geocoding API
+    useEffect(() => {
+        if (allGeoItems.length === 0) return;
+        let cancelled = false;
+        setGeoProgress({ done: 0, total: allGeoItems.length });
+        
+        batchGeocodeForMap(allGeoItems, (done, total) => {
+            if (!cancelled) setGeoProgress({ done, total });
+        })
+        .then(results => {
+            if (!cancelled) {
+                const coordsMap = new Map<string, { lat: number; lng: number }>();
+                results.forEach((v, k) => {
+                    coordsMap.set(k, { lat: v.lat, lng: v.lng });
+                });
+                setGeoCoords(coordsMap);
+                setGeoProgress(null);
+            }
+        })
+        .catch(err => {
+            console.error('Batch geocoding failed:', err);
+            if (!cancelled) setGeoProgress(null);
+        });
+
+        return () => { cancelled = true; };
+    }, [allGeoItems]);
+
+    // Merge all data sources into MapItem[] using resolved Google Geocoding coordinates
     const allMapItems: MapItem[] = useMemo(() => {
         const items: MapItem[] = [];
 
         // 1. From realizations table
         realizations.forEach(r => {
-            if (r.latitude && r.longitude) {
+            const geo = geoCoords.get(`r-${r.id}`) || (r.latitude && r.longitude ? { lat: r.latitude, lng: r.longitude } : null);
+            if (geo) {
                 items.push({
                     id: `r-${r.id}`,
-                    lat: r.latitude,
-                    lng: r.longitude,
+                    lat: geo.lat,
+                    lng: geo.lng,
                     title: r.title,
                     description: r.description,
                     product_type: r.product_type,
@@ -198,19 +268,21 @@ export const PortfolioDashboard: React.FC = () => {
             }
         });
 
-        // 2. From installations with coordinates (not already in realizations)
+        // 2. From installations (not already in realizations)
         const realizationContractIds = new Set(realizations.filter(r => r.contract_id).map(r => r.contract_id));
         const installationOfferIds = new Set<string>();
+        
         installations.forEach(inst => {
             if (realizationContractIds.has(inst.contractId)) return;
-            if (!inst.client?.coordinates) return;
+            const geo = geoCoords.get(`i-${inst.id}`);
+            if (!geo) return;
 
             installationOfferIds.add(inst.offerId || '');
 
             items.push({
                 id: `i-${inst.id}`,
-                lat: inst.client.coordinates.lat,
-                lng: inst.client.coordinates.lng,
+                lat: geo.lat,
+                lng: geo.lng,
                 title: inst.productSummary || 'Realizacja',
                 description: null,
                 product_type: 'Terrassenüberdachung',
@@ -229,39 +301,14 @@ export const PortfolioDashboard: React.FC = () => {
 
         // 3. From contracts NOT already covered by installations or realizations
         contracts.forEach(contract => {
-            // Skip if installation already covers this contract
             if (installationOfferIds.has(contract.offerId)) return;
             if (realizationContractIds.has(contract.id)) return;
 
-            // Try to get coordinates from client data
             const client = contract.client;
             if (!client) return;
 
-            // Use client coordinates if available
-            let lat = client.coordinates?.lat;
-            let lng = client.coordinates?.lng;
-
-            // Fallback: approximate from PLZ (German postal codes)
-            if (!lat && client.postalCode) {
-                const plz = String(client.postalCode).replace(/\D/g, '').substring(0, 5);
-                if (plz.length >= 4) {
-                    // Simple PLZ→approximate coordinates for Germany
-                    const plzPrefix = parseInt(plz.substring(0, 2));
-                    // Rough lat/lng grid for German PLZ regions
-                    const plzGrid: Record<number, [number, number]> = {
-                        0: [51.3, 12.4], 1: [52.5, 13.4], 2: [53.6, 10.0], 3: [52.4, 9.7],
-                        4: [51.5, 7.5], 5: [50.9, 7.0], 6: [50.1, 8.7], 7: [48.8, 9.2],
-                        8: [48.1, 11.6], 9: [49.5, 11.1],
-                    };
-                    const region = plzGrid[Math.floor(plzPrefix / 10)];
-                    if (region) {
-                        lat = region[0] + (plzPrefix % 10) * 0.15;
-                        lng = region[1] + (plzPrefix % 10) * 0.12;
-                    }
-                }
-            }
-
-            if (!lat || !lng) return;
+            const geo = geoCoords.get(`c-${contract.id}`);
+            if (!geo) return;
 
             const clientName = [client.firstName, client.lastName].filter(Boolean).join(' ') || client.company || '';
             const productDesc = contract.product
@@ -270,8 +317,8 @@ export const PortfolioDashboard: React.FC = () => {
 
             items.push({
                 id: `c-${contract.id}`,
-                lat,
-                lng,
+                lat: geo.lat,
+                lng: geo.lng,
                 title: productDesc,
                 description: null,
                 product_type: 'Terrassenüberdachung',
@@ -288,7 +335,7 @@ export const PortfolioDashboard: React.FC = () => {
         });
 
         return items;
-    }, [realizations, installations, contracts]);
+    }, [realizations, installations, contracts, geoCoords]);
 
     // Apply filters
     const filteredItems = useMemo(() => {
@@ -345,6 +392,215 @@ export const PortfolioDashboard: React.FC = () => {
         return stats;
     }, [allMapItems]);
 
+    // Initialize Google Map
+    useEffect(() => {
+        const init = async () => {
+            if (!mapContainerRef.current || mapRef.current) return;
+            try {
+                await loadGoogleMapsAPI();
+                const map = new google.maps.Map(mapContainerRef.current, {
+                    center: { lat: 51.5, lng: 11.5 }, // Central Germany
+                    zoom: 6,
+                    mapTypeControl: true,
+                    fullscreenControl: true,
+                    streetViewControl: false,
+                    zoomControl: true,
+                    styles: [
+                        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+                        { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+                    ],
+                });
+                infoWindowRef.current = new google.maps.InfoWindow();
+                mapRef.current = map;
+                setIsMapReady(true);
+            } catch (err) {
+                console.error('[Portfolio] Google Maps load error:', err);
+                toast.error('Błąd ładowania Google Maps API');
+            }
+        };
+        init();
+        return () => {
+            mapRef.current = null;
+        };
+    }, []);
+
+    // Info Window content builder
+    const buildItemPopupHtml = useCallback((item: MapItem): string => {
+        const color = PRODUCT_COLORS[item.product_type] || '#6B7280';
+        const sourceLabel = item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu';
+        
+        let photosHtml = '';
+        if (item.photos.length > 0) {
+            photosHtml = `
+                <div style="display:flex;gap:4px;overflow-x:auto;padding:4px 0;margin-bottom:6px;">
+                    ${item.photos.slice(0, 4).map(p => `
+                        <img src="${p.url}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;" />
+                    `).join('')}
+                    ${item.photos.length > 4 ? `
+                        <div style="width:48px;height:48px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#475569;border-radius:4px;">
+                            +${item.photos.length - 4}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            photosHtml = `
+                <div style="background:#f8fafc;border:1px dashed #e2e8f0;border-radius:6px;padding:8px;text-align:center;font-size:11px;color:#94a3b8;margin-bottom:6px;">
+                    Brak zdjęć w galerii
+                </div>
+            `;
+        }
+
+        return `
+            <div style="min-width:240px;max-width:280px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;padding:4px;">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:4px;">
+                    <div style="flex:1;min-width:0;">
+                        <h4 style="margin:0;font-size:13px;font-weight:bold;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</h4>
+                        <div style="margin-top:2px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                            <span style="display:inline-block;padding:1px 6px;background:${color};color:white;border-radius:10px;font-size:9px;font-weight:bold;">${item.product_type}</span>
+                            <span style="font-size:9px;color:#64748b;">${sourceLabel}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.4;">
+                    ${item.client_name ? `<div style="font-weight:500;color:#334155;">👤 ${item.client_name}</div>` : ''}
+                    ${item.contract_number ? `<div style="font-weight:600;color:#4f46e5;">📄 ${item.contract_number}</div>` : ''}
+                    ${item.address ? `<div style="margin-top:1px;">📍 ${[item.address, item.postal_code, item.city].filter(Boolean).join(', ')}</div>` : ''}
+                    ${item.completion_date ? `<div style="margin-top:1px;">📅 ${new Date(item.completion_date).toLocaleDateString('pl-PL')}</div>` : ''}
+                </div>
+
+                ${photosHtml}
+
+                <div style="display:flex;gap:4px;margin-top:8px;">
+                    <button onclick="window.__portfolioSelectRealization&&window.__portfolioSelectRealization('${item.id}')" 
+                            style="flex:1;padding:6px 0;background:#4f46e5;color:white;border:none;border-radius:6px;font-size:10px;font-weight:bold;cursor:pointer;transition:all;">
+                        Szczegóły / Galeria
+                    </button>
+                    <button onclick="window.__portfolioUploadPhotos&&window.__portfolioUploadPhotos('${item.id}')" 
+                            style="padding:6px 10px;background:#10b981;color:white;border:none;border-radius:6px;font-size:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:2px;">
+                        📷 +
+                    </button>
+                </div>
+            </div>
+        `;
+    }, []);
+
+    // Global window functions registration for markers interaction
+    useEffect(() => {
+        (window as any).__portfolioSelectRealization = (id: string) => {
+            setSelectedItemId(id);
+        };
+        (window as any).__portfolioUploadPhotos = (itemId: string) => {
+            setUploadingItemId(itemId);
+            photoInputRef.current?.click();
+        };
+        return () => {
+            delete (window as any).__portfolioSelectRealization;
+            delete (window as any).__portfolioUploadPhotos;
+        };
+    }, []);
+
+    // Render Markers & Polylines on Google Map
+    useEffect(() => {
+        if (!mapRef.current || !isMapReady || viewMode !== 'map') return;
+        const map = mapRef.current;
+
+        // Clear existing map items
+        markersRef.current.forEach(m => m.setMap(null));
+        markersRef.current = [];
+        polylinesRef.current.forEach(p => p.setMap(null));
+        polylinesRef.current = [];
+        if (hqMarkerRef.current) {
+            hqMarkerRef.current.setMap(null);
+            hqMarkerRef.current = null;
+        }
+
+        const bounds = new google.maps.LatLngBounds();
+        let hasMarkers = false;
+
+        // 1. Add HQ Marker
+        const hqMarker = new google.maps.Marker({
+            position: { lat: 51.9516, lng: 14.7118 },
+            map,
+            icon: {
+                url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><text x="15" y="24" font-size="24" text-anchor="middle">🏢</text></svg>'),
+                scaledSize: new google.maps.Size(30, 30),
+                anchor: new google.maps.Point(15, 15)
+            },
+            zIndex: 1000,
+            title: 'Baza Firmy (Gubin)'
+        });
+        hqMarker.addListener('click', () => {
+            if (infoWindowRef.current) {
+                infoWindowRef.current.setContent('<div style="padding:6px;font-family:sans-serif;"><h3 style="margin:0 0 2px 0;font-size:13px;font-weight:bold;">Baza Firmy</h3><p style="margin:0;font-size:11px;color:#64748b;">Gubin 66-620</p></div>');
+                infoWindowRef.current.open(map, hqMarker);
+            }
+        });
+        hqMarkerRef.current = hqMarker;
+        bounds.extend({ lat: 51.9516, lng: 14.7118 });
+        hasMarkers = true;
+
+        // 2. Add Realization Markers
+        filteredItems.forEach(item => {
+            const isSelected = selectedItemId === item.id;
+            const marker = new google.maps.Marker({
+                position: { lat: item.lat, lng: item.lng },
+                map,
+                icon: createGoogleMarkerIcon(item.product_type, item.photos.length > 0, isSelected),
+                title: item.title,
+                zIndex: isSelected ? 100 : 10
+            });
+
+            marker.addListener('click', () => {
+                setSelectedItemId(item.id);
+                if (infoWindowRef.current) {
+                    infoWindowRef.current.setContent(buildItemPopupHtml(item));
+                    infoWindowRef.current.open({ anchor: marker, map });
+                }
+            });
+
+            markersRef.current.push(marker);
+            bounds.extend({ lat: item.lat, lng: item.lng });
+            hasMarkers = true;
+        });
+
+        // 3. Draw distance lines from selected to nearest 3 realizations
+        if (selectedItem) {
+            nearbyItems.slice(0, 3).forEach(ni => {
+                const polyline = new google.maps.Polyline({
+                    path: [
+                        { lat: selectedItem.lat, lng: selectedItem.lng },
+                        { lat: ni.lat, lng: ni.lng }
+                    ],
+                    map,
+                    strokeColor: '#4f46e5',
+                    strokeWeight: 2,
+                    strokeOpacity: 0.7,
+                    icons: [{
+                        icon: {
+                            path: 'M 0,-1 0,1',
+                            strokeOpacity: 1,
+                            scale: 2
+                        },
+                        offset: '0',
+                        repeat: '8px'
+                    }],
+                });
+                polylinesRef.current.push(polyline);
+            });
+        }
+
+        // Fit map bounds
+        if (hasMarkers && filteredItems.length > 0) {
+            map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+            const listener = map.addListener('idle', () => {
+                if ((map.getZoom() || 6) > 12) map.setZoom(12);
+                google.maps.event.removeListener(listener);
+            });
+        }
+    }, [filteredItems, selectedItemId, viewMode, isMapReady, selectedItem, nearbyItems, buildItemPopupHtml]);
+
     const handleSearch = async () => {
         if (!searchLocation) { setSearchCenter(null); return; }
         setIsSearching(true);
@@ -353,6 +609,10 @@ export const PortfolioDashboard: React.FC = () => {
             if (coords) {
                 setSearchCenter(coords);
                 toast.success(`Szukam w promieniu ${searchRadius} km`);
+                if (mapRef.current) {
+                    mapRef.current.panTo(coords);
+                    mapRef.current.setZoom(10);
+                }
             } else {
                 toast.error('Nie znaleziono lokalizacji');
             }
@@ -365,14 +625,16 @@ export const PortfolioDashboard: React.FC = () => {
         try {
             await DatabaseService.deleteRealization(id);
             toast.success('Realizacja usunięta');
+            setSelectedItemId(null);
             void loadData();
         } catch { toast.error('Błąd usuwania'); }
     };
 
     // Photo upload handler
     const handlePhotoUpload = async (files: FileList) => {
-        if (!uploadingItemId) return;
-        const item = allMapItems.find(i => i.id === uploadingItemId);
+        const activeItemId = uploadingItemId || selectedItemId;
+        if (!activeItemId) return;
+        const item = allMapItems.find(i => i.id === activeItemId);
         if (!item) return;
 
         setIsUploading(true);
@@ -383,7 +645,7 @@ export const PortfolioDashboard: React.FC = () => {
                 toast.success(`Dodano ${files.length} zdjęć`);
             } else if (item.installation_id) {
                 // Installation without realization — create one first
-                const newReal = await DatabaseService.createRealization({
+                await DatabaseService.createRealization({
                     title: item.title,
                     product_type: item.product_type,
                     address: item.address || undefined,
@@ -422,7 +684,7 @@ export const PortfolioDashboard: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-xl font-bold text-slate-800">Mapa Realizacji</h1>
-                            <p className="text-sm text-slate-500">Portfolio zrealizowanych projektów • automatycznie z umów</p>
+                            <p className="text-sm text-slate-500">Portfolio zrealizowanych projektów • geolokalizacja Google Maps</p>
                         </div>
                     </div>
 
@@ -475,7 +737,7 @@ export const PortfolioDashboard: React.FC = () => {
 
             {/* Filters Row */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col md:flex-row gap-3 items-end">
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 w-full">
                     <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
                         <Package className="w-3 h-3" /> Typ produktu
                     </label>
@@ -515,7 +777,7 @@ export const PortfolioDashboard: React.FC = () => {
                     </div>
                 )}
 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 w-full">
                     <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
                         <Search className="w-3 h-3" /> Szukaj w okolicy
                     </label>
@@ -524,14 +786,14 @@ export const PortfolioDashboard: React.FC = () => {
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
                 </div>
 
-                <div className="w-20">
+                <div className="w-full md:w-20">
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Promień</label>
                     <input type="number" value={searchRadius} onChange={(e) => setSearchRadius(Number(e.target.value))}
                         className="w-full p-2 border border-slate-300 rounded-lg text-sm" min={1} max={500} />
                 </div>
 
                 <button onClick={handleSearch} disabled={isSearching}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors h-[38px] whitespace-nowrap">
+                    className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors h-[38px] whitespace-nowrap">
                     {isSearching ? '...' : '🔍 Szukaj'}
                 </button>
 
@@ -542,6 +804,20 @@ export const PortfolioDashboard: React.FC = () => {
                     </button>
                 )}
             </div>
+
+            {/* Geocoding Progress Bar */}
+            {geoProgress && (
+                <div className="px-4 py-2 bg-blue-50 border border-blue-100 rounded-xl flex flex-col md:flex-row md:items-center gap-3 text-xs text-blue-700">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                        <span className="font-semibold">Geokodowanie adresów z Google Maps:</span>
+                        <span>{geoProgress.done} z {geoProgress.total}</span>
+                    </div>
+                    <div className="flex-1 h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-600 rounded-full transition-all duration-300" style={{ width: `${(geoProgress.done / geoProgress.total) * 100}%` }} />
+                    </div>
+                </div>
+            )}
 
             {/* Product type legend */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-wrap gap-2">
@@ -563,7 +839,7 @@ export const PortfolioDashboard: React.FC = () => {
             {/* Main content area */}
             <div className="flex-1 flex gap-3 min-h-[500px]">
                 {/* Main view (map or list) */}
-                <div className={`${selectedItem ? 'flex-1' : 'w-full'} bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden transition-all`}>
+                <div className={`${selectedItemId ? 'flex-1' : 'w-full'} bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden transition-all`}>
                     {isLoading ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
                             <div className="text-center">
@@ -573,116 +849,23 @@ export const PortfolioDashboard: React.FC = () => {
                         </div>
                     ) : viewMode === 'map' ? (
                         /* ========== MAP VIEW ========== */
-                        filteredItems.length > 0 ? (
-                            <MapContainer center={[52.0, 15.0]} zoom={7} style={{ height: '100%', width: '100%' }}>
-                                <TileLayer
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                />
-                                <MapBounds items={filteredItems} />
-
-                                {/* HQ Marker */}
-                                <Marker position={[51.9516, 14.7118]}
-                                    icon={L.divIcon({ className: 'hq-marker', html: `<div style="font-size:24px;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.3));">🏢</div>`, iconSize: [30, 30], iconAnchor: [15, 15] })}
-                                    zIndexOffset={2000}>
-                                    <Popup><div className="p-2 text-center"><h3 className="font-bold text-sm">Baza Firmy</h3><p className="text-xs text-slate-500">Gubin 66-620</p></div></Popup>
-                                </Marker>
-
-                                {/* Distance lines from selected to nearest */}
-                                {selectedItem && nearbyItems.slice(0, 3).map(ni => (
-                                    <Polyline key={`line-${ni.id}`}
-                                        positions={[[selectedItem.lat, selectedItem.lng], [ni.lat, ni.lng]]}
-                                        pathOptions={{ color: '#6366f1', weight: 2, dashArray: '8,6', opacity: 0.6 }} />
-                                ))}
-
-                                {/* Realization Markers */}
-                                {filteredItems.map(item => (
-                                    <Marker key={item.id}
-                                        position={[item.lat, item.lng]}
-                                        icon={createMarkerIcon(item.product_type, item.photos.length > 0, selectedItemId === item.id)}
-                                        eventHandlers={{ click: () => setSelectedItemId(item.id) }}>
-                                        <Popup minWidth={300} maxWidth={380}>
-                                            <div className="p-1" style={{ minWidth: '280px' }}>
-                                                {/* Header */}
-                                                <div className="flex items-start justify-between gap-2 mb-2">
-                                                    <div className="flex-1 min-w-0">
-                                                        <h3 className="font-bold text-sm text-slate-800 leading-tight">{item.title}</h3>
-                                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                                                                style={{ backgroundColor: PRODUCT_COLORS[item.product_type] || '#6B7280' }}>
-                                                                {item.product_type}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-400">
-                                                                {item.source === 'manual' ? '✍️ Manualne' : item.source === 'contract' ? '📄 Z umowy' : '🔧 Z montażu'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    {item.realization_id && (
-                                                        <button onClick={() => handleDeleteRealization(item.realization_id!)}
-                                                            className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Usuń">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                {/* Contract + Client info */}
-                                                <div className="space-y-1 text-xs text-slate-500 mb-2">
-                                                    {item.contract_number && (
-                                                        <div className="flex items-center gap-1 text-indigo-600 font-semibold">
-                                                            <FileText className="w-3 h-3" /> {item.contract_number}
-                                                        </div>
-                                                    )}
-                                                    {item.client_name && (
-                                                        <div className="flex items-center gap-1 font-medium text-slate-700">
-                                                            👤 {item.client_name}
-                                                        </div>
-                                                    )}
-                                                    {item.address && (
-                                                        <div className="flex items-center gap-1">
-                                                            <MapPin className="w-3 h-3" />
-                                                            {[item.address, item.postal_code, item.city].filter(Boolean).join(', ')}
-                                                        </div>
-                                                    )}
-                                                    {item.completion_date && (
-                                                        <div className="flex items-center gap-1">
-                                                            <Calendar className="w-3 h-3" />
-                                                            {new Date(item.completion_date).toLocaleDateString('pl-PL')}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Gallery */}
-                                                {item.photos.length > 0 ? (
-                                                    <RealizationGallery photos={item.photos} title={item.title} />
-                                                ) : (
-                                                    <div className="bg-slate-50 rounded-lg p-3 text-center text-xs text-slate-400 border border-dashed border-slate-200">
-                                                        <Camera className="w-5 h-5 mx-auto mb-1 text-slate-300" />
-                                                        Brak zdjęć
-                                                    </div>
-                                                )}
-
-                                                {/* Upload button */}
-                                                <button
-                                                    onClick={() => { setUploadingItemId(item.id); photoInputRef.current?.click(); }}
-                                                    className="w-full mt-2 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1">
-                                                    <Upload className="w-3 h-3" /> Dodaj zdjęcia
-                                                </button>
-                                            </div>
-                                        </Popup>
-                                    </Marker>
-                                ))}
-                            </MapContainer>
-                        ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 bg-slate-50 rounded-xl">
-                                <div className="text-center">
-                                    <MapPin className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                                    <p className="text-sm font-medium">Brak realizacji spełniających kryteria</p>
+                        <div className="relative w-full h-full">
+                            <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '500px' }} />
+                            
+                            {/* Overlay Statistics (map only) */}
+                            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-200 z-[10]">
+                                <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Widoczne</div>
+                                <div className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                                    {filteredItems.length}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                    {filteredItems.filter(i => i.photos.length > 0).length} ze zdjęciami
                                 </div>
                             </div>
-                        )
+                        </div>
                     ) : (
                         /* ========== LIST VIEW ========== */
-                        <div className="overflow-y-auto h-full p-4">
+                        <div className="overflow-y-auto h-full p-4 max-h-[600px]">
                             {filteredItems.length === 0 ? (
                                 <div className="text-center py-12 text-slate-400">
                                     <MapPin className="w-12 h-12 mx-auto mb-3 text-slate-300" />
@@ -768,32 +951,37 @@ export const PortfolioDashboard: React.FC = () => {
                             )}
                         </div>
                     )}
-
-                    {/* Overlay Statistics (map only) */}
-                    {viewMode === 'map' && !isLoading && (
-                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-200 z-[400]">
-                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Widoczne</div>
-                            <div className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                                {filteredItems.length}
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                                {filteredItems.filter(i => i.photos.length > 0).length} ze zdjęciami
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* ========== SIDE PANEL — Nearby Items ========== */}
+                {/* ========== SIDE PANEL — Selected Realization Details & Gallery ========== */}
                 {selectedItem && (
-                    <div className="w-80 bg-white rounded-xl border border-slate-200 shadow-sm overflow-y-auto flex-shrink-0 hidden lg:block">
+                    <div className="w-80 bg-white rounded-xl border border-slate-200 shadow-sm overflow-y-auto flex-shrink-0 flex flex-col hidden lg:flex max-h-[600px]">
                         {/* Selected item header */}
                         <div className="p-4 border-b border-slate-100">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-slate-800 truncate">{selectedItem.title}</h3>
-                                <button onClick={() => setSelectedItemId(null)} className="text-slate-400 hover:text-slate-600 p-1">
-                                    <X className="w-4 h-4" />
-                                </button>
+                                <h3 className="text-sm font-bold text-slate-800 truncate pr-2">{selectedItem.title}</h3>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {selectedItem.realization_id && (
+                                        <button
+                                            onClick={() => {
+                                                const real = realizations.find(r => r.id === selectedItem.realization_id);
+                                                if (real) {
+                                                    setSelectedEditRealization(real);
+                                                    setShowEditModal(true);
+                                                }
+                                            }}
+                                            className="text-slate-400 hover:text-blue-600 p-1 transition-colors"
+                                            title="Edytuj realizację"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    <button onClick={() => setSelectedItemId(null)} className="text-slate-400 hover:text-slate-600 p-1">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
+                            
                             {selectedItem.contract_number && (
                                 <div className="flex items-center gap-1 mt-1 text-indigo-600 text-xs font-semibold">
                                     <FileText className="w-3 h-3" /> {selectedItem.contract_number}
@@ -820,6 +1008,21 @@ export const PortfolioDashboard: React.FC = () => {
                                     <><Upload className="w-3.5 h-3.5" /> Dodaj zdjęcia ({selectedItem.photos.length})</>
                                 )}
                             </button>
+                        </div>
+
+                        {/* Realization Gallery in Side Panel */}
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Camera className="w-3.5 h-3.5 text-emerald-500" /> Zdjęcia realizacji
+                            </h4>
+                            {selectedItem.photos.length > 0 ? (
+                                <RealizationGallery photos={selectedItem.photos} title={selectedItem.title} />
+                            ) : (
+                                <div className="bg-white rounded-lg p-4 text-center text-xs text-slate-400 border border-dashed border-slate-200">
+                                    <Camera className="w-6 h-6 mx-auto mb-1 text-slate-300" />
+                                    Brak zdjęć w portfolio. Kliknij przycisk powyżej, aby dodać.
+                                </div>
+                            )}
                         </div>
 
                         {/* Nearby realizations */}
@@ -866,6 +1069,19 @@ export const PortfolioDashboard: React.FC = () => {
                 onClose={() => setShowAddModal(false)}
                 onSuccess={loadData}
             />
+
+            {/* Edit Realization Modal */}
+            {selectedEditRealization && (
+                <EditRealizationModal
+                    isOpen={showEditModal}
+                    onClose={() => {
+                        setShowEditModal(false);
+                        setSelectedEditRealization(null);
+                    }}
+                    realization={selectedEditRealization}
+                    onSuccess={loadData}
+                />
+            )}
         </div>
     );
 };

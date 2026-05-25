@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { generateContractProtocolPDF } from '../../utils/contractProtocolPDF';
 import type { PhotoLayout } from '../../utils/contractProtocolPDF';
@@ -14,6 +14,10 @@ import { OrderedItemsModule } from './OrderedItemsModule';
 import { InstallationDetailsModal } from '../installations/InstallationDetailsModal';
 import { InstallationStatusCard } from '../installations/InstallationStatusCard';
 import { ProjectMeasurementsList } from '../measurements/ProjectMeasurementsList';
+import { supabase } from '../../services/database/base.service';
+import { geocodeAddress } from '../../utils/geocoding';
+import type { Realization, RealizationPhoto } from '../../services/database/realization.service';
+import { Camera, Upload, Trash2 } from 'lucide-react';
 
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -31,6 +35,31 @@ export const ContractDetails: React.FC = () => {
     const [teams, setTeams] = useState<InstallationTeam[]>([]);
 
     const [salesReps, setSalesReps] = useState<User[]>([]);
+
+    const [realization, setRealization] = useState<Realization | null>(null);
+
+    const loadRealization = useCallback(async () => {
+        if (!id) return;
+        try {
+            const { data, error } = await supabase
+                .from('realizations')
+                .select('*')
+                .eq('contract_id', id)
+                .eq('is_visible', true)
+                .maybeSingle();
+            if (error) throw error;
+            if (data) {
+                setRealization({
+                    ...data,
+                    photos: Array.isArray(data.photos) ? data.photos : (data.photos ? JSON.parse(data.photos as any) : [])
+                });
+            } else {
+                setRealization(null);
+            }
+        } catch (err) {
+            console.error('Error loading realization for contract:', err);
+        }
+    }, [id]);
 
     useEffect(() => {
         if (!id) return;
@@ -55,6 +84,7 @@ export const ContractDetails: React.FC = () => {
         };
 
         loadContract();
+        loadRealization();
         InstallationService.getTeams().then(setTeams).catch(console.error);
 
         // Load cost breakdown
@@ -1243,6 +1273,168 @@ export const ContractDetails: React.FC = () => {
                             {allDocuments.length === 0 && allImages.length === 0 && (
                                 <div className="text-center text-xs text-slate-400 py-2 italic">Brak załączników — użyj przycisków powyżej lub przeciągnij pliki</div>
                             )}
+                        </div>
+                    </div>
+
+                    {/* Zdjęcia Realizacji (Portfolio Map) */}
+                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
+                            <span className="flex items-center gap-2 text-xs uppercase tracking-wider">
+                                <Camera className="w-4 h-4 text-emerald-500" />
+                                Zdjęcia Realizacji (Portfolio Map)
+                            </span>
+                            {realization && realization.photos.length > 0 && (
+                                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
+                                    {realization.photos.length} zdjęć
+                                </span>
+                            )}
+                        </h3>
+
+                        {realization && realization.photos.length > 0 ? (
+                            <div className="grid grid-cols-3 gap-2 mb-4">
+                                {realization.photos.map((photo, idx) => (
+                                    <div key={idx} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group">
+                                        <img src={photo.url} alt={photo.caption || 'Zdjęcie realizacji'} className="w-full h-full object-cover" />
+                                        {photo.is_cover && (
+                                            <span className="absolute top-1 left-1 bg-yellow-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm">Cover</span>
+                                        )}
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!confirm('Czy na pewno usunąć to zdjęcie z portfolio?')) return;
+                                                try {
+                                                    const updatedPhotos = realization.photos.filter((_, i) => i !== idx);
+                                                    if (photo.is_cover && updatedPhotos.length > 0) {
+                                                        updatedPhotos[0].is_cover = true;
+                                                    }
+                                                    await supabase.from('realizations').update({ photos: updatedPhotos }).eq('id', realization.id);
+                                                    toast.success('Zdjęcie usunięte z portfolio');
+                                                    void loadRealization();
+                                                } catch {
+                                                    toast.error('Błąd usuwania zdjęcia');
+                                                }
+                                            }}
+                                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Usuń"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 rounded-lg p-4 text-center text-xs text-slate-400 border border-dashed border-slate-200 mb-4">
+                                <Camera className="w-6 h-6 mx-auto mb-1 text-slate-300" />
+                                Brak zdjęć tej realizacji w portfolio mapy.
+                            </div>
+                        )}
+
+                        <div className="flex gap-2">
+                            <label className="flex-1">
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    onChange={async (e) => {
+                                        if (!e.target.files?.length) return;
+                                        const files = Array.from(e.target.files);
+                                        
+                                        const toastId = toast.loading('Dodawanie zdjęć do portfolio...');
+                                        try {
+                                            if (realization) {
+                                                // Add photos to existing realization
+                                                const newPhotos: RealizationPhoto[] = [];
+                                                for (let i = 0; i < files.length; i++) {
+                                                    const file = files[i];
+                                                    const ext = file.name.split('.').pop() || 'jpg';
+                                                    const filePath = `${realization.id}/${Date.now()}_${i}.${ext}`;
+
+                                                    const { error: uploadError } = await supabase.storage
+                                                        .from('realizations')
+                                                        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+                                                    if (uploadError) continue;
+
+                                                    const { data: urlData } = supabase.storage
+                                                        .from('realizations')
+                                                        .getPublicUrl(filePath);
+
+                                                    newPhotos.push({
+                                                        url: urlData.publicUrl,
+                                                        caption: file.name.replace(/\.[^.]+$/, ''),
+                                                        is_cover: false
+                                                    });
+                                                }
+                                                const updatedPhotos = [...realization.photos, ...newPhotos];
+                                                await supabase.from('realizations').update({ photos: updatedPhotos }).eq('id', realization.id);
+                                                toast.success(`Dodano ${files.length} zdjęć do portfolio`, { id: toastId });
+                                            } else {
+                                                // Create a new realization first!
+                                                // Geocode contract address to get GPS coordinates
+                                                const fullAddress = `${contract.client.street} ${contract.client.houseNumber || ''}, ${contract.client.postalCode} ${contract.client.city}`;
+                                                const coords = await geocodeAddress(fullAddress);
+                                                
+                                                // Upload photos
+                                                const newRealId = crypto.randomUUID();
+                                                const newPhotos: RealizationPhoto[] = [];
+                                                for (let i = 0; i < files.length; i++) {
+                                                    const file = files[i];
+                                                    const ext = file.name.split('.').pop() || 'jpg';
+                                                    const filePath = `${newRealId}/${Date.now()}_${i}.${ext}`;
+
+                                                    const { error: uploadError } = await supabase.storage
+                                                        .from('realizations')
+                                                        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+                                                    if (uploadError) continue;
+
+                                                    const { data: urlData } = supabase.storage
+                                                        .from('realizations')
+                                                        .getPublicUrl(filePath);
+
+                                                    newPhotos.push({
+                                                        url: urlData.publicUrl,
+                                                        caption: file.name.replace(/\.[^.]+$/, ''),
+                                                        is_cover: i === 0
+                                                    });
+                                                }
+
+                                                const clientName = `${contract.client.firstName || ''} ${contract.client.lastName || ''}`.trim();
+                                                const productDesc = contract.product
+                                                    ? (typeof contract.product === 'string' ? contract.product : `${contract.product.modelId || ''} ${contract.product.width || ''}x${contract.product.projection || ''}`)
+                                                    : 'Realizacja';
+
+                                                await supabase.from('realizations').insert({
+                                                    id: newRealId,
+                                                    contract_id: contract.id,
+                                                    title: productDesc,
+                                                    product_type: 'Terrassenüberdachung',
+                                                    address: `${contract.client.street} ${contract.client.houseNumber || ''}`.trim(),
+                                                    city: contract.client.city,
+                                                    postal_code: contract.client.postalCode,
+                                                    latitude: coords?.lat || null,
+                                                    longitude: coords?.lng || null,
+                                                    photos: newPhotos,
+                                                    client_name: clientName,
+                                                    completion_date: contract.signedAt || contract.createdAt,
+                                                    source: 'contract',
+                                                    is_visible: true
+                                                });
+                                                toast.success('Utworzono realizację i dodano zdjęcia do portfolio', { id: toastId });
+                                            }
+                                            void loadRealization();
+                                        } catch (err) {
+                                            console.error('Error adding photos to realization:', err);
+                                            toast.error('Błąd dodawania zdjęć do portfolio', { id: toastId });
+                                        }
+                                        e.target.value = '';
+                                    }}
+                                    className="hidden"
+                                />
+                                <span className="w-full py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-sm">
+                                    <Upload className="w-3.5 h-3.5" /> Dodaj zdjęcia do portfolio mapy
+                                </span>
+                            </label>
                         </div>
                     </div>
 
