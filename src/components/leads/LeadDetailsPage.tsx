@@ -378,12 +378,26 @@ export const LeadDetailsPage: React.FC = () => {
                         <button onClick={() => setIsSnowZoneModalOpen(true)} className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span className="hidden lg:inline">Mail powitalny</span></button>
                         <button onClick={() => setIsMeasurementModalOpen(true)} className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><span className="hidden lg:inline">Termin</span></button>
                         <button onClick={() => setIsContractModalOpen(true)} className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg><span className="hidden lg:inline">Umowa</span></button>
-                        {lead.status !== 'won' && lead.status !== 'lost' && <div className="w-px h-4 bg-slate-200 mx-1 shrink-0" />}
-                        {lead.status !== 'won' && lead.status !== 'lost' && (
+                        <div className="w-px h-4 bg-slate-200 mx-1 shrink-0" />
+                        {lead.status !== 'won' && lead.status !== 'lost' ? (
                             <>
                                 <button onClick={() => setIsWonModalOpen(true)} className="px-2 py-1 text-green-700 hover:bg-green-50 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="hidden md:inline">Wygrane</span></button>
                                 <button onClick={() => setIsLostModalOpen(true)} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center gap-1 text-xs shrink-0"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="hidden md:inline">Utracony</span></button>
                             </>
+                        ) : (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await DatabaseService.updateLead(lead.id, { status: 'contacted' } as any);
+                                        setLead(prev => prev ? { ...prev, status: 'contacted' as any } : null);
+                                        toast.success('Lead przywrócony do pipeline');
+                                    } catch (e) { console.error(e); toast.error('Błąd'); }
+                                }}
+                                className="px-2.5 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md font-medium transition-colors flex items-center gap-1 text-xs shrink-0"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                <span className="hidden md:inline">Przywróć</span>
+                            </button>
                         )}
                         <div className="flex-1" />
                         <button onClick={() => navigate('/ai-assistant', { state: { leadContext: { id: lead.id, name: `${lead.customerData.firstName} ${lead.customerData.lastName}`, status: lead.status, city: lead.customerData.city, phone: lead.customerData.phone, email: lead.customerData.email, source: lead.source, product: lead.customerData.product, notes: lead.customerData.notes } } })}
@@ -423,6 +437,33 @@ export const LeadDetailsPage: React.FC = () => {
             {/* Main Content — full width, no sidebar */}
             <div className="flex-1 overflow-auto">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                    {/* Won/Lost Banner */}
+                    {lead.status === 'won' && (
+                        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-lg">🏆</div>
+                            <div className="flex-1 min-w-0">
+                                <div className="font-bold text-emerald-800 text-sm">Lead wygrany!</div>
+                                <div className="text-xs text-emerald-600 mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
+                                    {(lead as any).wonReason && <span>Powód: <strong>{(lead as any).wonReason}</strong></span>}
+                                    {(lead as any).wonValue && <span>Wartość: <strong>€{Number((lead as any).wonValue).toLocaleString('de-DE', { minimumFractionDigits: 2 })}</strong></span>}
+                                    {(lead as any).wonAt && <span>Data: {new Date((lead as any).wonAt).toLocaleDateString('pl-PL')}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {lead.status === 'lost' && (
+                        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-4">
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-lg">✕</div>
+                            <div className="flex-1 min-w-0">
+                                <div className="font-bold text-red-800 text-sm">Lead utracony</div>
+                                <div className="text-xs text-red-600 mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
+                                    {lead.lostReason && <span>Powód: <strong>{lead.lostReason}</strong></span>}
+                                    {lead.lostByName && <span>Przez: <strong>{lead.lostByName}</strong></span>}
+                                    {lead.lostAt && <span>Data: {new Date(lead.lostAt).toLocaleDateString('pl-PL')}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'overview' && (<div className="space-y-4">
 
                         {/* ═══ 2. CONTACT + LEAD META (side-by-side) ═══ */}
@@ -1787,15 +1828,18 @@ export const LeadDetailsPage: React.FC = () => {
                         lostReason: reason,
                         lostBy: currentUser?.id || null,
                         lostAt: new Date(),
-                        notes: notes ? ((lead.notes || '') + '\n\n[Utrata]: ' + notes) : lead.notes,
+                        notes: notes ? ((lead.notes || '') + '\n\n[Utrata]: ' + notes) : (lead.notes || undefined),
                     };
                     await DatabaseService.updateLead(lead.id, updates);
-                    setLead(prev => prev ? { ...prev, ...updates } : null);
+                    // Refresh lead from DB to get all mapped fields
+                    const freshLead = await DatabaseService.getLead(lead.id);
+                    if (freshLead) setLead(freshLead);
+                    else setLead(prev => prev ? { ...prev, ...updates } as any : null);
                     setIsLostModalOpen(false);
                     toast.success('Oznaczono jako utracone');
                 } catch (e) {
                     console.error(e);
-                    toast.error('Błąd');
+                    toast.error('Błąd zapisu');
                 }
             }}
         />
@@ -1807,20 +1851,23 @@ export const LeadDetailsPage: React.FC = () => {
             onConfirm={async (reason: string, value: string, notes: string) => {
                 if (!lead) return;
                 try {
-                    const updates: Partial<Lead> = {
+                    const updates: any = {
                         status: 'won',
                         wonReason: reason,
-                        wonValue: value ? parseFloat(value) : undefined,
                         wonAt: new Date(),
-                        notes: notes ? ((lead.notes || '') + '\n\n[Wygrana]: ' + notes) : lead.notes,
+                        notes: notes ? ((lead.notes || '') + '\n\n[Wygrana]: ' + notes) : (lead.notes || undefined),
                     };
-                    await DatabaseService.updateLead(lead.id, updates as any);
-                    setLead(prev => prev ? { ...prev, ...updates } as any : null);
+                    if (value) updates.wonValue = parseFloat(value);
+                    await DatabaseService.updateLead(lead.id, updates);
+                    // Refresh lead from DB to get all mapped fields
+                    const freshLead = await DatabaseService.getLead(lead.id);
+                    if (freshLead) setLead(freshLead);
+                    else setLead(prev => prev ? { ...prev, ...updates } : null);
                     setIsWonModalOpen(false);
                     toast.success('🏆 Gratulacje! Lead wygrany!');
                 } catch (e) {
                     console.error(e);
-                    toast.error('Błąd');
+                    toast.error('Błąd zapisu');
                 }
             }}
         />
