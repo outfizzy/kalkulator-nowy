@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// Configure pdf.js worker — use local import to avoid version mismatch
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface ScannedItem {
   name: string;
