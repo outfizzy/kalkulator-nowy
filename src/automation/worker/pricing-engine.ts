@@ -117,10 +117,48 @@ export const BUSINESS_RULES = {
 // PRICING RULES
 // ============================================================================
 
+// --- Single item input (backward compat) ---
 export interface PricingInput {
-  aluxeNetPrice: number;      // Cena netto z konfiguratora Aluxe (EUR)
+  aluxeNetPrice: number;      // Cena netto z konfiguratora Aluxe (EUR) — GESAMTPREIS
   transportAluxe?: number;    // Transport Aluxe (default ~€200)
   productType?: string;       // Typ produktu (dla przyszłych reguł per-produkt)
+}
+
+// --- Multi-item offer input ---
+export interface OfferLineItem {
+  name: string;               // "Trendstyle Poly 5000×3500"
+  aluxeNetPrice: number;      // Cena Aluxe netto tej pozycji
+  quantity: number;            // Ilość (zazwyczaj 1)
+}
+
+export interface OfferPricingInput {
+  lineItems: OfferLineItem[];  // Pozycje w ofercie
+  transportAluxe?: number;     // Transport (default €200)
+}
+
+export interface OfferPricingResult {
+  // Pozycje
+  lineItems: OfferLineItem[];
+  
+  // Aluxe side — GESAMTPREIS (suma wszystkich pozycji)
+  aluxeGesamtpreis: number;    // Suma netto wszystkich pozycji
+  aluxeTransport: number;
+  aluxeTotal: number;          // Gesamtpreis + transport
+  
+  // Margin — ZAWSZE od Gesamtpreis
+  marginPercent: number;
+  marginAmount: number;
+  minimumMarginApplied: boolean;
+  
+  // Customer price
+  customerNetPrice: number;
+  customerVAT: number;
+  customerGrossPrice: number;
+  
+  // Assembly placeholder
+  assemblyPrice: null;
+  
+  totalCustomerPrice: number;
 }
 
 export interface PricingResult {
@@ -129,48 +167,50 @@ export interface PricingResult {
   aluxeTransport: number;
   aluxeTotal: number;
   
-  // Margin calculation
-  marginPercent: number;      // 40% standard
-  marginAmount: number;       // Actual margin applied (may be > 40% if minimum kicks in)
-  minimumMarginApplied: boolean; // true if €2,000 minimum was used
+  // Margin calculation — od Gesamtpreis
+  marginPercent: number;
+  marginAmount: number;
+  minimumMarginApplied: boolean;
   
   // Customer price (without assembly)
-  customerNetPrice: number;   // Price for customer (excl. VAT, excl. assembly)
-  customerVAT: number;        // 19% MwSt (German VAT)
-  customerGrossPrice: number; // Incl. VAT
+  customerNetPrice: number;
+  customerVAT: number;
+  customerGrossPrice: number;
   
   // Assembly placeholder
-  assemblyPrice: null;        // To be added later
+  assemblyPrice: null;
   
   // Summary
-  totalCustomerPrice: number; // Final price for offer
+  totalCustomerPrice: number;
 }
 
 const MARGIN_PERCENT = 0.40;        // 40% markup
-const MINIMUM_MARGIN_EUR = 2000;    // €2,000 minimum on small roofs
+const MINIMUM_MARGIN_EUR = 2000;    // €2,000 minimum
 const GERMAN_VAT = 0.19;            // 19% MwSt
 const DEFAULT_TRANSPORT = 200;       // Aluxe default transport
 
 /**
- * Calculate customer price from Aluxe net price.
+ * Calculate customer price from Aluxe GESAMTPREIS.
+ * 
+ * WAŻNE: Marża ZAWSZE od Gesamtpreis (łączna cena koszyka), nie per pozycja!
  * 
  * Rules:
- * 1. Standard margin: 40% on Aluxe net price
+ * 1. Standard margin: 40% on Aluxe Gesamtpreis (total)
  * 2. Minimum margin: €2,000 (if 40% < €2,000, use flat €2,000)
  * 3. Transport: passed through at cost
  * 4. Assembly: NOT included (added later)
  * 5. VAT: 19% German MwSt
  * 
- * Breakeven: Aluxe price = €2,000 / 0.40 = €5,000
+ * Breakeven: Gesamtpreis = €2,000 / 0.40 = €5,000
  * - Below €5,000: flat €2,000 margin
  * - Above €5,000: 40% margin
  */
 export function calculateCustomerPrice(input: PricingInput): PricingResult {
-  const aluxeNet = input.aluxeNetPrice;
+  const aluxeNet = input.aluxeNetPrice; // This should be GESAMTPREIS
   const transport = input.transportAluxe ?? DEFAULT_TRANSPORT;
   const aluxeTotal = aluxeNet + transport;
   
-  // Calculate margin
+  // Margin from GESAMTPREIS
   const percentMargin = aluxeNet * MARGIN_PERCENT;
   const minimumMarginApplied = percentMargin < MINIMUM_MARGIN_EUR;
   const marginAmount = Math.max(percentMargin, MINIMUM_MARGIN_EUR);
@@ -202,6 +242,62 @@ export function calculateCustomerPrice(input: PricingInput): PricingResult {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Calculate offer price from multiple line items.
+ * 
+ * WAŻNE: Marża 40% / min €2.000 od GESAMTPREIS (sumy wszystkich pozycji),
+ * NIE per pozycja!
+ * 
+ * Wyjątek: jeśli ktoś zamawia TYLKO sam ZIP lub sam system szyb przesuwnych,
+ * to marża od tego jednego produktu.
+ * 
+ * Przykład:
+ *   Dach €2.500 + Panorama AL23 €800 + LEDy €471 = Gesamtpreis €3.771
+ *   Marża: max(€3.771 × 40%, €2.000) = €2.000 (minimum)
+ *   Klient netto: €3.771 + €200 (transport) + €2.000 = €5.971
+ *   Klient brutto: €5.971 × 1.19 = €7.105,49
+ */
+export function calculateOfferPrice(input: OfferPricingInput): OfferPricingResult {
+  const transport = input.transportAluxe ?? DEFAULT_TRANSPORT;
+  
+  // Sum all line items = Gesamtpreis
+  const gesamtpreis = input.lineItems.reduce(
+    (sum, item) => sum + (item.aluxeNetPrice * item.quantity), 0
+  );
+  
+  const aluxeTotal = gesamtpreis + transport;
+  
+  // Margin from GESAMTPREIS
+  const percentMargin = gesamtpreis * MARGIN_PERCENT;
+  const minimumMarginApplied = percentMargin < MINIMUM_MARGIN_EUR;
+  const marginAmount = Math.max(percentMargin, MINIMUM_MARGIN_EUR);
+  const effectiveMarginPercent = gesamtpreis > 0 ? (marginAmount / gesamtpreis) : 0;
+  
+  // Customer price
+  const customerNet = aluxeTotal + marginAmount;
+  const vat = customerNet * GERMAN_VAT;
+  const customerGross = customerNet + vat;
+  
+  return {
+    lineItems: input.lineItems,
+    
+    aluxeGesamtpreis: round2(gesamtpreis),
+    aluxeTransport: round2(transport),
+    aluxeTotal: round2(aluxeTotal),
+    
+    marginPercent: round2(effectiveMarginPercent * 100),
+    marginAmount: round2(marginAmount),
+    minimumMarginApplied,
+    
+    customerNetPrice: round2(customerNet),
+    customerVAT: round2(vat),
+    customerGrossPrice: round2(customerGross),
+    
+    assemblyPrice: null,
+    totalCustomerPrice: round2(customerGross),
+  };
 }
 
 /**

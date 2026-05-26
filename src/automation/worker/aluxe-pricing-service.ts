@@ -423,40 +423,83 @@ export class AluxePricingService {
     cfg.sun_color = 'x';
   }
 
-  // ---- Extract price from page ----
-  private async extractPrice(): Promise<number | null> {
-    const prices = await this.page!.evaluate(`(function() {
-      var results = [];
+  // ---- Extract ALL prices from cart (line items + Gesamtpreis) ----
+  private async extractCartItems(): Promise<{ items: { name: string; price: number }[]; gesamtpreis: number | null }> {
+    const cartData = await this.page!.evaluate(`(function() {
+      var items = [];
+      var gesamtpreis = null;
       var cart = document.querySelector('#cart');
-      if (cart) {
-        cart.querySelectorAll('td.price').forEach(function(td) { results.push(td.textContent.trim()); });
-        cart.querySelectorAll('td').forEach(function(td) {
+      if (!cart) return { items: items, gesamtpreis: null };
+      
+      // Extract individual product rows
+      var rows = cart.querySelectorAll('table.products tr');
+      rows.forEach(function(tr) {
+        var nameEl = tr.querySelector('td.name a');
+        var priceEl = tr.querySelector('td.price');
+        if (nameEl && priceEl) {
+          items.push({
+            name: nameEl.textContent.replace(/\\s+/g, ' ').trim(),
+            priceText: priceEl.textContent.trim()
+          });
+        }
+      });
+      
+      // Extract Gesamtpreis (usually in table.totals or last row)
+      var totalRows = cart.querySelectorAll('table.totals tr, tr.total, tr.grandtotal');
+      totalRows.forEach(function(tr) {
+        var cells = tr.querySelectorAll('td');
+        cells.forEach(function(td) {
           var t = td.textContent.trim();
-          if (t.indexOf('€') !== -1) results.push(t);
+          if (t.indexOf('€') !== -1) {
+            gesamtpreis = t;
+          }
         });
+      });
+      
+      // Fallback: get all € texts on page
+      if (!gesamtpreis) {
+        var allPrices = [];
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          var t = walker.currentNode.textContent.trim();
+          if (t.indexOf('€') !== -1 && t.length < 50) allPrices.push(t);
+        }
+        if (allPrices.length > 0) gesamtpreis = allPrices[allPrices.length - 1]; // Last € = total
       }
-      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      while (walker.nextNode()) {
-        var t = walker.currentNode.textContent.trim();
-        if (t.indexOf('€') !== -1 && t.length < 50) results.push(t);
-      }
-      return results;
-    })()`) as string[];
+      
+      return { items: items, gesamtpreis: gesamtpreis };
+    })()`) as { items: { name: string; priceText: string }[]; gesamtpreis: string | null };
     
-    for (const text of prices) {
-      const cleaned = text.replace(/[^0-9.,]/g, '');
-      if (!cleaned) continue;
-      let val: number;
-      if (cleaned.includes(',') && cleaned.includes('.')) {
-        val = parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
-      } else if (cleaned.includes(',')) {
-        val = parseFloat(cleaned.replace(',', '.'));
-      } else {
-        val = parseFloat(cleaned);
-      }
-      if (val && val > 50) return val;
-    }
+    const items = cartData.items.map(item => ({
+      name: item.name,
+      price: this.parseEurPrice(item.priceText),
+    })).filter(item => item.price > 0);
+    
+    const gesamtpreis = cartData.gesamtpreis ? this.parseEurPrice(cartData.gesamtpreis) : null;
+    
+    return { items, gesamtpreis };
+  }
+
+  // ---- Extract single price (backward compat, returns Gesamtpreis) ----
+  private async extractPrice(): Promise<number | null> {
+    const { items, gesamtpreis } = await this.extractCartItems();
+    // Return Gesamtpreis first, fallback to first item
+    if (gesamtpreis && gesamtpreis > 0) return gesamtpreis;
+    if (items.length > 0) return items[0].price;
     return null;
+  }
+
+  // ---- Parse European price: "€ 1.746,15" → 1746.15 ----
+  private parseEurPrice(text: string): number {
+    const cleaned = text.replace(/[^0-9.,]/g, '');
+    if (!cleaned) return 0;
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    if (cleaned.includes(',')) {
+      return parseFloat(cleaned.replace(',', '.')) || 0;
+    }
+    return parseFloat(cleaned) || 0;
   }
 
   // ---- Error response helper ----
