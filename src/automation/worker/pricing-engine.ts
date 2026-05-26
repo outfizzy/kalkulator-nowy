@@ -39,6 +39,57 @@ export const ALUXE_TO_POLENDACH: Record<string, string> = {
 };
 
 // ============================================================================
+// BUSINESS RULES — Polendach24 defaults & logic
+// ============================================================================
+
+export const BUSINESS_RULES = {
+  // Panorama: always default to AL23 (standard for Polendach24)
+  panorama: {
+    defaultModel: 'panorama_al23',
+    note: 'W podstawie zawsze liczymy AL23 — chyba że klient wymaga innego modelu',
+  },
+  
+  // Designline: only available in 9005, 9010, db703 (NO 7016!)
+  designline: {
+    availableColors: ['9005', '9010', 'db703'],
+    defaultColor: '9005',
+    note: 'Designline nie ma 7016 Anthrazitgrau — domyślnie 9005 mat schwarz',
+  },
+  
+  // Senkrechtmarkise = Verticale Zonwering = ZIP Screen Vertikal
+  zipScreen: {
+    aluxeName: 'Verticale zonwering',
+    polendachName: 'Senkrechtmarkise / ZIP Screen',
+    productId: 'fd60d47d74592d4',
+  },
+  
+  // Markise = Aufdach/Unterdach ZIP
+  markise: {
+    roofTypes: {
+      'TR': 'Trendline (Trendstyle)',
+      'TR+': 'Trendline+ (Trendstyle Plus)',
+      'TL': 'Topline (Topstyle)',
+      'TLXL': 'Topline XL (Topstyle XL)',
+      'OL': 'Orangeline',
+      'OL+': 'Orangeline+',
+    },
+  },
+  
+  // Name mapping summary
+  naming: {
+    'Trendline': 'Trendstyle',
+    'Topline': 'Topstyle',
+    'Designline': 'Designline',
+    'Ultraline': 'Ultraline',
+    'Skyline': 'Skyline',
+    'Orangeline': 'Orangeline',
+    'Panorama Schiebewand': 'System szyb przesuwnych',
+    'Verticale zonwering': 'Senkrechtmarkise',
+    'Bovendak/Onderdak zonwering': 'Markise ZIP',
+  },
+};
+
+// ============================================================================
 // PRICING RULES
 // ============================================================================
 

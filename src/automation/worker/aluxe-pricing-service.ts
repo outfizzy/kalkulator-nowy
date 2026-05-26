@@ -88,8 +88,11 @@ const PRODUCT_LINE_MAP = {
   frontwand: ALUXE_PRODUCTS.frontwand,
   // Other
   markise: ALUXE_PRODUCTS.markise,
+  senkrechtmarkise: ALUXE_PRODUCTS.verticale_zonwering,
   orangeline_poly: ALUXE_PRODUCTS.orangeline_poly,
   orangeline_glas: ALUXE_PRODUCTS.orangeline_glas,
+  orangeline_plus_poly: ALUXE_PRODUCTS.orangeline_plus_poly,
+  orangeline_plus_glas: ALUXE_PRODUCTS.orangeline_plus_glas,
   skyline_frei: ALUXE_PRODUCTS.skyline_frei,
 } as const;
 
@@ -102,6 +105,9 @@ const WALL_PRODUCTS = new Set([
 const PANORAMA_PRODUCTS = new Set([
   'panorama_al22', 'panorama_al23', 'panorama_al24', 'panorama_al25', 'panorama_al26',
 ]);
+// Designline only has 9005, 9010, db703 (NO 7016)
+const DESIGNLINE_PRODUCTS = new Set(['designline']);
+const SENKRECHTMARKISE_PRODUCTS = new Set(['senkrechtmarkise']);
 
 export class AluxePricingService {
   private browser: Browser | null = null;
@@ -197,7 +203,13 @@ export class AluxePricingService {
         await this.fillPanoramaConfig(request, configUsed);
       } else if (request.productLine === 'markise') {
         await this.fillMarkiseConfig(request, configUsed);
+      } else if (SENKRECHTMARKISE_PRODUCTS.has(request.productLine)) {
+        await this.fillSenkrechtmarkiseConfig(request, configUsed);
       } else {
+        // For Designline: override color to 9005 (no 7016 available)
+        if (DESIGNLINE_PRODUCTS.has(request.productLine) && (!request.color || request.color === '7016')) {
+          request.color = '9005';
+        }
         await this.fillRoofConfig(request, configUsed);
       }
       
@@ -358,6 +370,33 @@ export class AluxePricingService {
     await p.fill('#roofdepth', String(req.depth)).catch(() => {});
     cfg.roofwidth = String(req.width);
     cfg.roofdepth = String(req.depth);
+    
+    // Number of fields (required!)
+    const nf = await p.$('#numberoffields');
+    if (nf) { await p.fill('#numberoffields', '1'); cfg.numberoffields = '1'; }
+    
+    // Motor
+    await p.selectOption('#motor', 'links').catch(() => {});
+    cfg.motor = 'links';
+    
+    // Cloth color (required text field)
+    await p.fill('#colorcloth', 'grau').catch(() => {});
+    cfg.colorcloth = 'grau';
+    
+    await p.selectOption('#color', req.color || '7016').catch(() => {});
+    cfg.color = req.color || '7016';
+  }
+
+  // ---- Fill Senkrechtmarkise / ZIP Screen config ----
+  private async fillSenkrechtmarkiseConfig(req: PriceRequest, cfg: Record<string, string>) {
+    const p = this.page!;
+    
+    await p.fill('#width', String(req.width)).catch(() => {});
+    cfg.width = String(req.width);
+    
+    // depth = height for ZIP screen
+    await p.fill('#depth', String(req.depth)).catch(() => {});
+    cfg.height = String(req.depth);
     
     await p.selectOption('#color', req.color || '7016').catch(() => {});
     cfg.color = req.color || '7016';
