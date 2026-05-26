@@ -197,40 +197,31 @@ export class AluxeAutomator {
   async startNewOrder(): Promise<void> {
     if (!this.page || !this.isLoggedIn) throw new Error('Not logged in');
     
-    console.log('  📋 Starting new order...');
+    // Always go back to dashboard first for clean state
+    await this.page.goto(`https://bestellen.aluxe.nl/dealer/?cookie_key=${this.cookieKey}`, { 
+      waitUntil: 'networkidle', timeout: 15000 
+    }).catch(() => {});
     
-    // From dealer dashboard, click "Auftrag" (it's a link in the top nav)
-    const auftragLink = await this.page.$('a:text("Auftrag"), #menu a[href*="dealer-order"]');
-    if (auftragLink) {
-      await auftragLink.click();
-    } else {
-      // Direct navigation to new order
-      await this.page.goto(`https://bestellen.aluxe.nl/dealer/dealer-order/informatie/?cookie_key=${this.cookieKey}`, { waitUntil: 'networkidle' });
-    }
-    await this.page.waitForLoadState('networkidle');
+    // Navigate directly to new order information page
+    await this.page.goto(`https://bestellen.aluxe.nl/dealer/dealer-order/informatie/?cookie_key=${this.cookieKey}`, { 
+      waitUntil: 'networkidle', timeout: 15000 
+    });
     
     const url = this.page.url();
-    console.log(`  📄 Current URL: ${url}`);
     
     // If on Information page, fill reference and click next
-    if (url.includes('/informatie/') || url.includes('/informatie?')) {
-      console.log('  📋 Filling order information...');
-      
-      // Try to fill reference field
+    if (url.includes('/informatie')) {
       const refField = await this.page.$('#reference, [name="reference"]');
       if (refField) {
         await refField.fill(`AutoTest-${Date.now()}`);
       }
       
-      // Click Weiter
       const nextBtn = await this.page.$('#next');
       if (nextBtn) {
         await nextBtn.click();
         await this.page.waitForLoadState('networkidle');
       }
     }
-    
-    console.log(`  ✅ Ready for product selection. URL: ${this.page.url()}`);
   }
 
   // ---- Discover all products ----
