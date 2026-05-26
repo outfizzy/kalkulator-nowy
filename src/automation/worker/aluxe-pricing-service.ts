@@ -417,6 +417,10 @@ export class AluxePricingService {
     
     await p.selectOption('#color', req.color || '7016').catch(() => {});
     cfg.color = req.color || '7016';
+    
+    // Tuchfarbe (cloth color) — required! "x" as placeholder
+    await p.fill('#sun_color', 'x').catch(() => {});
+    cfg.sun_color = 'x';
   }
 
   // ---- Extract price from page ----
