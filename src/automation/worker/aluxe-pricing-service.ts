@@ -250,7 +250,7 @@ export class AluxePricingService {
       }
       
       // 1. Start fresh order
-      await this.startOrder(`OnDemand-${Date.now()}`);
+      await this.startOrder(`BOT - ${Date.now()}`);
       
       // 2. Add product to cart
       const addResult = await this.addProductToCart(request);
@@ -304,7 +304,7 @@ export class AluxePricingService {
       await this.init();
       
       // 1. Start fresh order — saved under customer name
-      await this.startOrder(customerName || `Angebot-${Date.now()}`);
+      await this.startOrder(customerName ? `BOT - ${customerName}` : `BOT - Angebot-${Date.now()}`);
       
       // 2. Add each product to cart
       for (let i = 0; i < requests.length; i++) {
