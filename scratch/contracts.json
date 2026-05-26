@@ -1,0 +1,2024 @@
+[
+  {
+    "id": "998754b4-e967-4b7d-9021-2b5e896b6d26",
+    "offer_id": "efe2b4ec-1c3d-4f84-8146-fca088cea84f",
+    "user_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "contract_data": {
+      "client": {
+        "id": "a400afab-eeaf-4d90-8bbd-3829c1e0b2e0",
+        "lat": null,
+        "lng": null,
+        "city": "Bad Schmiedeberg",
+        "email": "",
+        "notes": null,
+        "phone": "",
+        "source": "manual",
+        "status": "new",
+        "street": "Pfeffmühlweg",
+        "country": "Deutschland",
+        "lastName": "Pitsche",
+        "firstName": "Heiko",
+        "last_name": "Pitsche",
+        "wind_zone": null,
+        "created_at": "2026-03-21T20:45:54.482418+00:00",
+        "created_by": null,
+        "first_name": "Heiko",
+        "postalCode": "06905",
+        "salutation": null,
+        "updated_at": "2026-03-21T20:45:54.482418+00:00",
+        "companyName": null,
+        "houseNumber": "22",
+        "postal_code": "06905",
+        "company_name": null,
+        "house_number": "22",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": "Ledwin",
+          "firstName": "Mike"
+        },
+        "contract_number": null,
+        "representative_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 13.4,
+        "finalPriceNet": 13400,
+        "paymentMethod": "transfer",
+        "advancePayment": 4783.8,
+        "sellingPriceNet": 13.4
+      },
+      "product": {
+        "color": "N/A",
+        "width": 0,
+        "addons": [],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "7f4a1bfb-ebc0-49f5-90a6-7d7b0aec02c2",
+            "name": "Balustrada 4490 x 1000 - M.003",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "78197958-2956-4ad1-a20b-5b39a5187888",
+            "name": "Balustrada 1200 x 1000 - M.003",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "20e37166-fb71-4378-96af-35d6a2c5b73c",
+            "name": "WPC ciemno szare - 42m2",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 670,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "7f4a1bfb-ebc0-49f5-90a6-7d7b0aec02c2",
+          "name": "Balustrada 4490 x 1000 - M.003",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "78197958-2956-4ad1-a20b-5b39a5187888",
+          "name": "Balustrada 1200 x 1000 - M.003",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "20e37166-fb71-4378-96af-35d6a2c5b73c",
+          "name": "WPC ciemno szare - 42m2",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Flooring",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "MPL/1218/04/05/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-05-10T12:13:18.148+00:00",
+    "status": "signed",
+    "created_at": "2026-05-10T12:13:19.134+00:00",
+    "signed_by": null,
+    "sales_rep_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "installation_days_estimate": 1,
+    "advance_amount": 4783.8,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  },
+  {
+    "id": "d7da8c90-edc3-4d73-8ab3-270de34dc990",
+    "offer_id": "aafb500f-2a91-4f42-886d-9c819595729e",
+    "user_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "contract_data": {
+      "client": {
+        "id": "64bc3b36-60b5-4eed-ab3f-7e116f54ca56",
+        "lat": null,
+        "lng": null,
+        "city": "Delitzsch",
+        "email": "manuelakujus@online.de",
+        "notes": null,
+        "phone": "015228616143",
+        "source": "manual",
+        "status": "new",
+        "street": "An den Schrebergarten",
+        "country": "Deutschland",
+        "lastName": "Kujus",
+        "firstName": "Manuela",
+        "last_name": "Kujus",
+        "wind_zone": null,
+        "created_at": "2026-04-21T12:32:46.937918+00:00",
+        "created_by": null,
+        "first_name": "Manuela",
+        "postalCode": "04509",
+        "salutation": "Frau",
+        "updated_at": "2026-04-21T12:32:46.937918+00:00",
+        "companyName": null,
+        "houseNumber": "35",
+        "postal_code": "04509",
+        "company_name": null,
+        "house_number": "35",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": " Kosciow",
+          "firstName": "Hubert"
+        },
+        "contract_number": null,
+        "representative_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 0.19,
+        "basePrice": 11411.76,
+        "finalPriceNet": 11411.76,
+        "paymentMethod": "transfer",
+        "advancePayment": 5705.882352941177,
+        "sellingPriceNet": 11411.76
+      },
+      "product": {
+        "color": "RAL 7016",
+        "width": 5620,
+        "addons": [
+          {
+            "id": "addon-0",
+            "name": "Topstyle (5620 x 2800) - Freistehende 2x 150x110 / 2x 110x110 RAL 7016",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-1",
+            "name": "VSG GLAS 10mm KLAR",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-2",
+            "name": "uwaga tylni slup z prawej strony 110x110 przesunięty (będziemy nachodzić na mur, dlatego slup lewy tylni ma być przesunięty o ok 40cm w prawa stronę",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-3",
+            "name": "Zabrać beton slupy w beton",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-4",
+            "name": "uwaga: zabrać młot do montażu będzie trzeba kuc",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-5",
+            "name": "Unterdachmarkise 5620 x 2800 Aluxe",
+            "price": 0,
+            "quantity": 1
+          }
+        ],
+        "modelId": "topstyle",
+        "roofType": "other",
+        "projection": 2800,
+        "customItems": [
+          {
+            "id": "addon-0-1776775312598",
+            "name": "Topstyle (5620 x 2800) - Freistehende 2x 150x110 / 2x 110x110 RAL 7016",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-1-1776775312598",
+            "name": "VSG GLAS 10mm KLAR",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-2-1776775312598",
+            "name": "uwaga tylni slup z prawej strony 110x110 przesunięty (będziemy nachodzić na mur, dlatego slup lewy tylni ma być przesunięty o ok 40cm w prawa stronę",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-3-1776775312598",
+            "name": "Zabrać beton slupy w beton",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-4-1776775312598",
+            "name": "uwaga: zabrać młot do montażu będzie trzeba kuc",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-5-1776775312598",
+            "name": "Unterdachmarkise 5620 x 2800 Aluxe",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "freestanding",
+          "unterkWand": 2400,
+          "hasDrainage": false,
+          "unterkRinne": 2000,
+          "hasElectrical": true
+        },
+        "numberOfPosts": 4,
+        "installationType": "freestanding"
+      },
+      "comments": [],
+      "commission": 570.59,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "addon-0-1776775312598",
+          "name": "Topstyle (5620 x 2800) - Freistehende 2x 150x110 / 2x 110x110 RAL 7016",
+          "status": "pending",
+          "details": "H3: 2000mm | H1: 2400mm | Wand: Massivwand | ⚡ Strom | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "5620×2800mm, RAL 7016, Freistand"
+        },
+        {
+          "id": "addon-1-1776775312598",
+          "name": "VSG GLAS 10mm KLAR",
+          "status": "pending",
+          "details": "H3: 2000mm | H1: 2400mm | Wand: Massivwand | ⚡ Strom | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "5620×2800mm, RAL 7016, Freistand"
+        },
+        {
+          "id": "addon-2-1776775312598",
+          "name": "uwaga tylni slup z prawej strony 110x110 przesunięty (będziemy nachodzić na mur, dlatego slup lewy tylni ma być przesunięty o ok 40cm w prawa stronę",
+          "status": "pending",
+          "details": "H3: 2000mm | H1: 2400mm | Wand: Massivwand | ⚡ Strom | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "5620×2800mm, RAL 7016, Freistand"
+        },
+        {
+          "id": "addon-3-1776775312598",
+          "name": "Zabrać beton slupy w beton",
+          "status": "pending",
+          "details": "H3: 2000mm | H1: 2400mm | Wand: Massivwand | ⚡ Strom | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "5620×2800mm, RAL 7016, Freistand"
+        },
+        {
+          "id": "addon-4-1776775312598",
+          "name": "uwaga: zabrać młot do montażu będzie trzeba kuc",
+          "status": "pending",
+          "details": "H3: 2000mm | H1: 2400mm | Wand: Massivwand | ⚡ Strom | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "5620×2800mm, RAL 7016, Freistand"
+        },
+        {
+          "id": "addon-5-1776775312598",
+          "name": "Unterdachmarkise 5620 x 2800 Aluxe",
+          "status": "pending",
+          "details": "H3: 2000mm | H1: 2400mm | Wand: Massivwand | ⚡ Strom | 4 Pfosten",
+          "category": "Awning",
+          "quantity": 1,
+          "technicalSpec": "5620×2800mm, RAL 7016, Freistand"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "HPL/1199/20/04/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-04-21T12:41:52.598+00:00",
+    "status": "signed",
+    "created_at": "2026-04-21T12:41:54.147875+00:00",
+    "signed_by": null,
+    "sales_rep_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "installation_days_estimate": 1,
+    "advance_amount": 5705.882352941177,
+    "advance_paid": true,
+    "advance_paid_at": "2026-05-15T08:48:59.603+00:00",
+    "advance_paid_by": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "advance_notes": null
+  },
+  {
+    "id": "05a16b6c-edf8-4529-b52f-176b011ef46b",
+    "offer_id": "71484e6f-597a-4c62-bcbf-6c71ebe77d6c",
+    "user_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "contract_data": {
+      "client": {
+        "id": "2f37210d-8e72-459a-a274-58b0106840c2",
+        "lat": null,
+        "lng": null,
+        "city": "Greifswald",
+        "email": "",
+        "notes": null,
+        "phone": "",
+        "source": "manual",
+        "status": "new",
+        "street": "Binnenweg",
+        "country": "Deutschland",
+        "lastName": "Hausmann",
+        "firstName": "Herr",
+        "last_name": "Hausmann",
+        "wind_zone": null,
+        "created_at": "2026-03-21T20:37:54.320162+00:00",
+        "created_by": null,
+        "first_name": "Herr",
+        "postalCode": "17491",
+        "salutation": null,
+        "updated_at": "2026-03-21T20:37:54.320162+00:00",
+        "companyName": null,
+        "houseNumber": "10",
+        "postal_code": "17491",
+        "company_name": null,
+        "house_number": "10",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": "Ledwin",
+          "firstName": "Mike"
+        },
+        "contract_number": null,
+        "representative_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 23800,
+        "finalPriceNet": 23800,
+        "paymentMethod": "transfer",
+        "advancePayment": 6000,
+        "sellingPriceNet": 23800
+      },
+      "product": {
+        "color": "N/A",
+        "width": 0,
+        "addons": [],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "db6e942d-7777-47f0-82e1-1032ca9cc7f9",
+            "name": "6000 x 3235",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "topstyle"
+            }
+          },
+          {
+            "id": "b732e792-11d8-49a6-8eab-966ea60725d6",
+            "name": "10x LED",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "1089f35a-0870-4b7f-9281-a312fa0cd108",
+            "name": "2x Trojkaty VSG - czyste",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "8b5d324f-2936-47f6-a077-87f403fc5eb4",
+            "name": "Przesuwki 3x Strony",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "037c4df6-d201-4212-a0ed-489312b4306b",
+            "name": "WPC Podloga i Legary 6000 x 4000",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "a83d7efe-4fce-48ff-8a89-62e9c7d715ee",
+            "name": "2x naswietla VSG czyste",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 1190,
+      "attachments": [
+        {
+          "id": "5acbf87e-3ad0-42f8-b9ab-50301f2bac00",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/05a16b6c-edf8-4529-b52f-176b011ef46b/sxlzw2wk7j_1774611783842.jpg",
+          "name": "SKAN-MPL-1178-25-03-26-2026-03-27T11-43-03.jpg",
+          "type": "image",
+          "createdAt": "2026-03-27T11:43:05.504Z"
+        },
+        {
+          "id": "554bf72d-358a-4a78-83ed-ef89abf1a807",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/05a16b6c-edf8-4529-b52f-176b011ef46b/f1dlon1uceu_1774611815297.jpg",
+          "name": "Foto-2026-03-27T11-43-35.jpg",
+          "type": "image",
+          "createdAt": "2026-03-27T11:43:36.446Z"
+        }
+      ],
+      "orderedItems": [
+        {
+          "id": "db6e942d-7777-47f0-82e1-1032ca9cc7f9",
+          "name": "6000 x 3235",
+          "status": "pending",
+          "details": "Model: topstyle | Wand: Massivwand",
+          "category": "Roofing",
+          "quantity": 1,
+          "technicalSpec": "Topstyle, Wandmontage"
+        },
+        {
+          "id": "b732e792-11d8-49a6-8eab-966ea60725d6",
+          "name": "10x LED",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "1089f35a-0870-4b7f-9281-a312fa0cd108",
+          "name": "2x Trojkaty VSG - czyste",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "8b5d324f-2936-47f6-a077-87f403fc5eb4",
+          "name": "Przesuwki 3x Strony",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "037c4df6-d201-4212-a0ed-489312b4306b",
+          "name": "WPC Podloga i Legary 6000 x 4000",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Flooring",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "a83d7efe-4fce-48ff-8a89-62e9c7d715ee",
+          "name": "2x naswietla VSG czyste",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "MPL/1178/25/03/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-03-25T22:12:21.447+00:00",
+    "status": "signed",
+    "created_at": "2026-03-25T22:12:22.463+00:00",
+    "signed_by": null,
+    "sales_rep_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "installation_days_estimate": 3,
+    "advance_amount": 6000,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  },
+  {
+    "id": "30eeee37-2592-4a53-b7eb-8b5d8b6dd368",
+    "offer_id": "e710b3f6-439d-4897-9724-429e961070fb",
+    "user_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "contract_data": {
+      "client": {
+        "id": "0c3da5ba-a43e-4f24-9a97-edc3ac2ca0c3",
+        "lat": null,
+        "lng": null,
+        "city": "Wismar",
+        "email": "",
+        "notes": null,
+        "phone": "",
+        "source": "manual",
+        "status": "new",
+        "street": "Hinter dem Lebkenhof",
+        "country": "Deutschland",
+        "lastName": "Rozal",
+        "firstName": "Herr",
+        "last_name": "Rozal",
+        "wind_zone": null,
+        "created_at": "2026-03-21T20:39:13.719268+00:00",
+        "created_by": null,
+        "first_name": "Herr",
+        "postalCode": "22966",
+        "salutation": null,
+        "updated_at": "2026-03-21T20:39:13.719268+00:00",
+        "companyName": null,
+        "houseNumber": "7",
+        "postal_code": "22966",
+        "company_name": null,
+        "house_number": "7",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": "Ledwin",
+          "firstName": "Mike"
+        },
+        "contract_number": null,
+        "representative_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 16500,
+        "finalPriceNet": 16500,
+        "paymentMethod": "transfer",
+        "advancePayment": 5073.75,
+        "sellingPriceNet": 16500
+      },
+      "product": {
+        "color": "N/A",
+        "width": 0,
+        "addons": [],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "17cfd459-0256-4366-a7b8-6f7d38fd9b33",
+            "name": "4000 x 4000 wolnostojaca",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "trendstyle"
+            }
+          },
+          {
+            "id": "5aeb7dcd-ba5a-4d4e-bad7-40549b11c84e",
+            "name": "6x LED",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "f6d75a1b-9945-4d4a-a98a-61d8e8a321f5",
+            "name": "Systemy przesuwne Front i lewo",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "90d87fac-b4e2-4715-84cd-f58269797a30",
+            "name": "Trojkat lewo z Grillo RAL 9010",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "82d2d899-63bd-4c62-9bab-70dfc58cbacd",
+            "name": "prawo - scianka z Grillo RAL 9010",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "01b2039c-2e4c-49b9-ab79-f0b6fc458000",
+            "name": "tyl pod Rama / przesuwne 2x torowy 2,5m",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 825,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "17cfd459-0256-4366-a7b8-6f7d38fd9b33",
+          "name": "4000 x 4000 wolnostojaca",
+          "status": "pending",
+          "details": "Model: trendstyle | Wand: Massivwand",
+          "category": "Roofing",
+          "quantity": 1,
+          "technicalSpec": "Trendstyle, Wandmontage"
+        },
+        {
+          "id": "5aeb7dcd-ba5a-4d4e-bad7-40549b11c84e",
+          "name": "6x LED",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "f6d75a1b-9945-4d4a-a98a-61d8e8a321f5",
+          "name": "Systemy przesuwne Front i lewo",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "90d87fac-b4e2-4715-84cd-f58269797a30",
+          "name": "Trojkat lewo z Grillo RAL 9010",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "82d2d899-63bd-4c62-9bab-70dfc58cbacd",
+          "name": "prawo - scianka z Grillo RAL 9010",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "01b2039c-2e4c-49b9-ab79-f0b6fc458000",
+          "name": "tyl pod Rama / przesuwne 2x torowy 2,5m",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "MPL/1181/30/03/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-03-31T08:57:34.902+00:00",
+    "status": "signed",
+    "created_at": "2026-03-31T08:57:35.947+00:00",
+    "signed_by": null,
+    "sales_rep_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "installation_days_estimate": 1,
+    "advance_amount": 5073.75,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  },
+  {
+    "id": "cff62414-5e04-40db-bffd-260d66f770b8",
+    "offer_id": "b871f6ab-88b2-4721-9f2b-6630a66772f5",
+    "user_id": "4e151d84-8cae-4ec8-90c4-a3bd46365b40",
+    "contract_data": {
+      "client": {
+        "id": "a5d1e0f0-02e2-4437-bc4a-4bb7f9388b0f",
+        "lat": null,
+        "lng": null,
+        "city": "Mühlenbecker Land",
+        "email": "garbas@gmail9.com",
+        "notes": null,
+        "phone": "+49 3301526362",
+        "source": "manual",
+        "status": "new",
+        "street": "Griegstraße",
+        "country": "Deutschland",
+        "lastName": "Garbas",
+        "firstName": "Fam",
+        "last_name": "Garbas",
+        "wind_zone": null,
+        "created_at": "2026-05-15T09:39:02.220523+00:00",
+        "created_by": null,
+        "first_name": "Fam",
+        "postalCode": "16515",
+        "salutation": "Herr",
+        "updated_at": "2026-05-15T09:39:02.220523+00:00",
+        "companyName": null,
+        "houseNumber": "5",
+        "postal_code": "16515",
+        "company_name": null,
+        "house_number": "5",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "contractSigner": {
+          "lastName": "Duz",
+          "firstName": "Oliwia"
+        },
+        "representative": {
+          "lastName": "Duz",
+          "firstName": "Oliwia"
+        },
+        "contract_number": null,
+        "representative_id": "4e151d84-8cae-4ec8-90c4-a3bd46365b40",
+        "contract_signer_id": "4e151d84-8cae-4ec8-90c4-a3bd46365b40",
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 0.19,
+        "basePrice": 4800,
+        "finalPriceNet": 4800,
+        "paymentMethod": "cash",
+        "advancePayment": 0,
+        "sellingPriceNet": 4800
+      },
+      "product": {
+        "color": "RAL 7016 (Anthrazit)",
+        "width": 0,
+        "addons": [
+          {
+            "id": "addon-0",
+            "name": "Dwa zipy 4375 x 2150 kolor SC5/1010",
+            "price": 0,
+            "quantity": 1
+          }
+        ],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "addon-0-1778838125524",
+            "name": "Dwa zipy 4375 x 2150 kolor SC5/1010",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [
+        {
+          "id": "e04443f5-e80c-46a2-a5b7-a08f92828411",
+          "text": "Twój komentarz z WhatsApp igorek; 4375 x 2200 rura 70mm ta do zatkania ",
+          "author": "Aktualny Użytkownik",
+          "createdAt": "2026-05-15T09:44:28.560Z"
+        }
+      ],
+      "commission": 240,
+      "attachments": [
+        {
+          "id": "cbe67661-fc81-4eaa-81b4-f2f64e7a1077",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/cff62414-5e04-40db-bffd-260d66f770b8/s0pes91qft_1778838189813.jpeg",
+          "name": "IMG_8459.jpeg",
+          "type": "image",
+          "createdAt": "2026-05-15T09:43:13.846Z"
+        },
+        {
+          "id": "6be352f6-28c3-4c7a-84b3-51480d688777",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/cff62414-5e04-40db-bffd-260d66f770b8/63y3a0ceq56_1778838214631.jpeg",
+          "name": "IMG_8461.jpeg",
+          "type": "image",
+          "createdAt": "2026-05-15T09:43:37.573Z"
+        },
+        {
+          "id": "e3f21463-faf8-4f57-ad8b-4cef33e397b3",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/cff62414-5e04-40db-bffd-260d66f770b8/wb414p7idw_1778838284100.jpeg",
+          "name": "IMG_3093.jpeg",
+          "type": "image",
+          "createdAt": "2026-05-15T09:44:45.910Z"
+        },
+        {
+          "id": "a4f09d87-7bcf-4aca-b21b-15c3cf9d0912",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/cff62414-5e04-40db-bffd-260d66f770b8/mwso7m97kb_1778838299002.jpeg",
+          "name": "IMG_3094.jpeg",
+          "type": "image",
+          "createdAt": "2026-05-15T09:45:04.391Z"
+        },
+        {
+          "id": "a15c4806-7a28-484c-b7eb-f7d1b07debd7",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/cff62414-5e04-40db-bffd-260d66f770b8/k145v6azm7j_1778838329945.jpeg",
+          "name": "IMG_3095.jpeg",
+          "type": "image",
+          "createdAt": "2026-05-15T09:45:33.812Z"
+        }
+      ],
+      "orderedItems": [
+        {
+          "id": "addon-0-1778838125524",
+          "name": "Dwa zipy 4375 x 2150 kolor SC5/1010",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "ZIP Screen",
+          "quantity": 1,
+          "technicalSpec": "RAL 7016 (Anthrazit), Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "KS/1230/12/05/2026",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-05-15T09:42:05.524+00:00",
+    "status": "signed",
+    "created_at": "2026-05-15T09:42:06.21+00:00",
+    "signed_by": null,
+    "sales_rep_id": "4e151d84-8cae-4ec8-90c4-a3bd46365b40",
+    "installation_days_estimate": 1,
+    "advance_amount": 0,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  },
+  {
+    "id": "ba55ad02-9ed6-4189-a146-c06e56ec1684",
+    "offer_id": "8dd89ef5-3992-4d87-8173-473ab0aae604",
+    "user_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "contract_data": {
+      "client": {
+        "id": "672e05dd-3108-4230-973a-dce2b807f378",
+        "lat": null,
+        "lng": null,
+        "city": "",
+        "email": "Ramon.petzold@arcor.de",
+        "notes": null,
+        "phone": "01727589831",
+        "source": "email",
+        "status": "new",
+        "street": "",
+        "country": "Deutschland",
+        "lastName": "Petzold",
+        "firstName": "Ramon",
+        "last_name": "Petzold",
+        "wind_zone": null,
+        "created_at": "2026-03-05T10:13:02.990312+00:00",
+        "created_by": null,
+        "first_name": "Ramon",
+        "postalCode": "14974",
+        "salutation": null,
+        "updated_at": "2026-03-05T10:13:02.990312+00:00",
+        "companyName": null,
+        "houseNumber": "",
+        "postal_code": "14974",
+        "company_name": null,
+        "house_number": "",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": "Ledwin",
+          "firstName": "Mike"
+        },
+        "contract_number": null,
+        "representative_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 0.19,
+        "basePrice": 19327.73,
+        "finalPriceNet": 19327.73,
+        "paymentMethod": "transfer",
+        "advancePayment": 0,
+        "sellingPriceNet": 19327.73
+      },
+      "product": {
+        "color": "N/A",
+        "width": 0,
+        "addons": [],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "3d21abd4-f7d5-4b68-b213-f04684ffbbed",
+            "name": "Pergola Deluxe PLUS 6980 x 3500",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "pergola_deluxe"
+            }
+          },
+          {
+            "id": "9cc5cc78-0fc7-4756-a6b4-db0afd089dd0",
+            "name": "ZIP Screen 3420 x 2700",
+            "price": 0,
+            "quantity": 2,
+            "attributes": {
+              "modelId": "other"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 966.39,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "3d21abd4-f7d5-4b68-b213-f04684ffbbed",
+          "name": "Pergola Deluxe PLUS 6980 x 3500",
+          "status": "pending",
+          "details": "Model: pergola_deluxe | Wand: Massivwand",
+          "category": "Roofing",
+          "quantity": 1,
+          "technicalSpec": "Pergola_deluxe, Wandmontage"
+        },
+        {
+          "id": "9cc5cc78-0fc7-4756-a6b4-db0afd089dd0",
+          "name": "ZIP Screen 3420 x 2700",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "ZIP Screen",
+          "quantity": 2,
+          "technicalSpec": "Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "MPL/1203/25/04/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-04-25T12:43:04.536+00:00",
+    "status": "signed",
+    "created_at": "2026-04-25T12:43:05.620642+00:00",
+    "signed_by": null,
+    "sales_rep_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "installation_days_estimate": 1,
+    "advance_amount": null,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  },
+  {
+    "id": "9e9b9536-5dbf-49c6-b075-8ac5ab199383",
+    "offer_id": "d892be67-b72d-4a1e-abff-dd18884d0fec",
+    "user_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "contract_data": {
+      "client": {
+        "id": "96b1f06b-9ee0-482f-bb1a-9064696e7bd7",
+        "lat": null,
+        "lng": null,
+        "city": "Ludwigsfelde",
+        "email": "kerstin_helms@yahoo.de",
+        "notes": null,
+        "phone": "017670041849",
+        "source": "email",
+        "status": "new",
+        "street": "Ziegelfichtenweg ",
+        "country": "Deutschland",
+        "lastName": "Berlin",
+        "firstName": "Kerstin",
+        "last_name": "Berlin",
+        "wind_zone": null,
+        "created_at": "2026-01-27T18:34:37.224104+00:00",
+        "created_by": null,
+        "first_name": "Kerstin",
+        "postalCode": "14974",
+        "salutation": null,
+        "updated_at": "2026-01-27T18:34:37.224104+00:00",
+        "companyName": null,
+        "houseNumber": "14",
+        "postal_code": "14974",
+        "company_name": null,
+        "house_number": "",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": " Kosciow",
+          "firstName": "Hubert"
+        },
+        "contract_number": null,
+        "representative_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 11.76,
+        "finalPriceNet": 12000,
+        "paymentMethod": "transfer",
+        "advancePayment": 7568.4,
+        "sellingPriceNet": 11.76
+      },
+      "product": {
+        "color": "RAL 7016",
+        "width": 6000,
+        "addons": [
+          {
+            "id": "addon-0",
+            "name": "Markise Unterdach (Poddachowa) — Links (Lewa)",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-1",
+            "name": "Zadaszenie z Aluxe 6000 x 4000 (montaż do ściany) TOPSTYLE - 2 slupy 150x110",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-2",
+            "name": "Markiza poddachowa: ACRYL 314030 6000 x 4000 Aluxe",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-3",
+            "name": "zabrać beton - 2 slupy w beton",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-4",
+            "name": "15 LED SPOTS (Nie zamówione zabrać z biura)",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-5",
+            "name": "Będziemy mieli łącznie 9 krokwi (łącznie z zewnętrznymi). Na 5 krokwiach środkowych maja być ledy po 3 sztuki na krokwi.",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-6",
+            "name": "Zabrać gotówkę po montażu 4 300 Euro",
+            "price": 0,
+            "quantity": 1
+          }
+        ],
+        "modelId": "topstyle",
+        "roofType": "other",
+        "projection": 4000,
+        "customItems": [
+          {
+            "id": "addon-0-1776418264872",
+            "name": "Markise Unterdach (Poddachowa) — Links (Lewa)",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-1-1776418264872",
+            "name": "Zadaszenie z Aluxe 6000 x 4000 (montaż do ściany) TOPSTYLE - 2 slupy 150x110",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-2-1776418264872",
+            "name": "Markiza poddachowa: ACRYL 314030 6000 x 4000 Aluxe",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-3-1776418264872",
+            "name": "zabrać beton - 2 slupy w beton",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-4-1776418264872",
+            "name": "15 LED SPOTS (Nie zamówione zabrać z biura)",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-5-1776418264872",
+            "name": "Będziemy mieli łącznie 9 krokwi (łącznie z zewnętrznymi). Na 5 krokwiach środkowych maja być ledy po 3 sztuki na krokwi.",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-6-1776418264872",
+            "name": "Zabrać gotówkę po montażu 4 300 Euro",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 600,
+      "attachments": [
+        {
+          "id": "c695744e-a0aa-48a6-ad23-12a72fd3a628",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/8to15gvb50n_1776593765536.jpeg",
+          "name": "WhatsApp Image 2026-04-19 at 11.58.00.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:16:06.153Z"
+        },
+        {
+          "id": "2ca450fc-71ef-4e12-8f38-843982a14cc5",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/za8y9j616yk_1776593841763.jpeg",
+          "name": "IMG_3145.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:17:31.145Z"
+        },
+        {
+          "id": "4f470b12-41e5-47f6-9ea1-39c45746784b",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/2k1g0yfonuw_1776593871064.jpeg",
+          "name": "WhatsApp Image 2026-04-19 at 11.58.00 (1).jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:17:52.517Z"
+        },
+        {
+          "id": "204f741f-af53-4183-8e19-7a4758fa53f4",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/zbvxdzft8p9_1776593903275.jpeg",
+          "name": "IMG_3146.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:18:41.208Z"
+        },
+        {
+          "id": "7bb414a0-1da7-4d80-b43d-f2bf928624c7",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/myt9apj8t5o_1776593937254.jpeg",
+          "name": "IMG_3147.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:19:09.185Z"
+        },
+        {
+          "id": "a69a6651-abe1-42c5-9177-1f6c5113e8df",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/zmla78v9qi9_1776593990046.jpeg",
+          "name": "IMG_3149.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:20:03.313Z"
+        },
+        {
+          "id": "b2205a7b-20c9-456f-b7e1-2ec9b34d8dd4",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/95yjaua8xgj_1776594015282.jpeg",
+          "name": "IMG_3148.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:20:40.259Z"
+        },
+        {
+          "id": "215adcdb-6f30-4ec3-9766-fde873877a8c",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/tq0ert6exlq_1776594066560.jpeg",
+          "name": "IMG_3150.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:21:30.334Z"
+        },
+        {
+          "id": "cc18eb46-5fd3-40d7-bc19-d1a71bf92358",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/9i60zgruqxp_1776594137437.jpeg",
+          "name": "IMG_3153.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:22:29.318Z"
+        },
+        {
+          "id": "37472f62-f0ed-4ef3-bd58-abe0a8f70887",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/qwajh7sf6g_1776594158472.jpeg",
+          "name": "IMG_3152.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:23:05.662Z"
+        },
+        {
+          "id": "3cbfaaef-4bbd-46b9-8fb2-881c8afa6c73",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/zpwjj990mz_1776594196061.jpeg",
+          "name": "IMG_3154.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:23:25.817Z"
+        },
+        {
+          "id": "e6138e6b-7aaa-4dd0-bbcf-7ef7fcff16e8",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/dhdg8r8h1dk_1776594255745.jpeg",
+          "name": "IMG_3156.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:24:27.089Z"
+        },
+        {
+          "id": "64f5f679-ef7e-44a0-afb8-10297bbcb035",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/mt48qlvk1s_1776594355197.jpeg",
+          "name": "IMG_3157.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:26:09.081Z"
+        },
+        {
+          "id": "78ed6885-9371-43d7-a001-92aa2a37b079",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/sjtl3utkko_1776594391653.jpeg",
+          "name": "IMG_3158.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:26:46.040Z"
+        },
+        {
+          "id": "d7f65ede-7437-4ace-bfe9-e3beaf10e6d3",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/n8ncrz6efj9_1776594415335.jpeg",
+          "name": "IMG_3159.jpeg",
+          "type": "image",
+          "createdAt": "2026-04-19T10:27:11.739Z"
+        },
+        {
+          "id": "63c15f04-773b-4124-86c7-35812c2a612e",
+          "url": "https://whgjsppyuvglhbdgdark.supabase.co/storage/v1/object/public/attachments/contracts/9e9b9536-5dbf-49c6-b075-8ac5ab199383/vha011b9ap_1776847381767.pdf",
+          "name": "Order-Q1776592014-2.pdf",
+          "type": "document",
+          "createdAt": "2026-04-22T08:43:02.624Z"
+        }
+      ],
+      "orderedItems": [
+        {
+          "id": "addon-0-1776418264872",
+          "name": "Markise Unterdach (Poddachowa) — Links (Lewa)",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Awning",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-1-1776418264872",
+          "name": "Zadaszenie z Aluxe 6000 x 4000 (montaż do ściany) TOPSTYLE - 2 slupy 150x110",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-2-1776418264872",
+          "name": "Markiza poddachowa: ACRYL 314030 6000 x 4000 Aluxe",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Awning",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-3-1776418264872",
+          "name": "zabrać beton - 2 slupy w beton",
+          "status": "ordered",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "orderedAt": "2026-05-05T10:57:52.567Z",
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-4-1776418264872",
+          "name": "15 LED SPOTS (Nie zamówione zabrać z biura)",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-5-1776418264872",
+          "name": "Będziemy mieli łącznie 9 krokwi (łącznie z zewnętrznymi). Na 5 krokwiach środkowych maja być ledy po 3 sztuki na krokwi.",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-6-1776418264872",
+          "name": "Zabrać gotówkę po montażu 4 300 Euro",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "HPL/1195/16/04/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-04-17T09:31:04.872+00:00",
+    "status": "signed",
+    "created_at": "2026-04-17T09:31:06.264+00:00",
+    "signed_by": null,
+    "sales_rep_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "installation_days_estimate": 2,
+    "advance_amount": 7568.4,
+    "advance_paid": true,
+    "advance_paid_at": "2026-05-05T10:57:53.08+00:00",
+    "advance_paid_by": "47d34e4e-da12-4834-b1aa-0f7f680ef2ca",
+    "advance_notes": null
+  },
+  {
+    "id": "d925e836-0f65-4c10-a041-01558b06eb87",
+    "offer_id": "ac87398e-671e-4c19-8b64-daf9f5629506",
+    "user_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "contract_data": {
+      "client": {
+        "id": "21041b1d-b1f9-4db7-a4cc-085d71a25cfd",
+        "lat": null,
+        "lng": null,
+        "city": "Wittenberge",
+        "email": "",
+        "notes": null,
+        "phone": "+49 1709619193",
+        "source": "manual",
+        "status": "new",
+        "street": "Dallminer Straße 2",
+        "country": "Deutschland",
+        "lastName": "Scholz",
+        "firstName": "Simone",
+        "last_name": "Scholz",
+        "wind_zone": null,
+        "created_at": "2026-01-13T10:07:43.62417+00:00",
+        "created_by": "01cfbf7c-56d6-4c96-996b-1774a153a068",
+        "first_name": "Simone",
+        "postalCode": "19322",
+        "salutation": null,
+        "updated_at": "2026-01-13T10:07:43.62417+00:00",
+        "companyName": null,
+        "houseNumber": "",
+        "postal_code": "19322",
+        "company_name": null,
+        "house_number": null,
+        "phone_number": null,
+        "snow_zone_din": null,
+        "contract_number": null,
+        "representative_id": null,
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 2700,
+        "finalPriceNet": 2700,
+        "paymentMethod": "cash",
+        "advancePayment": 0,
+        "sellingPriceNet": 2700
+      },
+      "product": {
+        "color": "N/A",
+        "width": 0,
+        "addons": [],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "22d6ecf4-249b-4755-bd42-bda1ebdba03b",
+            "name": "ZIP SCREEN",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 135,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "22d6ecf4-249b-4755-bd42-bda1ebdba03b",
+          "name": "ZIP SCREEN",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "ZIP Screen",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "MPL/1222/05/05/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-05-10T12:15:57.636+00:00",
+    "status": "signed",
+    "created_at": "2026-05-10T12:15:58.442247+00:00",
+    "signed_by": null,
+    "sales_rep_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "installation_days_estimate": 1,
+    "advance_amount": null,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  },
+  {
+    "id": "0bba195d-0da4-4605-9f05-fa445ff28d77",
+    "offer_id": "ed59f1cd-c4df-4f09-8142-86933beb64a9",
+    "user_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "contract_data": {
+      "client": {
+        "id": "691bb32b-054d-4d5a-8741-b5ad8b22c25b",
+        "lat": null,
+        "lng": null,
+        "city": "Spreetal",
+        "email": "contam4@hotmail.com",
+        "notes": null,
+        "phone": "+491783443922",
+        "source": "manual",
+        "status": "new",
+        "street": "Kirchstrasse 13 ",
+        "country": "Deutschland",
+        "lastName": "Oelschalger ",
+        "firstName": "Thomas ",
+        "last_name": "Oelschalger ",
+        "wind_zone": null,
+        "created_at": "2026-03-16T14:33:18.818259+00:00",
+        "created_by": null,
+        "first_name": "Thomas ",
+        "postalCode": "02979",
+        "salutation": null,
+        "updated_at": "2026-03-16T14:33:18.818259+00:00",
+        "companyName": null,
+        "houseNumber": "",
+        "postal_code": "02979",
+        "company_name": null,
+        "house_number": "",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": " Kosciow",
+          "firstName": "Hubert"
+        },
+        "contract_number": null,
+        "representative_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 18193.28,
+        "finalPriceNet": 17601.62601626016,
+        "paymentMethod": "transfer",
+        "advancePayment": 10824.999999999998,
+        "sellingPriceNet": 18193.28
+      },
+      "product": {
+        "color": "RAL 7016",
+        "width": 6000,
+        "addons": [
+          {
+            "id": "addon-0",
+            "name": "Pinela Glas 6000 x 4000 - wolnostojąca",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-1",
+            "name": "zamówić szkło od szklarza niemca (MILCH GLAS 8MM) - cena ok 1500 Euro brutto",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-2",
+            "name": "klient musi otrzymać pozwolenie na budowę",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-3",
+            "name": "system szyb przesuwnych prawa, lewa, front aluxe (patrząc w stronę budynku system szyb otwierany od frontu w prawa stronę, lewa strona w stronę budynku, prawa strona w stronę budynku)",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-4",
+            "name": "LISTWA LED W PINELI MUSI BYC",
+            "price": 0,
+            "quantity": 1
+          },
+          {
+            "id": "addon-5",
+            "name": "profil wyrównujący spadek ok 14m",
+            "price": 0,
+            "quantity": 1
+          }
+        ],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 4000,
+        "customItems": [
+          {
+            "id": "addon-0-1773672064169",
+            "name": "Pinela Glas 6000 x 4000 - wolnostojąca",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-1-1773672064169",
+            "name": "zamówić szkło od szklarza niemca (MILCH GLAS 8MM) - cena ok 1500 Euro brutto",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-2-1773672064169",
+            "name": "klient musi otrzymać pozwolenie na budowę",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-3-1773672064169",
+            "name": "system szyb przesuwnych prawa, lewa, front aluxe (patrząc w stronę budynku system szyb otwierany od frontu w prawa stronę, lewa strona w stronę budynku, prawa strona w stronę budynku)",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-4-1773672064169",
+            "name": "LISTWA LED W PINELI MUSI BYC",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          },
+          {
+            "id": "addon-5-1773672064169",
+            "name": "profil wyrównujący spadek ok 14m",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "addon"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 4,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 909.66,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "addon-0-1773672064169",
+          "name": "Pinela Glas 6000 x 4000 - wolnostojąca",
+          "status": "pending",
+          "details": "Wand: Massivwand | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-1-1773672064169",
+          "name": "zamówić szkło od szklarza niemca (MILCH GLAS 8MM) - cena ok 1500 Euro brutto",
+          "status": "pending",
+          "details": "Wand: Massivwand | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-2-1773672064169",
+          "name": "klient musi otrzymać pozwolenie na budowę",
+          "status": "pending",
+          "details": "Wand: Massivwand | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-3-1773672064169",
+          "name": "system szyb przesuwnych prawa, lewa, front aluxe (patrząc w stronę budynku system szyb otwierany od frontu w prawa stronę, lewa strona w stronę budynku, prawa strona w stronę budynku)",
+          "status": "pending",
+          "details": "Wand: Massivwand | 4 Pfosten",
+          "category": "Sliding Glass",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-4-1773672064169",
+          "name": "LISTWA LED W PINELI MUSI BYC",
+          "status": "pending",
+          "details": "Wand: Massivwand | 4 Pfosten",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        },
+        {
+          "id": "addon-5-1773672064169",
+          "name": "profil wyrównujący spadek ok 14m",
+          "status": "pending",
+          "details": "Wand: Massivwand | 4 Pfosten",
+          "category": "Profiles",
+          "quantity": 1,
+          "technicalSpec": "6000×4000mm, RAL 7016, Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "HPL/1151/16/03/26",
+      "installationNotes": "",
+      "installation_days_estimate": 1
+    },
+    "signed_at": "2026-03-16T14:41:04.169+00:00",
+    "status": "signed",
+    "created_at": "2026-03-16T14:41:05.435763+00:00",
+    "signed_by": null,
+    "sales_rep_id": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "installation_days_estimate": 1,
+    "advance_amount": 10824.999999999998,
+    "advance_paid": true,
+    "advance_paid_at": "2026-05-18T12:14:33.988+00:00",
+    "advance_paid_by": "15fb3c80-269f-42eb-8dcd-be11ed8153b1",
+    "advance_notes": null
+  },
+  {
+    "id": "b3e7f77c-1d26-4767-9202-9d4b5a1bfbb9",
+    "offer_id": "6ab226f6-d3d4-4e92-904a-b97439ceee94",
+    "user_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "contract_data": {
+      "client": {
+        "id": "4da6d250-6d98-41f8-acdf-1752cf84a004",
+        "lat": null,
+        "lng": null,
+        "city": "Ehrenfriedersdorf",
+        "email": "",
+        "notes": null,
+        "phone": "",
+        "source": "manual",
+        "status": "new",
+        "street": "Seifenstraße",
+        "country": "Deutschland",
+        "lastName": "Günther",
+        "firstName": "Mey",
+        "last_name": "Günther",
+        "wind_zone": null,
+        "created_at": "2026-03-21T20:43:46.317573+00:00",
+        "created_by": null,
+        "first_name": "Mey",
+        "postalCode": "09427",
+        "salutation": null,
+        "updated_at": "2026-03-21T20:43:46.317573+00:00",
+        "companyName": null,
+        "houseNumber": "1",
+        "postal_code": "09427",
+        "company_name": null,
+        "house_number": "1",
+        "phone_number": null,
+        "snow_zone_din": null,
+        "representative": {
+          "lastName": "Ledwin",
+          "firstName": "Mike"
+        },
+        "contract_number": null,
+        "representative_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+        "contract_signer_id": null,
+        "structural_recommendation": null
+      },
+      "pricing": {
+        "vatRate": 1.19,
+        "basePrice": 22000,
+        "finalPriceNet": 22000,
+        "paymentMethod": "transfer",
+        "advancePayment": 5546.218487394958,
+        "sellingPriceNet": 22000
+      },
+      "product": {
+        "color": "N/A",
+        "width": 0,
+        "addons": [],
+        "modelId": "MANUAL",
+        "roofType": "other",
+        "projection": 0,
+        "customItems": [
+          {
+            "id": "b732e792-11d8-49a6-8eab-966ea60725d6",
+            "name": "10x LED",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "1089f35a-0870-4b7f-9281-a312fa0cd108",
+            "name": "2x Trojkaty VSG - czyste",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "8b5d324f-2936-47f6-a077-87f403fc5eb4",
+            "name": "Przesuwki 3x Strony",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          },
+          {
+            "id": "bbc3b3ab-4bdb-412b-8f48-e75724b12473",
+            "name": "5060 x 3900",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "topstyle"
+            }
+          },
+          {
+            "id": "ad244381-9d2f-4119-afb5-84481e6285e2",
+            "name": "Markiza Naddachowa",
+            "price": 0,
+            "quantity": 1,
+            "attributes": {
+              "modelId": "other"
+            }
+          }
+        ],
+        "measurements": {
+          "wallType": "massiv",
+          "mountType": "wall",
+          "hasDrainage": false,
+          "hasElectrical": false
+        },
+        "numberOfPosts": 2,
+        "installationType": "wall"
+      },
+      "comments": [],
+      "commission": 1100,
+      "attachments": [],
+      "orderedItems": [
+        {
+          "id": "b732e792-11d8-49a6-8eab-966ea60725d6",
+          "name": "10x LED",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Accessories",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "1089f35a-0870-4b7f-9281-a312fa0cd108",
+          "name": "2x Trojkaty VSG - czyste",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "8b5d324f-2936-47f6-a077-87f403fc5eb4",
+          "name": "Przesuwki 3x Strony",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Other",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        },
+        {
+          "id": "bbc3b3ab-4bdb-412b-8f48-e75724b12473",
+          "name": "5060 x 3900",
+          "status": "pending",
+          "details": "Model: topstyle | Wand: Massivwand",
+          "category": "Roofing",
+          "quantity": 1,
+          "technicalSpec": "Topstyle, Wandmontage"
+        },
+        {
+          "id": "ad244381-9d2f-4119-afb5-84481e6285e2",
+          "name": "Markiza Naddachowa",
+          "status": "pending",
+          "details": "Wand: Massivwand",
+          "category": "Awning",
+          "quantity": 1,
+          "technicalSpec": "Wandmontage"
+        }
+      ],
+      "requirements": {
+        "foundation": false,
+        "powerSupply": false,
+        "constructionProject": false
+      },
+      "contractNumber": "MPL/1176/25/03/26",
+      "installationNotes": "",
+      "installation_days_estimate": 3
+    },
+    "signed_at": "2026-03-25T22:14:23.911+00:00",
+    "status": "signed",
+    "created_at": "2026-03-25T22:14:24.160731+00:00",
+    "signed_by": null,
+    "sales_rep_id": "0375aad6-5e1b-43c1-82c1-640f8cb7feb9",
+    "installation_days_estimate": 3,
+    "advance_amount": 5546.218487394958,
+    "advance_paid": false,
+    "advance_paid_at": null,
+    "advance_paid_by": null,
+    "advance_notes": null
+  }
+]

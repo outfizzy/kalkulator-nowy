@@ -21,25 +21,47 @@ class ConfiguratorWorker {
 
   constructor() {
     // Read config from env vars or .env.local
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
     this.config = {
-      supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
-      supabaseServiceKey:
-        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
+      supabaseUrl,
+      supabaseServiceKey: supabaseKey,
       pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '5000', 10),
       workerId: `worker-${process.env.HOSTNAME || 'local'}-${Date.now()}`,
       headless: process.env.HEADLESS === 'true',
       screenshotDir: path.join(process.cwd(), 'recordings'),
     };
 
-    if (!this.config.supabaseUrl || !this.config.supabaseServiceKey) {
-      console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.');
-      console.error(
-        '   Set them in .env.local or as environment variables before starting the worker.'
-      );
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Missing Supabase environment variables.');
+      console.error('   Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are in .env.local');
       process.exit(1);
     }
 
-    this.supabase = createClient(this.config.supabaseUrl, this.config.supabaseServiceKey);
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+  }
+
+  /**
+   * Authenticates the worker as an admin user (needed for RLS).
+   */
+  private async authenticate(): Promise<void> {
+    const email = process.env.WORKER_ADMIN_EMAIL;
+    const password = process.env.WORKER_ADMIN_PASSWORD;
+
+    if (email && password) {
+      console.log(`  🔐 Authenticating as ${email}...`);
+      const { error } = await this.supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error(`  ❌ Auth failed: ${error.message}`);
+        console.error('  Worker will continue with anon key (limited access).');
+      } else {
+        console.log('  ✅ Authenticated as admin');
+      }
+    } else {
+      console.warn('  ⚠️  No WORKER_ADMIN_EMAIL/PASSWORD set. Using anon key (limited access).');
+      console.warn('     Add WORKER_ADMIN_EMAIL and WORKER_ADMIN_PASSWORD to .env.local');
+    }
   }
 
   /**
@@ -60,6 +82,9 @@ class ConfiguratorWorker {
 
     // Ensure screenshot directory exists
     fs.mkdirSync(this.config.screenshotDir, { recursive: true });
+
+    // Authenticate as admin user (needed for RLS)
+    await this.authenticate();
 
     // Launch browser
     console.log('  🚀 Launching browser...');

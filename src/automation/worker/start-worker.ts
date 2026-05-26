@@ -4,22 +4,24 @@
 // ============================================================================
 //
 // Usage:
-//   npx tsx src/automation/worker/start-worker.ts
+//   npm run worker:start
 //
-// Or with ts-node:
-//   npx ts-node src/automation/worker/start-worker.ts
-//
-// Environment Variables:
-//   VITE_SUPABASE_URL        - Supabase project URL
-//   VITE_SUPABASE_ANON_KEY   - Supabase anon key (dev only)
-//   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key (production)
-//   HEADLESS                  - Set to 'true' for headless browser mode
-//   POLL_INTERVAL_MS          - Job queue poll interval (default: 5000)
+// Environment Variables (in .env.local):
+//   VITE_SUPABASE_URL         - Supabase project URL
+//   VITE_SUPABASE_ANON_KEY    - Supabase anon key
+//   WORKER_ADMIN_EMAIL         - Admin user email for RLS auth
+//   WORKER_ADMIN_PASSWORD      - Admin user password
+//   HEADLESS                   - 'true' for headless browser (default: false = visible)
 //
 // ============================================================================
 
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env.local
 const envPath = path.resolve(__dirname, '../../../.env.local');
@@ -37,12 +39,5 @@ if (process.env.VITE_SUPABASE_URL && !process.env.SUPABASE_URL) {
   process.env.SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 }
 
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VITE_SUPABASE_ANON_KEY) {
-  // Use anon key for development - switch to service role key for production
-  console.warn('⚠️  Using VITE_SUPABASE_ANON_KEY as SUPABASE_SERVICE_ROLE_KEY (dev mode)');
-  console.warn('   For production, set SUPABASE_SERVICE_ROLE_KEY to the service role key.');
-  process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
-}
-
 // Start the worker
-import './index';
+import('./index.js');
