@@ -286,7 +286,8 @@ export class AluxePricingService {
   // ---- Get price for MULTIPLE products in one order ----
   async getMultiProductPrice(requests: PriceRequest[]): Promise<{
     success: boolean;
-    items: { name: string; price: number }[];
+    items: { name: string; price: number }[];              // Cart summary
+    details: { name: string; unitPrice: number | null; qty: number; total: number | null }[];  // Full breakdown
     gesamtpreis: number | null;
     pricing: import('./pricing-engine').OfferPricingResult | null;
     durationMs: number;
@@ -312,18 +313,89 @@ export class AluxePricingService {
         }
       }
       
-      // 3. Extract all items + Gesamtpreis from cart
-      const { items, gesamtpreis } = await this.extractCartItems();
+      // 3. Go to Übersicht page for full breakdown
+      const overzichtLink = await this.page!.$('.rel-overzicht');
+      if (overzichtLink) {
+        await overzichtLink.click();
+        await this.page!.waitForLoadState('networkidle');
+      }
+      
+      // 4. Extract full itemized breakdown from Übersicht
+      const overviewData = await this.page!.evaluate(`(function() {
+        var details = [];
+        var gesamtpreis = null;
+        
+        var tables = document.querySelectorAll('table');
+        tables.forEach(function(table) {
+          table.querySelectorAll('tr').forEach(function(tr) {
+            var cells = [];
+            tr.querySelectorAll('td, th').forEach(function(td) {
+              cells.push(td.textContent.replace(/\\s+/g, ' ').trim());
+            });
+            
+            if (cells.length >= 2) {
+              // Skip header row
+              if (cells[0] === 'Produkt' || cells[0] === 'Product') return;
+              
+              // Check for Gesamt/Total row
+              if (cells[0] === 'Gesamt' || cells[0] === 'Totaal') {
+                var gp = cells[cells.length - 1];
+                if (gp && gp.indexOf('€') !== -1) gesamtpreis = gp;
+                return;
+              }
+              
+              // Skip Zwischensumme, Transport, Pfand labels
+              if (cells[0] === 'Zwischensumme' || cells[0] === 'Subtotaal') return;
+              if (cells[0] === 'Transport') return;
+              if (cells[0].indexOf('Pfand') !== -1 || cells[0].indexOf('Statiegeld') !== -1) return;
+              
+              // Product detail row
+              if (cells[0].length > 2) {
+                details.push({
+                  name: cells[0],
+                  unitPrice: cells.length >= 4 ? cells[1] : null,
+                  qty: cells.length >= 4 ? cells[2] : (cells.length >= 3 ? cells[1] : '1'),
+                  total: cells[cells.length - 1]
+                });
+              }
+            }
+          });
+        });
+        
+        return { details: details, gesamtpreis: gesamtpreis };
+      })()`) as { details: { name: string; unitPrice: string | null; qty: string; total: string }[]; gesamtpreis: string | null };
+      
+      // 5. Parse breakdown into structured data
+      const details = overviewData.details.map(d => ({
+        name: this.translateToGerman(d.name),
+        unitPrice: d.unitPrice ? this.parseEurPrice(d.unitPrice) : null,
+        qty: parseInt(d.qty) || 1,
+        total: d.total ? this.parseEurPrice(d.total) : null,
+      }));
+      
+      const gesamtpreis = overviewData.gesamtpreis ? this.parseEurPrice(overviewData.gesamtpreis) : null;
+      
+      // 6. Extract cart items for pricing
+      const { items } = await this.extractCartItems();
+      
+      // 7. SAVE the offer — "Offerte speichern"
+      const saveBtn = await this.page!.$('#save');
+      if (saveBtn) {
+        await saveBtn.click();
+        await this.page!.waitForLoadState('networkidle').catch(() => {});
+        console.log('[MultiProduct] ✅ Offerte gespeichert');
+      }
+      
       this.lastActivity = Date.now();
       
       if (!gesamtpreis || gesamtpreis <= 0) {
-        return { success: false, items, gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [...errors, 'No Gesamtpreis'] };
+        return { success: false, items, details, gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [...errors, 'No Gesamtpreis'] };
       }
       
-      // 4. Calculate offer price from Gesamtpreis (margin from total!)
+      // 8. Calculate offer price from Gesamtpreis
       const { calculateOfferPrice } = await import('./pricing-engine');
       const lineItems = items.map(item => ({
-        name: item.name,
+        name: this.translateToGerman(item.name),
         aluxeNetPrice: item.price,
         quantity: 1,
       }));
@@ -332,7 +404,8 @@ export class AluxePricingService {
       
       return {
         success: true,
-        items,
+        items: items.map(i => ({ ...i, name: this.translateToGerman(i.name) })),
+        details,
         gesamtpreis,
         pricing,
         durationMs: Date.now() - startTime,
@@ -341,9 +414,62 @@ export class AluxePricingService {
       
     } catch (err) {
       this.isReady = false;
-      return { success: false, items: [], gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [(err as Error).message] };
+      return { success: false, items: [], details: [], gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [(err as Error).message] };
     }
   };
+
+  // ---- Dutch → German translation for Aluxe product names ----
+  private translateToGerman(text: string): string {
+    const translations: [RegExp, string][] = [
+      [/\bmet\b/gi, 'mit'],
+      [/\bplaten\b/gi, 'Platten'],
+      [/\bglas\b/gi, 'Glas'],
+      [/\bveranda\b/gi, 'Veranda'],
+      [/\bschuifwand\b/gi, 'Schiebewand'],
+      [/\bvrijstaand\b/gi, 'freistehend'],
+      [/\bvaste\b/gi, 'feste'],
+      [/\bzij-element(?:en)?\b/gi, 'Seitenelemente'],
+      [/\bschuifdeur(?:en)?\b/gi, 'Schiebetüren'],
+      [/\bwigvormig raam\b/gi, 'Keilfenster'],
+      [/\bvoorwand\b/gi, 'Frontwand'],
+      [/\bpolycarbonaat\b/gi, 'Polycarbonat'],
+      [/\bverlichting\b/gi, 'Beleuchtung'],
+      [/\bzonwering\b/gi, 'Sonnenschutz'],
+      [/\bkoppelgoot\b/gi, 'Koppelrinne'],
+      [/\bgootversteviging\b/gi, 'Rinnenverstärkung'],
+      [/\bpalen?\b/gi, 'Pfosten'],
+      [/\bstaander\b/gi, 'Ständer'],
+      [/\bligger\b/gi, 'Dachträger'],
+      [/\bdak\b/gi, 'Dach'],
+      [/\bkleur\b/gi, 'Farbe'],
+      [/\bspant(?:en)?\b/gi, 'Sparren'],
+      [/\bhelder\b/gi, 'klar'],
+      [/\bmelk(?:wit)?\b/gi, 'matt/milch'],
+      [/\bstandaard\b/gi, 'Standard'],
+      [/\bhoekstuk\b/gi, 'Eckstück'],
+      [/\bafvoer\b/gi, 'Abfluss'],
+      [/\bhoog\b/gi, 'hoch'],
+      [/\blaag\b/gi, 'niedrig'],
+      [/\blinks\b/gi, 'links'],
+      [/\brechts\b/gi, 'rechts'],
+      [/\baantal\b/gi, 'Anzahl'],
+      [/\bstuk(?:s)?\b/gi, 'Stück'],
+      [/\bbreedte\b/gi, 'Breite'],
+      [/\bdiepte\b/gi, 'Tiefe'],
+      [/\bhoogte\b/gi, 'Höhe'],
+      [/\bkit\b/gi, 'Kit'],
+      [/\btransparant\b/gi, 'transparent'],
+      [/\bbocht\b/gi, 'Bogen'],
+      [/\bsierlijst\b/gi, 'Zierleiste'],
+      [/\bafstandsprofiel(?:en)?\b/gi, 'Distanzprofile'],
+    ];
+    
+    let result = text;
+    for (const [pattern, replacement] of translations) {
+      result = result.replace(pattern, replacement);
+    }
+    return result;
+  }
 
   // ---- Fill roof product config (Trendstyle, Topstyle, Ultrastyle, etc.) ----
   private async fillRoofConfig(req: PriceRequest, cfg: Record<string, string>) {
