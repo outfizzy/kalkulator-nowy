@@ -168,16 +168,20 @@ export class AluxePricingService {
   }
 
   // ---- Start a fresh order ----
-  private async startOrder(ref: string): Promise<void> {
+  private async startOrder(customerName: string): Promise<void> {
     await this.page!.goto(`https://bestellen.aluxe.nl/dealer/dealer-order/informatie/?cookie_key=${this.cookieKey}`, {
       waitUntil: 'networkidle', timeout: 12000,
     });
     
-    // Handle both old (#reference) and new (#description) form
+    // Fill customer name as order description (saved in Aluxe system)
     const refField = await this.page!.$('#reference');
     const descField = await this.page!.$('#description');
-    if (refField) await refField.fill(ref);
-    else if (descField) await descField.fill(ref);
+    if (refField) await refField.fill(customerName);
+    if (descField) await descField.fill(customerName);
+    
+    // Fill delivery contact with customer name
+    const deliveryContact = await this.page!.$('#address-delivery--contact-');
+    if (deliveryContact) await deliveryContact.fill(customerName);
     
     // Click next or submit
     const nextBtn = await this.page!.$('#next');
@@ -284,7 +288,7 @@ export class AluxePricingService {
   }
 
   // ---- Get price for MULTIPLE products in one order ----
-  async getMultiProductPrice(requests: PriceRequest[]): Promise<{
+  async getMultiProductPrice(requests: PriceRequest[], customerName?: string): Promise<{
     success: boolean;
     items: { name: string; price: number }[];              // Cart summary
     details: { name: string; unitPrice: number | null; qty: number; total: number | null }[];  // Full breakdown
@@ -299,8 +303,8 @@ export class AluxePricingService {
     try {
       await this.init();
       
-      // 1. Start fresh order
-      await this.startOrder(`Multi-${Date.now()}`);
+      // 1. Start fresh order — saved under customer name
+      await this.startOrder(customerName || `Angebot-${Date.now()}`);
       
       // 2. Add each product to cart
       for (let i = 0; i < requests.length; i++) {
