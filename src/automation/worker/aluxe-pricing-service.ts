@@ -167,7 +167,73 @@ export class AluxePricingService {
     console.log(`[AluxePricing] ✅ Session ready (cookie: ${this.cookieKey})`);
   }
 
-  // ---- Get price for a configuration ----
+  // ---- Start a fresh order ----
+  private async startOrder(ref: string): Promise<void> {
+    await this.page!.goto(`https://bestellen.aluxe.nl/dealer/dealer-order/informatie/?cookie_key=${this.cookieKey}`, {
+      waitUntil: 'networkidle', timeout: 12000,
+    });
+    
+    // Handle both old (#reference) and new (#description) form
+    const refField = await this.page!.$('#reference');
+    const descField = await this.page!.$('#description');
+    if (refField) await refField.fill(ref);
+    else if (descField) await descField.fill(ref);
+    
+    // Click next or submit
+    const nextBtn = await this.page!.$('#next');
+    const submitBtn = await this.page!.$('input[type=submit]');
+    if (nextBtn) await nextBtn.click();
+    else if (submitBtn) await submitBtn.click();
+    
+    await this.page!.waitForLoadState('networkidle').catch(() => {});
+    await this.page!.waitForTimeout(500);
+  }
+
+  // ---- Add a single product to current cart ----
+  private async addProductToCart(request: PriceRequest): Promise<{ success: boolean; error?: string }> {
+    const productId = PRODUCT_LINE_MAP[request.productLine];
+    if (!productId) return { success: false, error: `Unknown product: ${request.productLine}` };
+    
+    // Navigate to product
+    await this.page!.goto(
+      `https://bestellen.aluxe.nl/dealer/dealer-order/product/?product_id=${productId}&cookie_key=${this.cookieKey}`,
+      { waitUntil: 'networkidle', timeout: 15000 }
+    );
+    
+    // Fill configuration
+    const configUsed: Record<string, string> = {};
+    
+    if (WALL_PRODUCTS.has(request.productLine)) {
+      await this.fillWallConfig(request, configUsed);
+    } else if (PANORAMA_PRODUCTS.has(request.productLine)) {
+      await this.fillPanoramaConfig(request, configUsed);
+    } else if (request.productLine === 'markise') {
+      await this.fillMarkiseConfig(request, configUsed);
+    } else if (SENKRECHTMARKISE_PRODUCTS.has(request.productLine)) {
+      await this.fillSenkrechtmarkiseConfig(request, configUsed);
+    } else {
+      if (DESIGNLINE_PRODUCTS.has(request.productLine) && (!request.color || request.color === '7016')) {
+        request.color = '9005';
+      }
+      await this.fillRoofConfig(request, configUsed);
+    }
+    
+    // Submit product
+    await this.page!.click('#next');
+    await this.page!.waitForLoadState('networkidle');
+    await this.page!.waitForTimeout(300);
+    
+    // Go to materialen to register in cart
+    const matLink = await this.page!.$('.rel-materialen');
+    if (matLink) {
+      await matLink.click();
+      await this.page!.waitForLoadState('networkidle');
+    }
+    
+    return { success: true };
+  }
+
+  // ---- Get price for a single configuration ----
   async getPrice(request: PriceRequest): Promise<PriceResponse> {
     const startTime = Date.now();
     
@@ -180,57 +246,15 @@ export class AluxePricingService {
       }
       
       // 1. Start fresh order
-      await this.page!.goto(`https://bestellen.aluxe.nl/dealer/?cookie_key=${this.cookieKey}`, {
-        waitUntil: 'networkidle', timeout: 12000,
-      }).catch(() => {});
+      await this.startOrder(`OnDemand-${Date.now()}`);
       
-      await this.page!.goto(`https://bestellen.aluxe.nl/dealer/dealer-order/informatie/?cookie_key=${this.cookieKey}`, {
-        waitUntil: 'networkidle', timeout: 12000,
-      });
-      
-      const ref = await this.page!.$('#reference');
-      if (ref) await ref.fill(`OnDemand-${Date.now()}`);
-      await this.page!.click('#next');
-      await this.page!.waitForLoadState('networkidle');
-      
-      // 2. Navigate to product
-      await this.page!.goto(
-        `https://bestellen.aluxe.nl/dealer/dealer-order/product/?product_id=${productId}&cookie_key=${this.cookieKey}`,
-        { waitUntil: 'networkidle', timeout: 15000 }
-      );
-      
-      // 3. Fill configuration based on product type
-      const configUsed: Record<string, string> = {};
-      
-      if (WALL_PRODUCTS.has(request.productLine)) {
-        await this.fillWallConfig(request, configUsed);
-      } else if (PANORAMA_PRODUCTS.has(request.productLine)) {
-        await this.fillPanoramaConfig(request, configUsed);
-      } else if (request.productLine === 'markise') {
-        await this.fillMarkiseConfig(request, configUsed);
-      } else if (SENKRECHTMARKISE_PRODUCTS.has(request.productLine)) {
-        await this.fillSenkrechtmarkiseConfig(request, configUsed);
-      } else {
-        // For Designline: override color to 9005 (no 7016 available)
-        if (DESIGNLINE_PRODUCTS.has(request.productLine) && (!request.color || request.color === '7016')) {
-          request.color = '9005';
-        }
-        await this.fillRoofConfig(request, configUsed);
+      // 2. Add product to cart
+      const addResult = await this.addProductToCart(request);
+      if (!addResult.success) {
+        return this.errorResponse(request, addResult.error || 'Failed to add product', startTime);
       }
       
-      // 4. Submit and get price
-      await this.page!.click('#next');
-      await this.page!.waitForLoadState('networkidle');
-      await this.page!.waitForTimeout(300);
-      
-      // Navigate to materialen if needed
-      const matLink = await this.page!.$('.rel-materialen');
-      if (matLink) {
-        await matLink.click();
-        await this.page!.waitForLoadState('networkidle');
-      }
-      
-      // 5. Extract price
+      // 3. Extract price (Gesamtpreis)
       const aluxePrice = await this.extractPrice();
       this.lastActivity = Date.now();
       
@@ -238,7 +262,7 @@ export class AluxePricingService {
         return this.errorResponse(request, 'No price returned from Aluxe', startTime);
       }
       
-      // 6. Calculate customer price
+      // 4. Calculate customer price
       const pricing = calculateCustomerPrice({ aluxeNetPrice: aluxePrice });
       
       return {
@@ -248,16 +272,78 @@ export class AluxePricingService {
         productLine: request.productLine,
         productId,
         dimensions: `${request.width}×${request.depth}`,
-        configurationUsed: configUsed,
+        configurationUsed: {},
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
       };
       
     } catch (err) {
-      this.isReady = false; // Force re-login on next request
+      this.isReady = false;
       return this.errorResponse(request, (err as Error).message, startTime);
     }
   }
+
+  // ---- Get price for MULTIPLE products in one order ----
+  async getMultiProductPrice(requests: PriceRequest[]): Promise<{
+    success: boolean;
+    items: { name: string; price: number }[];
+    gesamtpreis: number | null;
+    pricing: import('./pricing-engine').OfferPricingResult | null;
+    durationMs: number;
+    errors: string[];
+  }> {
+    const startTime = Date.now();
+    const errors: string[] = [];
+    
+    try {
+      await this.init();
+      
+      // 1. Start fresh order
+      await this.startOrder(`Multi-${Date.now()}`);
+      
+      // 2. Add each product to cart
+      for (let i = 0; i < requests.length; i++) {
+        const req = requests[i];
+        console.log(`[MultiProduct] Adding ${i + 1}/${requests.length}: ${req.productLine} ${req.width}×${req.depth}`);
+        
+        const result = await this.addProductToCart(req);
+        if (!result.success) {
+          errors.push(`${req.productLine}: ${result.error}`);
+        }
+      }
+      
+      // 3. Extract all items + Gesamtpreis from cart
+      const { items, gesamtpreis } = await this.extractCartItems();
+      this.lastActivity = Date.now();
+      
+      if (!gesamtpreis || gesamtpreis <= 0) {
+        return { success: false, items, gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [...errors, 'No Gesamtpreis'] };
+      }
+      
+      // 4. Calculate offer price from Gesamtpreis (margin from total!)
+      const { calculateOfferPrice } = await import('./pricing-engine');
+      const lineItems = items.map(item => ({
+        name: item.name,
+        aluxeNetPrice: item.price,
+        quantity: 1,
+      }));
+      
+      const pricing = calculateOfferPrice({ lineItems });
+      
+      return {
+        success: true,
+        items,
+        gesamtpreis,
+        pricing,
+        durationMs: Date.now() - startTime,
+        errors,
+      };
+      
+    } catch (err) {
+      this.isReady = false;
+      return { success: false, items: [], gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [(err as Error).message] };
+    }
+  };
 
   // ---- Fill roof product config (Trendstyle, Topstyle, Ultrastyle, etc.) ----
   private async fillRoofConfig(req: PriceRequest, cfg: Record<string, string>) {
@@ -291,10 +377,33 @@ export class AluxePricingService {
       cfg.color = '7016';
     }
     
-    if (req.postHeight) {
-      await p.selectOption('#height', req.postHeight).catch(() => {});
-      cfg.postHeight = req.postHeight;
+    // ═══ POLENDACH24 STANDARDS — zawsze dodawane ═══
+    
+    // Słupy ZAWSZE 3000mm (nie 2400 default!)
+    const heightField = await p.$('#height');
+    if (heightField) {
+      const tag = await p.evaluate(`document.querySelector('#height')?.tagName`);
+      if (tag === 'SELECT') {
+        await p.selectOption('#height', req.postHeight || '3000').catch(() => {});
+      } else {
+        await p.fill('#height', req.postHeight || '3000').catch(() => {});
+      }
+      cfg.postHeight = req.postHeight || '3000';
     }
+    
+    // Silikon kit (HWA) — ZAWSZE Ja
+    await p.selectOption('#standard_kit', '1').catch(() => {});
+    cfg.standard_kit = 'Ja';
+    
+    // HWA Bohr 83mm — ZAWSZE Ja
+    await p.selectOption('#hole_drill', '1').catch(() => {});
+    cfg.hole_drill = 'Ja';
+    
+    // Bocht 90 — ZAWSZE Ja
+    await p.selectOption('#bocht_90', '1').catch(() => {});
+    cfg.bocht_90 = 'Ja';
+    
+    // ═══ END STANDARDS ═══
     
     if (req.postType) {
       await p.selectOption('#staander_type', req.postType).catch(() => {});
