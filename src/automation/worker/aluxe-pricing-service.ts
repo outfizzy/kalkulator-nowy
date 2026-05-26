@@ -68,10 +68,16 @@ const PRODUCT_LINE_MAP = {
   topstyle_glas: ALUXE_PRODUCTS.topline_glas,
   topstyle_xl_poly: ALUXE_PRODUCTS.topline_xl_platten,
   topstyle_xl_glas: ALUXE_PRODUCTS.topline_xl_glas,
-  // Premium
-  designline: ALUXE_PRODUCTS.designline,
-  ultraline: ALUXE_PRODUCTS.ultraline,
-  skyline: ALUXE_PRODUCTS.skyline,
+  // Premium (Designstyle, Ultrastyle, Skystyle)
+  designstyle: ALUXE_PRODUCTS.designline,
+  designline: ALUXE_PRODUCTS.designline, // alias
+  ultrastyle: ALUXE_PRODUCTS.ultraline, // default = classic
+  ultrastyle_classic: ALUXE_PRODUCTS.ultraline,
+  ultrastyle_style: ALUXE_PRODUCTS.ultraline,
+  ultrastyle_compact: ALUXE_PRODUCTS.ultraline,
+  ultraline: ALUXE_PRODUCTS.ultraline, // alias
+  skystyle: ALUXE_PRODUCTS.skyline,
+  skyline: ALUXE_PRODUCTS.skyline, // alias
   // Carport
   carport: ALUXE_PRODUCTS.carport,
   carport_frei: ALUXE_PRODUCTS.carport_frei,
@@ -255,9 +261,20 @@ export class AluxePricingService {
     }
   }
 
-  // ---- Fill roof product config (Trendstyle, Topstyle, Ultraline, etc.) ----
+  // ---- Fill roof product config (Trendstyle, Topstyle, Ultrastyle, etc.) ----
   private async fillRoofConfig(req: PriceRequest, cfg: Record<string, string>) {
     const p = this.page!;
+    
+    // Ultrastyle variant selection (Classic/Style/Compact)
+    const ultraType = await p.$('#ultra_type');
+    if (ultraType) {
+      let variant = 'classic'; // default
+      if (req.productLine === 'ultrastyle_style') variant = 'style';
+      else if (req.productLine === 'ultrastyle_compact') variant = 'compact';
+      await p.selectOption('#ultra_type', variant).catch(() => {});
+      cfg.ultra_type = variant;
+      await p.waitForTimeout(300); // Wait for form update
+    }
     
     await p.fill('#width', String(req.width));
     cfg.width = String(req.width);

@@ -4,38 +4,50 @@
 // Assembly (Montage) excluded for now — will be added later
 // ============================================================================
 
-// Name mapping: Aluxe → Polendach24
+// Name mapping: Aluxe → Polendach24 (pattern: "line" → "style")
 export const ALUXE_TO_POLENDACH: Record<string, string> = {
-  // Pattern: "line" → "style" for main product lines
+  // Trendline → Trendstyle
   'Trendline veranda - mit Platten': 'Trendstyle mit Polycarbonat',
   'Trendline Veranda - mit Glas': 'Trendstyle mit Glas',
   'Trendline plus veranda - Trendline plus mit Platten': 'Trendstyle Plus mit Polycarbonat',
   'Trendline plus Veranda - Trendline Plus mit Glas': 'Trendstyle Plus mit Glas',
+  // Topline → Topstyle
   'Topline XL Veranda - XL mit Platten': 'Topstyle XL mit Polycarbonat',
   'Topline XL Veranda - XL mit Glas': 'Topstyle XL mit Glas',
   'Topline Veranda - mit Platten': 'Topstyle mit Polycarbonat',
   'Topline Veranda - mit Glas': 'Topstyle mit Glas',
-  'Designline veranda': 'Designline',
-  'Ultraline veranda': 'Ultraline',
+  // Ultraline → Ultrastyle (3 variants: Classic, Style, Compact)
+  'Ultraline veranda': 'Ultrastyle',
+  'Ultraline Classic': 'Ultrastyle Classic',
+  'Ultraline Style': 'Ultrastyle Style',
+  'Ultraline Compact': 'Ultrastyle Compact',
+  // Designline → Designstyle
+  'Designline veranda': 'Designstyle',
+  // Skyline → Skystyle
+  'Skyline veranda': 'Skystyle',
+  'Skyline freistehend': 'Skystyle Freistehend',
+  // Orangeline → Orangestyle
+  'Orangeline plus veranda - Orangeline plus mit polycarbonat': 'Orangestyle Plus Poly',
+  'Orangeline plus veranda - Orangeline plus mit Glas': 'Orangestyle Plus Glas',
+  'Orangeline veranda - für polycarbonat': 'Orangestyle Poly',
+  'Orangeline veranda - mit Glas': 'Orangestyle Glas',
+  // Carport
   'Carport mit Wandanschluß': 'Carport',
   'Carport freistehend': 'Carport Freistehend',
-  'Panorama Schiebewand AL25 hoch': 'Panorama Schiebewand AL25',
-  'Panorama Schiebewand AL24': 'Panorama Schiebewand AL24',
-  'Panorama Schiebewand AL26': 'Panorama Schiebewand AL26',
-  'Panorama Schiebewand AL23 hoch': 'Panorama Schiebewand AL23',
-  'Panorama Schiebewand AL22 flach': 'Panorama Schiebewand AL22',
+  // Panorama
+  'Panorama Schiebewand AL25 hoch': 'System szyb przesuwnych AL25',
+  'Panorama Schiebewand AL24': 'System szyb przesuwnych AL24',
+  'Panorama Schiebewand AL26': 'System szyb przesuwnych AL26',
+  'Panorama Schiebewand AL23 hoch': 'System szyb przesuwnych AL23',
+  'Panorama Schiebewand AL22 flach': 'System szyb przesuwnych AL22',
+  // Ściany
   'Aluminum Seiten-Wand': 'Feste Seitenelemente',
   'Keilfenster': 'Keilfenster',
   'Frontwand': 'Frontwand',
   'Rahmen mit Schiebetüren': 'Rahmen mit Schiebetüren',
-  'Markise': 'Markise / ZIP Screen',
-  'Verticale zonwering': 'ZIP Screen Vertikal',
-  'Skyline veranda': 'Skyline',
-  'Skyline freistehend': 'Skyline Freistehend',
-  'Orangeline plus veranda - Orangeline plus mit polycarbonat': 'Orangeline Plus Poly',
-  'Orangeline plus veranda - Orangeline plus mit Glas': 'Orangeline Plus Glas',
-  'Orangeline veranda - für polycarbonat': 'Orangeline Poly',
-  'Orangeline veranda - mit Glas': 'Orangeline Glas',
+  // Markise / ZIP
+  'Markise': 'Markise ZIP',
+  'Verticale zonwering': 'Senkrechtmarkise',
 };
 
 // ============================================================================
@@ -70,19 +82,31 @@ export const BUSINESS_RULES = {
       'TR+': 'Trendline+ (Trendstyle Plus)',
       'TL': 'Topline (Topstyle)',
       'TLXL': 'Topline XL (Topstyle XL)',
-      'OL': 'Orangeline',
-      'OL+': 'Orangeline+',
+      'OL': 'Orangeline (Orangestyle)',
+      'OL+': 'Orangeline+ (Orangestyle Plus)',
     },
   },
   
-  // Name mapping summary
+  // Ultraline has 3 variants via #ultra_type select
+  ultraline: {
+    variants: {
+      'classic': 'Ultrastyle Classic',
+      'style': 'Ultrastyle Style', 
+      'compact': 'Ultrastyle Compact',
+    },
+    defaultVariant: 'classic',
+    selectId: '#ultra_type',
+    note: 'Ultraline/Ultrastyle ma 3 warianty: Classic, Style, Compact',
+  },
+  
+  // Name mapping summary: ALWAYS "line" → "style"
   naming: {
     'Trendline': 'Trendstyle',
     'Topline': 'Topstyle',
-    'Designline': 'Designline',
-    'Ultraline': 'Ultraline',
-    'Skyline': 'Skyline',
-    'Orangeline': 'Orangeline',
+    'Designline': 'Designstyle',
+    'Ultraline': 'Ultrastyle',
+    'Skyline': 'Skystyle',
+    'Orangeline': 'Orangestyle',
     'Panorama Schiebewand': 'System szyb przesuwnych',
     'Verticale zonwering': 'Senkrechtmarkise',
     'Bovendak/Onderdak zonwering': 'Markise ZIP',
