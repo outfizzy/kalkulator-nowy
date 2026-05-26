@@ -422,9 +422,20 @@ export class AluxePricingService {
     }
   };
 
-  // ---- Dutch → German translation for Aluxe product names ----
+  // ---- Polendach24 naming + Dutch → German translation ----
   private translateToGerman(text: string): string {
     const translations: [RegExp, string][] = [
+      // ═══ POLENDACH24 BRAND NAMES (must be first!) ═══
+      [/\bTrendline plus\b/gi, 'Trendstyle 15 Plus'],
+      [/\bTrendline\b/gi, 'Trendstyle 15'],
+      [/\bTopline XL\b/gi, 'Topstyle 20'],
+      [/\bTopline\b/gi, 'Topstyle 20'],
+      [/\bOrangeline plus\b/gi, 'Orangestyle 10 Plus'],
+      [/\bOrangeline\b/gi, 'Orangestyle 10'],
+      [/\bUltraline\b/gi, 'Ultrastyle'],
+      [/\bSkyline\b/gi, 'Skystyle'],
+      [/\bDesignline\b/gi, 'Designstyle'],
+      // ═══ DUTCH → GERMAN ═══
       [/\bmet\b/gi, 'mit'],
       [/\bplaten\b/gi, 'Platten'],
       [/\bglas\b/gi, 'Glas'],
