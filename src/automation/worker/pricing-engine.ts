@@ -120,8 +120,7 @@ export const BUSINESS_RULES = {
 // --- Single item input (backward compat) ---
 export interface PricingInput {
   aluxeNetPrice: number;      // Cena netto z konfiguratora Aluxe (EUR) — GESAMTPREIS
-  transportAluxe?: number;    // Transport Aluxe (default ~€200)
-  productType?: string;       // Typ produktu (dla przyszłych reguł per-produkt)
+  productType?: string;       // Typ produktu
 }
 
 // --- Multi-item offer input ---
@@ -133,24 +132,22 @@ export interface OfferLineItem {
 
 export interface OfferPricingInput {
   lineItems: OfferLineItem[];  // Pozycje w ofercie
-  transportAluxe?: number;     // Transport (default €200)
 }
 
 export interface OfferPricingResult {
-  // Pozycje
+  // Pozycje (do oferty)
   lineItems: OfferLineItem[];
   
   // Aluxe side — GESAMTPREIS (suma wszystkich pozycji)
   aluxeGesamtpreis: number;    // Suma netto wszystkich pozycji
-  aluxeTransport: number;
-  aluxeTotal: number;          // Gesamtpreis + transport
+  // Transport+pakowanie WLICZONE w cenę — nie wyciągaj jako pozycji!
   
   // Margin — ZAWSZE od Gesamtpreis
   marginPercent: number;
   marginAmount: number;
   minimumMarginApplied: boolean;
   
-  // Customer price
+  // Customer price (transport wliczony)
   customerNetPrice: number;
   customerVAT: number;
   customerGrossPrice: number;
@@ -164,15 +161,14 @@ export interface OfferPricingResult {
 export interface PricingResult {
   // Aluxe side
   aluxeNetPrice: number;
-  aluxeTransport: number;
-  aluxeTotal: number;
+  aluxeTotal: number;          // Gesamtpreis + transport (transport wliczony)
   
   // Margin calculation — od Gesamtpreis
   marginPercent: number;
   marginAmount: number;
   minimumMarginApplied: boolean;
   
-  // Customer price (without assembly)
+  // Customer price (transport wliczony, nie jako osobna pozycja)
   customerNetPrice: number;
   customerVAT: number;
   customerGrossPrice: number;
@@ -223,8 +219,7 @@ export function calculateCustomerPrice(input: PricingInput): PricingResult {
   
   return {
     aluxeNetPrice: round2(aluxeNet),
-    aluxeTransport: round2(transport),
-    aluxeTotal: round2(aluxeTotal),
+    aluxeTotal: round2(aluxeTotal), // transport wliczony
     
     marginPercent: round2(effectiveMarginPercent * 100),
     marginAmount: round2(marginAmount),
@@ -284,8 +279,7 @@ export function calculateOfferPrice(input: OfferPricingInput): OfferPricingResul
     lineItems: input.lineItems,
     
     aluxeGesamtpreis: round2(gesamtpreis),
-    aluxeTransport: round2(transport),
-    aluxeTotal: round2(aluxeTotal),
+    // transport wliczony w cenę — nie wyciągaj jako pozycji!
     
     marginPercent: round2(effectiveMarginPercent * 100),
     marginAmount: round2(marginAmount),

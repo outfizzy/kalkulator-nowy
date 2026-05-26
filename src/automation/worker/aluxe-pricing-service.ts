@@ -38,9 +38,8 @@ export interface PriceRequest {
 export interface PriceResponse {
   success: boolean;
   
-  // Aluxe data
+  // Aluxe data (transport wliczony w cenę)
   aluxeNetPrice: number | null;
-  aluxeTransport: number;
   
   // Polendach24 pricing
   pricing: PricingResult | null;
@@ -245,7 +244,6 @@ export class AluxePricingService {
       return {
         success: true,
         aluxeNetPrice: aluxePrice,
-        aluxeTransport: 200,
         pricing,
         productLine: request.productLine,
         productId,
@@ -507,7 +505,6 @@ export class AluxePricingService {
     return {
       success: false,
       aluxeNetPrice: null,
-      aluxeTransport: 200,
       pricing: null,
       productLine: req.productLine,
       productId: PRODUCT_LINE_MAP[req.productLine] || '',
