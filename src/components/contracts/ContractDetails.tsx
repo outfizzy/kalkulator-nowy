@@ -811,16 +811,188 @@ export const ContractDetails: React.FC = () => {
                                     <table className="w-full text-sm">
                                         <thead className="bg-slate-100 border-b border-slate-200">
                                             <tr>
+                                                <th className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase w-10">✓</th>
                                                 <th className="p-2 text-left text-[10px] font-bold text-slate-500 uppercase">Nazwa</th>
                                                 <th className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase w-14">Ilość</th>
+                                                <th className="p-2 text-right text-[10px] font-bold text-slate-500 uppercase w-32">Cena zakupu</th>
+                                                <th className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase w-24">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {contract.product.customItems.map((item, i) => (
-                                                <tr key={i} className="hover:bg-white"><td className="p-2 font-medium text-slate-700">{item.name}</td><td className="p-2 text-center font-bold text-slate-800">{item.quantity}</td></tr>
-                                            ))}
+                                            {contract.product.customItems.map((item, i) => {
+                                                const orderedItem = (contract.orderedItems || []).find(
+                                                    oi => oi.name === item.name && oi.category === 'Other'
+                                                );
+                                                const isOrdered = orderedItem && orderedItem.status !== 'pending';
+                                                const currentCost = orderedItem?.purchaseCost || 0;
+
+                                                const handleQuickOrder = async (checked: boolean, cost?: number) => {
+                                                    const existingItems = contract.orderedItems || [];
+                                                    const existingIdx = existingItems.findIndex(
+                                                        oi => oi.name === item.name && oi.category === 'Other'
+                                                    );
+
+                                                    let newItems = [...existingItems];
+                                                    const now = new Date().toISOString();
+
+                                                    if (checked || (cost !== undefined && cost > 0)) {
+                                                        if (existingIdx >= 0) {
+                                                            newItems[existingIdx] = {
+                                                                ...newItems[existingIdx],
+                                                                status: 'ordered',
+                                                                orderedAt: newItems[existingIdx].orderedAt || now,
+                                                                ...(cost !== undefined ? { purchaseCost: cost } : {}),
+                                                            };
+                                                        } else {
+                                                            newItems.push({
+                                                                id: crypto.randomUUID(),
+                                                                category: 'Other',
+                                                                name: item.name,
+                                                                status: 'ordered',
+                                                                quantity: item.quantity || 1,
+                                                                orderedAt: now,
+                                                                ...(cost !== undefined ? { purchaseCost: cost } : {}),
+                                                            });
+                                                        }
+                                                    } else {
+                                                        if (existingIdx >= 0) {
+                                                            newItems[existingIdx] = {
+                                                                ...newItems[existingIdx],
+                                                                status: 'pending',
+                                                            };
+                                                        }
+                                                    }
+
+                                                    const updatedContract = { ...contract, orderedItems: newItems };
+                                                    setContract(updatedContract);
+                                                    try {
+                                                        await DatabaseService.updateContract(contract.id, updatedContract);
+                                                        if (checked) toast.success(`${item.name} → Zamówione`);
+                                                    } catch {
+                                                        toast.error('Błąd zapisu');
+                                                    }
+                                                };
+
+                                                const handleCostChange = async (value: string) => {
+                                                    const cost = parseFloat(value) || 0;
+                                                    const existingItems = contract.orderedItems || [];
+                                                    const existingIdx = existingItems.findIndex(
+                                                        oi => oi.name === item.name && oi.category === 'Other'
+                                                    );
+                                                    const now = new Date().toISOString();
+                                                    let newItems = [...existingItems];
+
+                                                    if (existingIdx >= 0) {
+                                                        newItems[existingIdx] = {
+                                                            ...newItems[existingIdx],
+                                                            purchaseCost: cost,
+                                                            ...(cost > 0 && newItems[existingIdx].status === 'pending' ? { status: 'ordered' as const, orderedAt: now } : {}),
+                                                        };
+                                                    } else if (cost > 0) {
+                                                        newItems.push({
+                                                            id: crypto.randomUUID(),
+                                                            category: 'Other',
+                                                            name: item.name,
+                                                            status: 'ordered',
+                                                            quantity: item.quantity || 1,
+                                                            orderedAt: now,
+                                                            purchaseCost: cost,
+                                                        });
+                                                    }
+
+                                                    setContract({ ...contract, orderedItems: newItems });
+                                                };
+
+                                                const handleCostBlur = async () => {
+                                                    try {
+                                                        await DatabaseService.updateContract(contract.id, contract);
+                                                    } catch {
+                                                        toast.error('Błąd zapisu');
+                                                    }
+                                                };
+
+                                                const statusLabel = orderedItem
+                                                    ? { pending: '⏳', ordered: '📦', in_production: '🏭', shipped: '🚚', delivered: '✅' }[orderedItem.status] || '—'
+                                                    : '—';
+
+                                                return (
+                                                    <tr key={i} className={`hover:bg-white transition-colors ${isOrdered ? 'bg-blue-50/40' : ''}`}>
+                                                        <td className="p-2 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!isOrdered}
+                                                                onChange={(e) => handleQuickOrder(e.target.checked)}
+                                                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                                                title={isOrdered ? 'Cofnij zamówienie' : 'Oznacz jako zamówione'}
+                                                            />
+                                                        </td>
+                                                        <td className="p-2 font-medium text-slate-700">
+                                                            {item.name}
+                                                            {orderedItem?.orderedAt && (
+                                                                <span className="ml-2 text-[9px] text-slate-400">
+                                                                    {new Date(orderedItem.orderedAt).toLocaleDateString('pl-PL')}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-2 text-center font-bold text-slate-800">{item.quantity}</td>
+                                                        <td className="p-2 text-right">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={currentCost || ''}
+                                                                onChange={(e) => handleCostChange(e.target.value)}
+                                                                onBlur={handleCostBlur}
+                                                                className={`w-full p-1 text-right text-xs border rounded font-bold outline-none transition-colors ${
+                                                                    currentCost > 0
+                                                                        ? 'border-emerald-300 bg-emerald-50/50 text-emerald-700 focus:border-emerald-500'
+                                                                        : 'border-slate-200 bg-white text-slate-600 focus:border-blue-400'
+                                                                }`}
+                                                                placeholder="0.00 €"
+                                                            />
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            {orderedItem ? (
+                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                                    orderedItem.status === 'ordered' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                    orderedItem.status === 'in_production' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                                                    orderedItem.status === 'shipped' ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                                                                    orderedItem.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                                }`}>
+                                                                    {statusLabel}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
+                                    {/* Quick total */}
+                                    {(() => {
+                                        const orderedCosts = (contract.product.customItems || []).reduce((sum, item) => {
+                                            const oi = (contract.orderedItems || []).find(o => o.name === item.name && o.category === 'Other');
+                                            return sum + ((oi?.purchaseCost || 0) * (item.quantity || 1));
+                                        }, 0);
+                                        const orderedCount = (contract.product.customItems || []).filter(item =>
+                                            (contract.orderedItems || []).some(oi => oi.name === item.name && oi.category === 'Other' && oi.status !== 'pending')
+                                        ).length;
+                                        return orderedCount > 0 ? (
+                                            <div className="px-3 py-2 bg-blue-50 border-t border-blue-200 flex items-center justify-between text-xs">
+                                                <span className="text-blue-600 font-medium">
+                                                    📦 {orderedCount}/{contract.product.customItems!.length} zamówionych
+                                                </span>
+                                                {orderedCosts > 0 && (
+                                                    <span className="font-bold text-emerald-700">
+                                                        💰 {orderedCosts.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € netto
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : null;
+                                    })()}
                                 </div>
                             </div>
                         )}
@@ -829,14 +1001,108 @@ export const ContractDetails: React.FC = () => {
                         {(!contract.product.customItems || contract.product.customItems.length === 0) && contract.product.addons && contract.product.addons.length > 0 && (
                             <div className="mb-4">
                                 <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Dodatki</h4>
-                                <ul className="space-y-1">
-                                    {contract.product.addons.map((addon, i) => (
-                                        <li key={i} className="text-sm text-slate-600 flex justify-between p-2 bg-slate-50 rounded-lg">
-                                            <span>{addon.name}</span>
-                                            <span className="font-bold text-slate-700">×{addon.quantity || 1}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-slate-100 border-b border-slate-200">
+                                            <tr>
+                                                <th className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase w-10">✓</th>
+                                                <th className="p-2 text-left text-[10px] font-bold text-slate-500 uppercase">Nazwa</th>
+                                                <th className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase w-14">Ilość</th>
+                                                <th className="p-2 text-right text-[10px] font-bold text-slate-500 uppercase w-32">Cena zakupu</th>
+                                                <th className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase w-24">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {contract.product.addons.map((addon, i) => {
+                                                const orderedItem = (contract.orderedItems || []).find(
+                                                    oi => oi.name === addon.name && oi.category === 'Accessories'
+                                                );
+                                                const isOrdered = orderedItem && orderedItem.status !== 'pending';
+                                                const currentCost = orderedItem?.purchaseCost || 0;
+
+                                                const handleQuickOrder = async (checked: boolean) => {
+                                                    const existingItems = contract.orderedItems || [];
+                                                    const existingIdx = existingItems.findIndex(
+                                                        oi => oi.name === addon.name && oi.category === 'Accessories'
+                                                    );
+                                                    let newItems = [...existingItems];
+                                                    const now = new Date().toISOString();
+
+                                                    if (checked) {
+                                                        if (existingIdx >= 0) {
+                                                            newItems[existingIdx] = { ...newItems[existingIdx], status: 'ordered', orderedAt: newItems[existingIdx].orderedAt || now };
+                                                        } else {
+                                                            newItems.push({ id: crypto.randomUUID(), category: 'Accessories', name: addon.name, status: 'ordered', quantity: addon.quantity || 1, orderedAt: now });
+                                                        }
+                                                    } else {
+                                                        if (existingIdx >= 0) {
+                                                            newItems[existingIdx] = { ...newItems[existingIdx], status: 'pending' };
+                                                        }
+                                                    }
+
+                                                    const updatedContract = { ...contract, orderedItems: newItems };
+                                                    setContract(updatedContract);
+                                                    try {
+                                                        await DatabaseService.updateContract(contract.id, updatedContract);
+                                                        if (checked) toast.success(`${addon.name} → Zamówione`);
+                                                    } catch { toast.error('Błąd zapisu'); }
+                                                };
+
+                                                const handleCostChange = (value: string) => {
+                                                    const cost = parseFloat(value) || 0;
+                                                    const existingItems = contract.orderedItems || [];
+                                                    const existingIdx = existingItems.findIndex(oi => oi.name === addon.name && oi.category === 'Accessories');
+                                                    const now = new Date().toISOString();
+                                                    let newItems = [...existingItems];
+
+                                                    if (existingIdx >= 0) {
+                                                        newItems[existingIdx] = { ...newItems[existingIdx], purchaseCost: cost, ...(cost > 0 && newItems[existingIdx].status === 'pending' ? { status: 'ordered' as const, orderedAt: now } : {}) };
+                                                    } else if (cost > 0) {
+                                                        newItems.push({ id: crypto.randomUUID(), category: 'Accessories', name: addon.name, status: 'ordered', quantity: addon.quantity || 1, orderedAt: now, purchaseCost: cost });
+                                                    }
+                                                    setContract({ ...contract, orderedItems: newItems });
+                                                };
+
+                                                const handleCostBlur = async () => {
+                                                    try { await DatabaseService.updateContract(contract.id, contract); } catch { toast.error('Błąd zapisu'); }
+                                                };
+
+                                                const statusLabel = orderedItem
+                                                    ? { pending: '⏳', ordered: '📦', in_production: '🏭', shipped: '🚚', delivered: '✅' }[orderedItem.status] || '—'
+                                                    : '—';
+
+                                                return (
+                                                    <tr key={i} className={`hover:bg-white transition-colors ${isOrdered ? 'bg-blue-50/40' : ''}`}>
+                                                        <td className="p-2 text-center">
+                                                            <input type="checkbox" checked={!!isOrdered} onChange={(e) => handleQuickOrder(e.target.checked)} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" title={isOrdered ? 'Cofnij zamówienie' : 'Oznacz jako zamówione'} />
+                                                        </td>
+                                                        <td className="p-2 font-medium text-slate-700">
+                                                            {addon.name}
+                                                            {orderedItem?.orderedAt && <span className="ml-2 text-[9px] text-slate-400">{new Date(orderedItem.orderedAt).toLocaleDateString('pl-PL')}</span>}
+                                                        </td>
+                                                        <td className="p-2 text-center font-bold text-slate-800">×{addon.quantity || 1}</td>
+                                                        <td className="p-2 text-right">
+                                                            <input type="number" step="0.01" min="0" value={currentCost || ''} onChange={(e) => handleCostChange(e.target.value)} onBlur={handleCostBlur}
+                                                                className={`w-full p-1 text-right text-xs border rounded font-bold outline-none transition-colors ${currentCost > 0 ? 'border-emerald-300 bg-emerald-50/50 text-emerald-700 focus:border-emerald-500' : 'border-slate-200 bg-white text-slate-600 focus:border-blue-400'}`}
+                                                                placeholder="0.00 €" />
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            {orderedItem ? (
+                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                                    orderedItem.status === 'ordered' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                    orderedItem.status === 'in_production' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                                                    orderedItem.status === 'shipped' ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                                                                    orderedItem.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                                }`}>{statusLabel}</span>
+                                                            ) : <span className="text-slate-300 text-xs">—</span>}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
 
