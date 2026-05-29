@@ -111,12 +111,7 @@ export const LeadsList: React.FC = () => {
         loadData();
     }, []);
 
-    // Set default assignee filter for sales representatives to prevent clutter
-    useEffect(() => {
-        if (currentUser && (currentUser.role === 'sales_rep' || currentUser.role === 'sales_rep_pl')) {
-            setFilterAssignee(currentUser.id);
-        }
-    }, [currentUser]);
+    // Sales reps see all leads by default (including unassigned new leads from forms)
 
     // Track which leads have completed configurator forms — derived from already-loaded data (zero queries)
     useEffect(() => {
@@ -177,25 +172,25 @@ export const LeadsList: React.FC = () => {
         // Search Query
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            const customer = lead.customerData;
+            const customer = lead.customerData || {};
 
             // Normalize search digits for phone matching
             const queryDigits = searchQuery.replace(/\D/g, '');
 
             // Basic Fields
             const matchesBasic = (
-                (customer.firstName || '').toLowerCase().includes(query) ||
-                (customer.lastName || '').toLowerCase().includes(query) ||
-                (customer.companyName || '').toLowerCase().includes(query) ||
-                (customer.city || '').toLowerCase().includes(query) ||
-                (customer.email || '').toLowerCase().includes(query)
+                (customer?.firstName || '').toLowerCase().includes(query) ||
+                (customer?.lastName || '').toLowerCase().includes(query) ||
+                (customer?.companyName || '').toLowerCase().includes(query) ||
+                (customer?.city || '').toLowerCase().includes(query) ||
+                (customer?.email || '').toLowerCase().includes(query)
             );
 
             if (matchesBasic) return true;
 
             // Phone number matching (normalized — strips all formatting)
             if (queryDigits.length >= 3) {
-                const phoneDigits = (customer.phone || '').replace(/\D/g, '');
+                const phoneDigits = (customer?.phone || '').replace(/\D/g, '');
                 if (phoneDigits.includes(queryDigits)) return true;
             }
 
@@ -255,7 +250,7 @@ export const LeadsList: React.FC = () => {
 
     // Grouping Logic
     const groupedLeads = groupByRegion ? filteredLeads.reduce((acc, lead) => {
-        const plz = lead.customerData.postalCode?.replace(/\D/g, '') || '';
+        const plz = lead.customerData?.postalCode?.replace(/\D/g, '') || '';
         const region = plz.length >= 2 ? `PLZ ${plz.substring(0, 2)}xxx` : 'Inne / Brak kodu';
 
         if (!acc[region]) acc[region] = [];
