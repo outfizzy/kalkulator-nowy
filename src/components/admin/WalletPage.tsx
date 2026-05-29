@@ -19,6 +19,7 @@ export const WalletPage: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [modalType, setModalType] = useState<'income' | 'expense'>('income');
     const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Date filtering
     const [datePreset, setDatePreset] = useState<DateRangePreset>('thisMonth');
@@ -190,8 +191,15 @@ export const WalletPage: React.FC = () => {
     }, [showDeleted]);
 
     const filteredTransactions = transactions.filter(t => {
-        if (filterType === 'all') return true;
-        return t.type === filterType;
+        if (filterType !== 'all' && t.type !== filterType) return false;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const desc = (t.description || '').toLowerCase();
+            const customer = (t.customerName || '').toLowerCase();
+            const category = (t.category || '').toLowerCase();
+            if (!desc.includes(q) && !customer.includes(q) && !category.includes(q)) return false;
+        }
+        return true;
     });
 
     // Only income transactions that haven't been fully deposited are selectable
@@ -430,31 +438,59 @@ export const WalletPage: React.FC = () => {
                     </div>
 
                     {!showDeleted && (
-                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <h2 className="text-xl font-bold text-slate-800">Historia Transakcji</h2>
+                        <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                <h2 className="text-xl font-bold text-slate-800">Historia Transakcji</h2>
 
-                            <div className="flex bg-slate-100 p-1 rounded-lg">
-                                <button
-                                    onClick={() => setFilterType('all')}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    Wszystkie
-                                </button>
-                                <button
-                                    onClick={() => setFilterType('income')}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    Wpływy
-                                </button>
-                                <button
-                                    onClick={() => setFilterType('expense')}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    Wydatki
-                                </button>
+                                <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setFilterType('all')}
+                                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        Wszystkie
+                                    </button>
+                                    <button
+                                        onClick={() => setFilterType('income')}
+                                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        Wpływy
+                                    </button>
+                                    <button
+                                        onClick={() => setFilterType('expense')}
+                                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterType === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        Wydatki
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Search bar */}
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Szukaj po opisie, kliencie lub kategorii..."
+                                    className="w-full pl-12 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
