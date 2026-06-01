@@ -147,15 +147,19 @@ export const OfferActivityWidget: React.FC = () => {
 
             // Fetch offer names
             const offerMap = new Map<string, string>();
+            const offerCustomerMap = new Map<string, string>();
             if (offerIds.length > 0) {
                 const { data: offers } = await supabase
                     .from('offers')
-                    .select('id, product_data')
+                    .select('id, product_data, customer_data')
                     .in('id', offerIds);
                 if (offers) {
                     offers.forEach(o => {
                         const pd = o.product_data as any;
                         offerMap.set(o.id, pd?.modelId || pd?.modelName || 'Angebot');
+                        const cd = o.customer_data as any;
+                        const name = `${cd?.firstName || ''} ${cd?.lastName || ''}`.trim() || cd?.company || '';
+                        if (name) offerCustomerMap.set(o.id, name);
                     });
                 }
             }
@@ -182,7 +186,7 @@ export const OfferActivityWidget: React.FC = () => {
                 eventType: i.event_type,
                 eventData: i.event_data || {},
                 createdAt: new Date(i.created_at),
-                clientName: i.lead_id ? leadMap.get(i.lead_id) : undefined,
+                clientName: (i.lead_id ? leadMap.get(i.lead_id) : undefined) || (i.offer_id ? offerCustomerMap.get(i.offer_id) : undefined),
                 offerName: i.offer_id ? offerMap.get(i.offer_id) : undefined,
             }));
 
