@@ -882,9 +882,22 @@ async function addImageFromUrl(
     maxW: number,
     maxH: number
 ): Promise<void> {
+    // Fetch image as blob to avoid CORS issues with Image element
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.status} ${url}`);
+    const blob = await response.blob();
+
+    // Convert blob to data URL
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read image blob'));
+        reader.readAsDataURL(blob);
+    });
+
+    // Use Image element from data URL (no CORS issue since it's a data: URI)
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
         img.onload = () => {
             try {
                 const w = img.naturalWidth;
@@ -903,7 +916,7 @@ async function addImageFromUrl(
                 reject(err);
             }
         };
-        img.onerror = () => reject(new Error(`Failed to load: ${url}`));
-        img.src = url;
+        img.onerror = () => reject(new Error(`Failed to load data URL for: ${url}`));
+        img.src = dataUrl;
     });
 }
