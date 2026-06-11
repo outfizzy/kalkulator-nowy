@@ -718,6 +718,7 @@ export const OfferService = {
                 publicToken: row.public_token,
                 attachments: row.attachments || [],
                 variants: row.variants || [],
+                cross_sell: row.cross_sell || [],
                 creator: creator // Populated from Profile
             };
         }
@@ -754,7 +755,8 @@ export const OfferService = {
             settings: row.settings_data,
             publicToken: row.public_token,
             attachments: row.attachments || [],
-            variants: row.variants || []
+            variants: row.variants || [],
+            cross_sell: row.cross_sell || []
         };
     },
 

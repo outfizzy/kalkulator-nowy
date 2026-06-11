@@ -4,8 +4,12 @@ import { createClient } from '@supabase/supabase-js';
 import imaps from 'imap-simple';
 
 // Initialize Supabase Client (safe for Vercel Functions)
+// Server-side logging/queueing needs the SERVICE ROLE key — the anon key is
+// blocked by RLS, which silently dropped every communications log until now.
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+    || process.env.VITE_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -35,19 +39,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- SCHEDULING LOGIC ---
     if (scheduledAt) {
+        // mail_queue columns are email_to / scheduled_for (the old insert used
+        // to_address / scheduled_at and failed on every single schedule).
+        // For shared inbox we materialize the SMTP config now, because the cron
+        // consumer (process-mail-queue) reads credentials from mail.config.
+        const effectiveConfig = useSharedConfig
+            ? {
+                smtpHost: process.env.SHARED_SMTP_HOST,
+                smtpPort: process.env.SHARED_SMTP_PORT || 465,
+                smtpUser: process.env.SHARED_SMTP_USER,
+                smtpPassword: process.env.SHARED_SMTP_PASS,
+                imapHost: process.env.SHARED_IMAP_HOST,
+                imapPort: process.env.SHARED_IMAP_PORT || 993,
+                imapUser: process.env.SHARED_IMAP_USER || process.env.SHARED_SMTP_USER,
+                imapPassword: process.env.SHARED_IMAP_PASS || process.env.SHARED_SMTP_PASS,
+            }
+            : config;
+
         const { error } = await supabase
             .from('mail_queue')
             .insert({
                 user_id: userId,
-                to_address: to,
+                email_to: to,
                 subject,
                 body,
                 attachments: attachments || [],
-                scheduled_at: scheduledAt,
+                scheduled_for: scheduledAt,
                 status: 'pending',
-                config: config, // We store the config used at scheduling time
+                config: effectiveConfig,
                 metadata: {
-                    useSharedConfig, // Store preference
+                    useSharedConfig,
                     leadId,
                     customerId
                 }
@@ -180,6 +201,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         tlsOptions: { rejectUnauthorized: false },
                     }
                 });
+                // home.pl zrywa sockety po stronie serwera — bez handlera nieobsłużony
+                // event 'error' ubija całą funkcję mimo że mail już wyszedł
+                connection.on('error', (err: any) => console.warn('IMAP connection error (ignored):', err?.message));
 
                 // Use the same discovery logic as fetch-emails.ts
                 let sentFolder = 'Sent';
@@ -216,17 +240,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
-        // --- LOGGING TO COMMUNICATIONS ---
+        // --- LOGGING TO CUSTOMER_COMMUNICATIONS ---
+        // (the old code wrote to a 'communications' table that does not exist,
+        //  so no outbound e-mail ever appeared on the lead's timeline)
         if (leadId || customerId) {
             const { error: logError } = await supabase
-                .from('communications')
+                .from('customer_communications')
                 .insert({
-                    user_id: userId,
+                    user_id: userId || null,
                     lead_id: leadId || null,
+                    customer_id: customerId || null,
                     type: 'email',
                     direction: 'outbound',
-                    title: subject,
+                    subject: subject,
                     content: body,
+                    date: new Date().toISOString(),
                     metadata: {
                         messageId: info.messageId,
                         sentBy: useSharedConfig ? 'shared' : 'personal',
@@ -235,7 +263,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 });
 
             if (logError) {
-                console.error('Failed to log email to communications:', logError);
+                console.error('Failed to log email to customer_communications:', logError);
             }
         }
 

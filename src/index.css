@@ -1,10 +1,20 @@
+/* Inter — Polendach24 brand typeface (matches polendach24.de) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-slate-900 font-sans antialiased;
+  }
+  /* Scroll-margin for anchor sections under sticky header */
+  [id^="offer-section-"] {
+    scroll-margin-top: 5rem;
   }
 }
 

@@ -48,7 +48,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Update status to processing (locking)
             await supabase.from('mail_queue').update({ status: 'processing' }).eq('id', mail.id);
 
-            const { smtpHost, smtpPort, smtpUser, smtpPassword, imapHost, imapPort, imapUser, imapPassword } = mail.config;
+            const { smtpHost, smtpPort, smtpUser, smtpPassword, imapHost, imapPort, imapUser, imapPassword } = (mail.config || {});
+            if (!smtpHost || !smtpUser) {
+                throw new Error('Missing SMTP config on queued mail');
+            }
 
             const transporter = nodemailer.createTransport({
                 host: (smtpHost || '').trim(),
@@ -123,6 +126,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // Update status to sent
             await supabase.from('mail_queue').update({ status: 'sent' }).eq('id', mail.id);
+
+            // Log to the lead's communication timeline (best-effort)
+            const meta = (mail as any).metadata || {};
+            if (meta.leadId || meta.customerId) {
+                const { error: logError } = await supabase.from('customer_communications').insert({
+                    user_id: mail.user_id || null,
+                    lead_id: meta.leadId || null,
+                    customer_id: meta.customerId || null,
+                    type: 'email',
+                    direction: 'outbound',
+                    subject: mail.subject,
+                    content: mail.body,
+                    date: new Date().toISOString(),
+                    metadata: { messageId: info.messageId, recipient: mail.email_to, scheduled: true },
+                });
+                if (logError) console.error('[CRON-MAIL] Failed to log communication:', logError);
+            }
+
             results.push({ id: mail.id, status: 'sent' });
 
         } catch (err: any) {

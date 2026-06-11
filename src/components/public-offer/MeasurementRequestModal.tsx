@@ -92,8 +92,8 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                                     type="button"
                                     onClick={() => toggleSelection(day, selectedDays, setSelectedDays)}
                                     className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedDays.includes(day)
-                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                                        ? 'bg-[#1E6FD9] border-[#1E6FD9] text-white shadow-md shadow-[#6DB1FF]/40'
+                                        : 'bg-white border-[#E5E7EB] text-slate-600 hover:border-[#6DB1FF]'
                                         }`}
                                 >
                                     {day}
@@ -111,8 +111,8 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                                     type="button"
                                     onClick={() => toggleSelection(time, selectedTimes, setSelectedTimes)}
                                     className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTimes.includes(time)
-                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                                        ? 'bg-[#1E6FD9] border-[#1E6FD9] text-white shadow-md shadow-[#6DB1FF]/40'
+                                        : 'bg-white border-[#E5E7EB] text-slate-600 hover:border-[#6DB1FF]'
                                         }`}
                                 >
                                     {time}
@@ -127,14 +127,14 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                             value={note}
                             onChange={e => setNote(e.target.value)}
                             placeholder="z.B. bitte erst ab 16:00 Uhr anrufen..."
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm h-20 resize-none"
+                            className="w-full p-3 bg-slate-50 border border-[#E5E7EB] rounded-xl focus:ring-2 focus:ring-[#1E6FD9]/40 focus:border-[#1E6FD9] outline-none text-sm h-20 resize-none transition-colors"
                         />
                     </div>
 
                     <button
                         type="submit"
                         disabled={sending}
-                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-transform active:scale-95"
+                        className="w-full py-3 bg-[#1E6FD9] text-white rounded-full font-semibold shadow-cta hover:bg-[#195FC0] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E6FD9] focus-visible:ring-offset-2"
                     >
                         {sending ? 'Wird gesendet...' : 'Anfrage absenden'}
                     </button>

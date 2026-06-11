@@ -1,3 +1,4 @@
+import { STALE_THRESHOLDS } from './LeadsKanban';
 import React, { useMemo, useState } from 'react';
 import type { Lead } from '../../types';
 import type { Fair } from '../../services/database/fair.service';
@@ -54,12 +55,8 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
             ? Math.round(aiScoredLeads.reduce((sum, l) => sum + (l.aiScore || 0), 0) / aiScoredLeads.length)
             : null;
 
-        // ── Stale Leads ──
-        const staleThresholds: Record<string, number> = {
-            new: 1, formularz_sent: 3, formularz: 2, contacted: 3,
-            measurement_scheduled: 2, measurement_completed: 3,
-            offer_sent: 5, contact_after_offer: 4, negotiation: 7
-        };
+        // ── Stale Leads — TE SAME progi co badge ZALEGŁY na kartach Kanban ──
+        const staleThresholds = STALE_THRESHOLDS;
         const now = new Date();
         const staleCount = filteredLeads.filter(l => {
             if (['won', 'lost', 'fair'].includes(l.status)) return false;
@@ -161,7 +158,15 @@ export const LeadsStats: React.FC<LeadsStatsProps> = ({ leads, fairs = [] }) => 
                     name = fair ? fair.name : lead.fairId;
                 } else { key = 'targi_unknown'; }
             } else if (lead.source === 'website' || lead.source === 'manual' || lead.source === 'website_pl') {
-                name = lead.source === 'website' ? 'Strona WWW' : lead.source === 'website_pl' ? 'Strona PL (zadaszto.pl)' : 'Ręczne';
+                name = lead.source === 'website' ? 'Strona WWW' : lead.source === 'website_pl' ? 'Strona PL (zadaszto.pl)' : 'Reczne';
+            } else if (lead.source === 'website_de') {
+                name = 'Strona DE (polendach24.de)';
+            } else if (lead.source === 'konfigurator_de') {
+                name = 'Konfigurator DE';
+            } else if (lead.source === 'schnellanfrage_de') {
+                name = 'Schnellanfrage DE';
+            } else if (lead.source === 'ai-berater_de') {
+                name = 'KI-Berater DE';
             }
             if (!sourceMap[key]) sourceMap[key] = { id: key, name, count: 0, won: 0, conversion: '0.0', isFair };
             sourceMap[key].count++;

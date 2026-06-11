@@ -147,7 +147,7 @@ export const ServiceService = {
             .from('service_tickets')
             .select(`
                 *,
-                client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, street ),
+                client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, street, houseNumber:house_number, postalCode:postal_code ),
                 team:assigned_team_id ( id, name, color ),
                 contract:contract_id ( id, contract_data ),
                 installation:installation_id ( id, installation_data )
@@ -195,7 +195,7 @@ export const ServiceService = {
             .from('service_tickets')
             .select(`
                 *,
-                client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, street ),
+                client:client_id ( firstName:first_name, lastName:last_name, email, phone, city, street, houseNumber:house_number, postalCode:postal_code ),
                 team:assigned_team_id ( id, name, color ),
                 contract:contract_id ( id, contract_data ),
                 installation:installation_id ( id, installation_data )

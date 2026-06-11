@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
           city: body.city?.trim() || "",
         },
         notes: body.notes || "",
-        assigned_to: null, // will be auto-assigned by system
+        assigned_to: null, // never auto-assign — zespół dostaje powiadomienie, lead czeka na kanbanie
       })
       .select("id, created_at")
       .single();
@@ -119,6 +119,31 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(`[website-lead-pl] New lead created: ${data.id} from ${body.email}`);
+
+    // ═══ POWIADOMIENIE ZESPOŁU ═══
+    // Lead jest nieprzypisany (polityka "never auto-assign", trigger auto-assign wyłączony
+    // 2026-06-11) — bez tego nikt by się nie dowiedział o nowym zgłoszeniu z formularza.
+    try {
+      const { data: team } = await adminClient
+        .from("profiles")
+        .select("id")
+        .in("role", ["sales_rep", "sales_rep_pl", "manager"])
+        .eq("status", "active");
+      if (team && team.length > 0) {
+        await adminClient.from("notifications").insert(
+          team.map((p: { id: string }) => ({
+            user_id: p.id,
+            type: "info",
+            title: `🔥 Nowy lead z zadaszto.pl: ${firstName} ${lastName}`.trim(),
+            message: `${body.city?.trim() || ""} ${phone}`.trim() || "Nowe zgłoszenie z formularza PL",
+            link: `/leads/${data.id}`,
+            metadata: { leadId: data.id, source: "website_pl" },
+          }))
+        );
+      }
+    } catch (notifyErr) {
+      console.error("[website-lead-pl] Notification error:", notifyErr);
+    }
 
     // ═══ AUTO FOLLOW-UP EMAIL (PL) ═══
     try {

@@ -1,6 +1,20 @@
 import { supabase } from '../../lib/supabase';
 import { normalizePhone } from '../../utils/phone';
 
+// ===== HELPERS =====
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://whgjsppyuvglhbdgdark.supabase.co';
+
+/**
+ * Twilio recording URLs require basic auth — playing them directly in <audio> fails with 401.
+ * Route them through the recording-proxy edge function which adds the credentials server-side.
+ * Non-Twilio URLs are returned unchanged.
+ */
+export const getRecordingProxyUrl = (recordingUrl: string): string => {
+    if (!recordingUrl || !recordingUrl.includes('twilio.com')) return recordingUrl;
+    return `${SUPABASE_URL}/functions/v1/recording-proxy?url=${encodeURIComponent(recordingUrl)}`;
+};
+
 // ===== TYPES =====
 
 export interface PhoneNumber {
@@ -230,7 +244,14 @@ export const TelephonyService = {
             .order('started_at', { ascending: false });
 
         if (options?.direction) query = query.eq('direction', options.direction);
-        if (options?.status) query = query.in('status', ['missed', 'no-answer']);
+        if (options?.status) {
+            // 'missed' obejmuje tez twilio-status 'no-answer'; pozostale statusy filtruj doslownie
+            if (options.status === 'missed') {
+                query = query.in('status', ['missed', 'no-answer']);
+            } else {
+                query = query.eq('status', options.status);
+            }
+        }
         if (options?.userId) query = query.eq('user_id', options.userId);
         if (options?.limit) query = query.limit(options.limit);
         if (options?.offset) query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
@@ -608,11 +629,11 @@ export const TelephonyService = {
     },
 
     async getAllMessagesByPhone(phoneNumber: string): Promise<SMSLog[]> {
-        // Strip whatsapp: prefix and leading + for matching
+        // Pelna normalizacja numeru (0157... <-> +49157... <-> 49157..., spacje) -
+        // wczesniej reczne warianty gubily niemiecki format lokalny, wiec
+        // ~1/5 SMS-ow powiazanych z leadami byla niewidoczna na karcie leada.
         const clean = phoneNumber.replace('whatsapp:', '').trim();
-        const variants = [clean];
-        if (clean.startsWith('+')) variants.push(clean.substring(1));
-        else variants.push('+' + clean);
+        const variants = this._phoneVariants(clean);
 
         const { data, error } = await supabase
             .from('sms_logs')

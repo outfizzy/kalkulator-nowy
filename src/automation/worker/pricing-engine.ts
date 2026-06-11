@@ -121,6 +121,7 @@ export const BUSINESS_RULES = {
 export interface PricingInput {
   aluxeNetPrice: number;      // Cena netto z konfiguratora Aluxe (EUR) — GESAMTPREIS
   productType?: string;       // Typ produktu
+  transportAluxe?: number;    // Custom transport override (default 200)
 }
 
 // --- Multi-item offer input ---
@@ -132,6 +133,8 @@ export interface OfferLineItem {
 
 export interface OfferPricingInput {
   lineItems: OfferLineItem[];  // Pozycje w ofercie
+  transportAluxe?: number;     // Custom transport override
+  skipMinimumMargin?: boolean; // True for cross-sell items (no €2k minimum)
 }
 
 export interface OfferPricingResult {
@@ -266,8 +269,9 @@ export function calculateOfferPrice(input: OfferPricingInput): OfferPricingResul
   
   // Margin from GESAMTPREIS
   const percentMargin = gesamtpreis * MARGIN_PERCENT;
-  const minimumMarginApplied = percentMargin < MINIMUM_MARGIN_EUR;
-  const marginAmount = Math.max(percentMargin, MINIMUM_MARGIN_EUR);
+  const skipMin = input.skipMinimumMargin || false;
+  const minimumMarginApplied = !skipMin && percentMargin < MINIMUM_MARGIN_EUR;
+  const marginAmount = skipMin ? percentMargin : Math.max(percentMargin, MINIMUM_MARGIN_EUR);
   const effectiveMarginPercent = gesamtpreis > 0 ? (marginAmount / gesamtpreis) : 0;
   
   // Customer price

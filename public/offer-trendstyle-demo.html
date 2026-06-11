@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Angebot — Terrassenüberdachung | Polendach24</title>
+  <meta name="description" content="Individuelles Angebot für Ihre Terrassenüberdachung Trendstyle 6000×3000mm mit Glasdach und LED-Beleuchtung">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1a1a2e;
+      --primary-light: #16213e;
+      --accent: #e94560;
+      --accent-gold: #d4a574;
+      --accent-warm: #f4a261;
+      --glass-bg: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,255,255,0.12);
+      --text: #f0f0f0;
+      --text-muted: #8a8a9a;
+      --text-dim: #5a5a6a;
+      --success: #4ecdc4;
+      --surface: rgba(26,26,46,0.85);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--primary);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* === ANIMATED BACKGROUND === */
+    .bg-pattern {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(233,69,96,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(78,205,196,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 60% at 50% 80%, rgba(212,165,116,0.05) 0%, transparent 50%),
+        linear-gradient(180deg, #0f0f23 0%, #1a1a2e 40%, #16213e 100%);
+    }
+    .bg-pattern::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    .container { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* === HEADER === */
+    .header {
+      padding: 40px 0 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--glass-border);
+      margin-bottom: 40px;
+    }
+    .logo {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800; font-size: 28px;
+      background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-warm) 50%, var(--accent) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .offer-badge {
+      background: linear-gradient(135deg, var(--accent), #c62a47);
+      color: white; padding: 8px 20px; border-radius: 100px;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.5px;
+      text-transform: uppercase;
+      animation: pulse-badge 2s ease-in-out infinite;
+    }
+    @keyframes pulse-badge { 0%, 100% { box-shadow: 0 0 0 0 rgba(233,69,96,0.4); } 50% { box-shadow: 0 0 0 8px rgba(233,69,96,0); } }
+
+    /* === HERO === */
+    .hero { text-align: center; padding: 20px 0 50px; }
+    .hero-label {
+      display: inline-block;
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 3px; color: var(--accent-gold);
+      margin-bottom: 16px;
+      opacity: 0; animation: fadeUp 0.6s ease forwards 0.2s;
+    }
+    .hero h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 800; line-height: 1.1;
+      margin-bottom: 16px;
+      opacity: 0; animation: fadeUp 0.6s ease forwards 0.4s;
+    }
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent-gold), var(--accent-warm));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      font-size: 18px; color: var(--text-muted); max-width: 600px; margin: 0 auto;
+      opacity: 0; animation: fadeUp 0.6s ease forwards 0.6s;
+    }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* === PRICE CARD === */
+    .price-hero {
+      background: linear-gradient(135deg, rgba(212,165,116,0.12), rgba(244,162,97,0.08));
+      border: 1px solid rgba(212,165,116,0.2);
+      border-radius: 24px; padding: 48px 40px;
+      text-align: center; margin-bottom: 48px;
+      position: relative; overflow: hidden;
+      opacity: 0; animation: fadeUp 0.8s ease forwards 0.8s;
+    }
+    .price-hero::before {
+      content: ''; position: absolute; top: -50%; right: -20%;
+      width: 300px; height: 300px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(212,165,116,0.1) 0%, transparent 70%);
+    }
+    .price-label { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-gold); margin-bottom: 12px; }
+    .price-amount {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(48px, 8vw, 72px);
+      font-weight: 800; line-height: 1;
+      background: linear-gradient(135deg, #fff 0%, var(--accent-gold) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .price-detail { color: var(--text-muted); margin-top: 8px; font-size: 15px; }
+    .price-net { font-size: 20px; color: var(--text); margin-top: 16px; font-weight: 500; }
+
+    /* === SPECS GRID === */
+    .specs-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px; margin-bottom: 48px;
+    }
+    .spec-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px; padding: 24px;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+    .spec-card:hover {
+      border-color: rgba(212,165,116,0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .spec-icon { font-size: 28px; margin-bottom: 8px; }
+    .spec-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 4px; }
+    .spec-value { font-size: 18px; font-weight: 600; color: var(--text); }
+
+    /* === POSITIONS TABLE === */
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px; font-weight: 700;
+      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .section-title .line { flex: 1; height: 1px; background: var(--glass-border); }
+
+    .positions-table {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px; overflow: hidden;
+      margin-bottom: 48px;
+      backdrop-filter: blur(12px);
+    }
+    .pos-header {
+      display: grid; grid-template-columns: 1fr auto;
+      padding: 16px 24px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--glass-border);
+      font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+      color: var(--text-muted);
+    }
+    .pos-row {
+      display: grid; grid-template-columns: 1fr auto;
+      padding: 18px 24px; align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.2s;
+    }
+    .pos-row:hover { background: rgba(255,255,255,0.03); }
+    .pos-row:last-child { border-bottom: none; }
+    .pos-name { font-weight: 500; }
+    .pos-desc { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+    .pos-check { color: var(--success); font-weight: 600; font-size: 15px; }
+
+    .pos-total {
+      display: grid; grid-template-columns: 1fr auto;
+      padding: 20px 24px;
+      background: rgba(212,165,116,0.08);
+      border-top: 2px solid rgba(212,165,116,0.2);
+      font-weight: 700; font-size: 16px;
+    }
+
+    /* === CROSS-SELL === */
+    .cross-sell {
+      margin-bottom: 48px;
+    }
+    .cross-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .cross-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px; padding: 28px;
+      backdrop-filter: blur(12px);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative; overflow: hidden;
+    }
+    .cross-card:hover {
+      border-color: var(--accent-gold);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+    .cross-card .tag {
+      position: absolute; top: 16px; right: 16px;
+      background: rgba(233,69,96,0.15);
+      color: var(--accent); padding: 4px 12px; border-radius: 100px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .cross-icon { font-size: 36px; margin-bottom: 12px; }
+    .cross-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+    .cross-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+    .cross-price { font-size: 16px; font-weight: 700; color: var(--accent-gold); }
+
+    /* === FOOTER === */
+    .offer-footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--glass-border);
+      text-align: center;
+      margin-top: 20px;
+    }
+    .offer-footer p { color: var(--text-muted); font-size: 13px; margin-bottom: 6px; }
+    .offer-footer .validity {
+      display: inline-block;
+      background: rgba(78,205,196,0.1);
+      border: 1px solid rgba(78,205,196,0.2);
+      color: var(--success);
+      padding: 8px 20px; border-radius: 100px;
+      font-size: 13px; font-weight: 500;
+      margin-top: 16px;
+    }
+
+    /* === CTA === */
+    .cta-section { text-align: center; padding: 40px 0; }
+    .cta-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, var(--accent-gold), var(--accent-warm));
+      color: var(--primary); padding: 18px 48px;
+      border: none; border-radius: 100px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(212,165,116,0.3);
+    }
+    .cta-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 8px 32px rgba(212,165,116,0.4);
+    }
+
+    .note-box {
+      background: rgba(78,205,196,0.06);
+      border: 1px solid rgba(78,205,196,0.15);
+      border-radius: 12px; padding: 20px 24px;
+      margin-bottom: 48px;
+      font-size: 14px; color: var(--text-muted);
+    }
+    .note-box strong { color: var(--success); }
+
+    /* Animations on scroll */
+    .animate-in {
+      opacity: 0; transform: translateY(30px);
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .animate-in.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 600px) {
+      .header { flex-direction: column; gap: 16px; text-align: center; }
+      .price-hero { padding: 36px 24px; }
+      .specs-grid { grid-template-columns: 1fr 1fr; }
+      .pos-header, .pos-row, .pos-total { grid-template-columns: 1fr auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-pattern"></div>
+
+  <div class="container">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="logo">Polendach24</div>
+      <div class="offer-badge">✦ Individuelles Angebot</div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-label">Terrassenüberdachung Premium</div>
+      <h1>Trendstyle <span class="gradient">6000 × 3000</span></h1>
+      <p class="hero-sub">Echtglas-Dach mit integrierter LED-Beleuchtung — Ihr perfekter Freiraum unter freiem Himmel.</p>
+    </section>
+
+    <!-- PRICE -->
+    <div class="price-hero">
+      <div class="price-label">Ihr Komplettpreis</div>
+      <div class="price-amount">5.750 €</div>
+      <div class="price-detail">inkl. 19% MwSt. · ohne Montage</div>
+      <div class="price-net">Nettopreis: 4.832,73 €</div>
+    </div>
+
+    <!-- SPECS -->
+    <div class="specs-grid animate-in">
+      <div class="spec-card">
+        <div class="spec-icon">📐</div>
+        <div class="spec-label">Breite</div>
+        <div class="spec-value">6.000 mm</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">📏</div>
+        <div class="spec-label">Tiefe</div>
+        <div class="spec-value">3.000 mm</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">🎨</div>
+        <div class="spec-label">Farbe</div>
+        <div class="spec-value">RAL 7016 Anthrazit</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">🏗️</div>
+        <div class="spec-label">Profil</div>
+        <div class="spec-value">Trendstyle 15</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">🪟</div>
+        <div class="spec-label">Dacheindeckung</div>
+        <div class="spec-value">VSG Glas klar</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">💡</div>
+        <div class="spec-label">Beleuchtung</div>
+        <div class="spec-value">LED warmweiß</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">📦</div>
+        <div class="spec-label">Lieferung</div>
+        <div class="spec-value">Frei Haus</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-icon">⏱️</div>
+        <div class="spec-label">Lieferzeit</div>
+        <div class="spec-value">ca. 4–6 Wochen</div>
+      </div>
+    </div>
+
+    <!-- POSITIONS -->
+    <div class="animate-in">
+      <div class="section-title">Leistungsumfang <span class="line"></span></div>
+      <div class="positions-table">
+        <div class="pos-header">
+          <span>Position</span>
+          <span>Enthalten</span>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">Terrassenüberdachung Trendstyle 15</div>
+            <div class="pos-desc">Aluminium-Tragkonstruktion 6.000 × 3.000 mm, RAL 7016</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">Dacheindeckung VSG Glas klar</div>
+            <div class="pos-desc">Verbundsicherheitsglas 44.2, transparent, UV-beständig</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">LED-Beleuchtung warmweiß</div>
+            <div class="pos-desc">Integrierte Einbaustrahler in Aluminiumfarbe, dimmbar</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">Pfosten 2.500 mm</div>
+            <div class="pos-desc">Stützpfosten für Rinnenseite, inkl. Befestigungsmaterial</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">Regenrinne & Entwässerung</div>
+            <div class="pos-desc">Integrierte Dachentwässerung mit Fallrohren</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">Wandanschlussprofil</div>
+            <div class="pos-desc">Dichtung zum Mauerwerk inkl. Silikon</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-row">
+          <div>
+            <div class="pos-name">Lieferung frei Haus</div>
+            <div class="pos-desc">Transport innerhalb Deutschlands inklusive</div>
+          </div>
+          <div class="pos-check">✓</div>
+        </div>
+        <div class="pos-total">
+          <span>Gesamtpreis inkl. MwSt.</span>
+          <span>5.750,00 €</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- INFO -->
+    <div class="note-box animate-in">
+      <strong>ℹ️ Hinweis:</strong> Dieses Angebot enthält die komplette Lieferung Ihrer Terrassenüberdachung inkl. aller Befestigungsmaterialien. 
+      Die Montage kann optional dazu gebucht werden — wir beraten Sie gerne zu Montageoptionen und Kosten.
+    </div>
+
+    <!-- CROSS-SELL -->
+    <div class="cross-sell animate-in">
+      <div class="section-title">Empfohlene Ergänzungen <span class="line"></span></div>
+      <div class="cross-grid">
+        <div class="cross-card">
+          <div class="tag">Beliebt</div>
+          <div class="cross-icon">🪟</div>
+          <div class="cross-title">Schiebewand SW450</div>
+          <div class="cross-desc">Rahmenlose Glas-Schiebewand für Wind- und Regenschutz. Öffnungsbreite bis 6.000 mm.</div>
+          <div class="cross-price">ab 2.890 €</div>
+        </div>
+        <div class="cross-card">
+          <div class="tag">Sichtschutz</div>
+          <div class="cross-icon">🌤️</div>
+          <div class="cross-title">Senkrechtmarkise ZIP</div>
+          <div class="cross-desc">Textiler Sonnen- und Sichtschutz mit seitlicher Führung. Windstabil bis 100 km/h.</div>
+          <div class="cross-price">ab 1.490 €</div>
+        </div>
+        <div class="cross-card">
+          <div class="tag">Komfort</div>
+          <div class="cross-icon">☀️</div>
+          <div class="cross-title">Unterglasmarkise</div>
+          <div class="cross-desc">Sonnenschutz direkt unter dem Glasdach. Fernbedienbar, verschiedene Stoffe verfügbar.</div>
+          <div class="cross-price">ab 1.290 €</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section animate-in">
+      <a href="mailto:info@polendach24.de?subject=Angebot%20Trendstyle%206000x3000&body=Ich%20interessiere%20mich%20für%20das%20Angebot%20Trendstyle%206000x3000%20mit%20Glasdach%20und%20LED." class="cta-btn">
+        ✉️ Angebot annehmen
+      </a>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="offer-footer">
+      <p>Polendach24 · Terrassenüberdachungen & Pergolen</p>
+      <p>Angebotsnummer: ANG-2026-0527 · Erstellt am: 27.05.2026</p>
+      <div class="validity">⏳ Gültig bis 27.06.2026</div>
+    </footer>
+  </div>
+
+  <script>
+    // Scroll animation
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+    // Cross-sell click animation
+    document.querySelectorAll('.cross-card').forEach(card => {
+      card.addEventListener('click', () => {
+        card.style.borderColor = 'var(--accent-gold)';
+        card.querySelector('.tag').textContent = '✓ Angefragt';
+        card.querySelector('.tag').style.background = 'rgba(78,205,196,0.15)';
+        card.querySelector('.tag').style.color = 'var(--success)';
+      });
+    });
+  </script>
+</body>
+</html>

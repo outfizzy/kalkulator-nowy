@@ -17,9 +17,10 @@ const t = (str: string): string => str.replace(/[ąćęłńóśźżĄĆĘŁŃÓ�
  */
 export async function generateContractProtocolPDF(
     contract: Contract,
-    photoLayout: PhotoLayout = '2-per-page'
+    photoLayout: PhotoLayout = '2-per-page',
+    extraPhotos?: { url: string; name: string }[]
 ): Promise<void> {
-    const doc = await buildContractProtocol(contract, photoLayout);
+    const doc = await buildContractProtocol(contract, photoLayout, extraPhotos);
     const lastName = t(contract.client?.lastName || 'Klient');
     const nr = (contract.contractNumber || '').replace(/\//g, '-');
     doc.save(`Protokol_Montazowy_${lastName}_${nr}.pdf`);
@@ -27,7 +28,7 @@ export async function generateContractProtocolPDF(
 
 // ─── INTERNAL ─────────────────────────────────────────────
 
-async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayout): Promise<jsPDF> {
+async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayout, extraPhotos?: { url: string; name: string }[]): Promise<jsPDF> {
     const doc = new jsPDF();
 
     // Use helvetica — always works, no font loading issues
@@ -797,7 +798,10 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
     // ════════════════════════════════════════════════════
     // PAGES 2+: ZDJĘCIA
     // ════════════════════════════════════════════════════
-    const images = (contract.attachments || []).filter(a => a.type === 'image' && a.url);
+    // Merge contract attachments (images) with extra photos (e.g. from realizations)
+    const attachmentImages = (contract.attachments || []).filter(a => a.type === 'image' && a.url).map(a => ({ url: a.url, name: a.name }));
+    const realizationImages = (extraPhotos || []).filter(p => p.url);
+    const images = [...attachmentImages, ...realizationImages];
 
     if (images.length > 0) {
         if (photoLayout === '2-per-page') {
@@ -882,22 +886,11 @@ async function addImageFromUrl(
     maxW: number,
     maxH: number
 ): Promise<void> {
-    // Fetch image as blob to avoid CORS issues with Image element
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch image: ${response.status} ${url}`);
-    const blob = await response.blob();
-
-    // Convert blob to data URL
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read image blob'));
-        reader.readAsDataURL(blob);
-    });
-
-    // Use Image element from data URL (no CORS issue since it's a data: URI)
+    // Use Image element with crossOrigin to load the image
+    // This works for public Supabase Storage URLs which return CORS headers
     return new Promise((resolve, reject) => {
         const img = new Image();
+        img.crossOrigin = 'anonymous';
         img.onload = () => {
             try {
                 const w = img.naturalWidth;
@@ -910,13 +903,27 @@ async function addImageFromUrl(
                 if (drawH > maxH) { drawH = maxH; drawW = drawH * ratio; }
 
                 const drawX = x + (maxW - drawW) / 2;
-                doc.addImage(img, 'JPEG', drawX, y, drawW, drawH);
+
+                // Draw to canvas first to get a clean data URL (avoids jsPDF CORS tainting)
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { reject(new Error('Canvas context failed')); return; }
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+                doc.addImage(dataUrl, 'JPEG', drawX, y, drawW, drawH);
                 resolve();
             } catch (err) {
+                console.error('addImage error for:', url, err);
                 reject(err);
             }
         };
-        img.onerror = () => reject(new Error(`Failed to load data URL for: ${url}`));
-        img.src = dataUrl;
+        img.onerror = () => {
+            console.error('Image load failed for:', url);
+            reject(new Error(`Failed to load image: ${url}`));
+        };
+        img.src = url;
     });
 }

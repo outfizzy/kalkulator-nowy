@@ -16,13 +16,25 @@ export interface BlogPost {
     meta_title?: string;
     meta_description?: string;
     tags?: string[];
+    /** 'de' for polendach24.de, 'pl' for zadaszto.pl */
+    site?: 'de' | 'pl';
+    /** SEO silo (DE only): terrassenueberdachung, pergola, carport, wintergarten */
+    silo?: string | null;
+    /** Display priority (1 = highest) */
+    priority?: number;
 }
 
 export const BlogService = {
-    async getPosts(publishedOnly = false): Promise<BlogPost[]> {
+    /**
+     * Get all posts for a specific site.
+     * @param publishedOnly - Only return published posts
+     * @param site - 'de' for polendach24.de, 'pl' for zadaszto.pl (default: 'pl' for backward compat)
+     */
+    async getPosts(publishedOnly = false, site: 'de' | 'pl' = 'pl'): Promise<BlogPost[]> {
         let query = supabase
             .from('blog_posts_pl')
             .select('*, profiles!author_id(full_name)')
+            .eq('site', site)
             .order('created_at', { ascending: false });
 
         if (publishedOnly) {
@@ -52,22 +64,36 @@ export const BlogService = {
         };
     },
 
-    async createPost(post: Partial<BlogPost>): Promise<BlogPost> {
+    /**
+     * Create a new post for a specific site.
+     * @param post - Post data
+     * @param site - 'de' or 'pl' (default: 'pl')
+     */
+    async createPost(post: Partial<BlogPost>, site: 'de' | 'pl' = 'pl'): Promise<BlogPost> {
         const slug = BlogService.generateSlug(post.title || 'post');
+        const insertData: any = {
+            title: post.title || '',
+            slug,
+            content: post.content || '',
+            excerpt: post.excerpt || '',
+            image_url: post.image_url || null,
+            is_published: false,
+            author_id: post.author_id || null,
+            meta_title: post.meta_title || post.title || '',
+            meta_description: post.meta_description || post.excerpt || '',
+            tags: post.tags || [],
+            site,
+        };
+
+        // DE-specific fields
+        if (site === 'de') {
+            insertData.silo = post.silo || null;
+            insertData.priority = post.priority || 3;
+        }
+
         const { data, error } = await supabase
             .from('blog_posts_pl')
-            .insert({
-                title: post.title || '',
-                slug,
-                content: post.content || '',
-                excerpt: post.excerpt || '',
-                image_url: post.image_url || null,
-                is_published: false,
-                author_id: post.author_id || null,
-                meta_title: post.meta_title || post.title || '',
-                meta_description: post.meta_description || post.excerpt || '',
-                tags: post.tags || [],
-            })
+            .insert(insertData)
             .select()
             .single();
 
@@ -138,15 +164,21 @@ export const BlogService = {
     generateSlug(title: string): string {
         return title
             .toLowerCase()
-            .replace(/[ąàáâãäå]/g, 'a')
+            // German characters
+            .replace(/[äæ]/g, 'ae')
+            .replace(/[öœ]/g, 'oe')
+            .replace(/[ü]/g, 'ue')
+            .replace(/[ß]/g, 'ss')
+            // Polish characters
+            .replace(/[ąàáâãå]/g, 'a')
             .replace(/[ćč]/g, 'c')
             .replace(/[ęèéêë]/g, 'e')
             .replace(/[ł]/g, 'l')
             .replace(/[ńñ]/g, 'n')
-            .replace(/[óòôõö]/g, 'o')
+            .replace(/[óòôõ]/g, 'o')
             .replace(/[śš]/g, 's')
             .replace(/[źżž]/g, 'z')
-            .replace(/[üù]/g, 'u')
+            .replace(/[ùû]/g, 'u')
             .replace(/[^a-z0-9\s-]/g, '')
             .replace(/\s+/g, '-')
             .replace(/-+/g, '-')
@@ -155,9 +187,15 @@ export const BlogService = {
             + '-' + Date.now().toString(36);
     },
 
-    async uploadImage(file: File): Promise<string> {
+    /**
+     * Upload image for a blog post.
+     * @param file - Image file
+     * @param site - 'de' or 'pl' — determines storage folder
+     */
+    async uploadImage(file: File, site: 'de' | 'pl' = 'pl'): Promise<string> {
         const ext = file.name.split('.').pop();
-        const fileName = `blog-pl/${Date.now()}-${Math.random().toString(36).substr(2, 8)}.${ext}`;
+        const folder = site === 'de' ? 'blog-de' : 'blog-pl';
+        const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substr(2, 8)}.${ext}`;
 
         const { error } = await supabase.storage
             .from('public')

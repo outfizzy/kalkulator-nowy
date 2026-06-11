@@ -261,9 +261,9 @@ export const ModelAdvantagesSection: React.FC<ModelAdvantagesSectionProps> = ({ 
     if (!data) return null;
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-card border border-[#E5E7EB] overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-5 md:p-6">
+            <div className="bg-brand-gradient p-5 md:p-6">
                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-3.5 h-3.5">
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" strokeLinecap="round" strokeLinejoin="round" />

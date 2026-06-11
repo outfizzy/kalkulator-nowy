@@ -32,8 +32,8 @@ const IconStar = () => (
 const TRUST_BADGES = [
     {
         Icon: IconShield,
-        title: '5 Jahre Garantie',
-        desc: 'Auf Konstruktion & Montage',
+        title: '10 Jahre Garantie',
+        desc: 'Auf Konstruktion & Beschichtung',
         iconBg: 'bg-emerald-50',
         iconColor: 'text-emerald-600',
         borderColor: 'border-emerald-100',
@@ -42,9 +42,9 @@ const TRUST_BADGES = [
         Icon: IconTeam,
         title: 'Profi-Montage',
         desc: 'Durch eigene Montageteams',
-        iconBg: 'bg-blue-50',
-        iconColor: 'text-blue-600',
-        borderColor: 'border-blue-100',
+        iconBg: 'bg-[#EAF2FE]',
+        iconColor: 'text-[#1E6FD9]',
+        borderColor: 'border-[#BFD9FB]',
     },
     {
         Icon: IconRuler,
@@ -81,7 +81,7 @@ export const TrustSection: React.FC = () => {
             </div>
 
             {/* Social Proof — Google Reviews link */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <div className="bg-white rounded-2xl p-6 border border-[#E5E7EB] shadow-card">
                 <div className="flex items-center justify-between mb-5">
                     <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
                         <span className="flex items-center gap-0.5 text-amber-400">
@@ -97,7 +97,7 @@ export const TrustSection: React.FC = () => {
                         href="https://www.google.com/maps/place/Polendach24"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1"
+                        className="text-xs font-semibold text-[#1E6FD9] hover:text-[#195FC0] transition-colors flex items-center gap-1"
                     >
                         Alle ansehen
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
@@ -112,7 +112,7 @@ export const TrustSection: React.FC = () => {
                             initials: 'P.K.',
                             name: 'Zufriedener Kunde',
                             location: 'Brandenburg',
-                            color: 'bg-blue-50 text-blue-600 border-blue-100',
+                            color: 'bg-[#EAF2FE] text-[#1E6FD9] border-[#BFD9FB]',
                         },
                         {
                             text: 'Top Qualität zu einem fairen Preis. Die Monteure waren sehr sauber und professionell. Gerne wieder!',

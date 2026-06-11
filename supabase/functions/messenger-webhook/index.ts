@@ -441,13 +441,21 @@ async function syncLeadToCRM(
       }
     } else {
       // Create new lead
-      const { data: newLead } = await sb.from("leads").insert({
+      // UWAGA: do 2026-06-11 ten insert ZAWSZE padał po cichu — CHECK leads_source_check
+      // nie dopuszczał 'facebook_messenger' (rozszerzony migracją 20260611120000),
+      // a błąd nie był logowany. Stąd 0 leadów z Messengera w produkcji.
+      const { data: newLead, error: leadError } = await sb.from("leads").insert({
         source: "facebook_messenger",
         status: "new",
         customer_data: customerData,
         notes: notesLines,
         last_contact_date: new Date().toISOString(),
       }).select("id").single();
+
+      if (leadError) {
+        console.error("[messenger-webhook] Lead insert FAILED:", JSON.stringify(leadError));
+        return;
+      }
 
       // Link conversation to lead
       if (conversationId && newLead) {

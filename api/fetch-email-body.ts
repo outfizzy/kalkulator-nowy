@@ -29,6 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const connection = await imaps.connect(imapConfig);
+        // home.pl zrywa sockety po stronie serwera — bez handlera nieobsłużony
+        // event 'error' ubija całą funkcję (HTTP 500) zamiast zwrócić dane
+        connection.on('error', (err: any) => console.warn('IMAP connection error (ignored):', err?.message));
 
         // Open box with auto-discovery for Sent folder
         console.log(`[DEBUG] Opening box: ${box} for UID: ${uid}`);
@@ -88,7 +91,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             markSeen: true
         };
 
-        const messages = await connection.search(searchCriteria, fetchOptions);
+        // Zerwany socket = nierozstrzygnięty promise z search() — bez limitu
+        // funkcja wisiałaby do timeoutu Vercela
+        const messages: any[] = await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('IMAP fetch timeout (25s) — serwer nie odpowiada')), 25000);
+            connection.once('error', (err: any) => { clearTimeout(timer); reject(err); });
+            connection.search(searchCriteria, fetchOptions).then(
+                (r: any) => { clearTimeout(timer); resolve(r); },
+                (e: any) => { clearTimeout(timer); reject(e); }
+            );
+        });
 
         if (!messages || messages.length === 0) {
             connection.end();
@@ -105,15 +117,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const parsed = await simpleParser(rawBody);
 
-        const attachments = parsed.attachments.map(att => ({
-            filename: att.filename,
-            contentType: att.contentType,
-            size: att.size,
-            contentId: att.contentId,
-            content: att.content.toString('base64')
-        }));
+        // Vercel serverless caps the response at ~4.5MB — anything above that
+        // and the email never loads at all, so budget what we inline/attach
+        const RESPONSE_BUDGET = 3 * 1024 * 1024;
+        let usedBudget = 0;
 
-        connection.end();
+        // Inline images (cid: references) → data URIs, otherwise they render broken
+        let html = parsed.html || parsed.textAsHtml || undefined;
+        const inlinedCids = new Set<string>();
+        if (html) {
+            usedBudget += html.length;
+            for (const att of parsed.attachments) {
+                if (!att.contentId) continue;
+                const cid = att.contentId.replace(/[<>]/g, '');
+                if (!html.includes(`cid:${cid}`)) continue;
+                const base64 = att.content.toString('base64');
+                if (usedBudget + base64.length > RESPONSE_BUDGET) continue;
+                html = html.split(`cid:${cid}`).join(`data:${att.contentType};base64,${base64}`);
+                usedBudget += base64.length;
+                inlinedCids.add(cid);
+            }
+        }
+
+        // partIndex lets /api/fetch-attachment re-locate an attachment whose
+        // content didn't fit the budget (content: null → fetched on demand)
+        const attachments = parsed.attachments
+            .map((att, partIndex) => ({ att, partIndex }))
+            .filter(({ att }) => !(att.contentId && inlinedCids.has(att.contentId.replace(/[<>]/g, ''))))
+            .map(({ att, partIndex }) => {
+                const base64Size = Math.ceil(att.size * 1.37);
+                const fits = usedBudget + base64Size <= RESPONSE_BUDGET;
+                if (fits) usedBudget += base64Size;
+                return {
+                    filename: att.filename,
+                    contentType: att.contentType,
+                    size: att.size,
+                    contentId: att.contentId,
+                    partIndex,
+                    content: fits ? att.content.toString('base64') : null
+                };
+            });
+
+        try { connection.end(); } catch { /* serwer mógł już zamknąć socket */ }
 
         return res.status(200).json({
             id: msg.attributes.uid,
@@ -122,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             to: Array.isArray(parsed.to) ? parsed.to.map(a => a.text).join(', ') : parsed.to?.text,
             date: parsed.date,
             text: parsed.text,
-            html: parsed.html || parsed.textAsHtml,
+            html,
             attachments: attachments
         });
 

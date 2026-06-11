@@ -6,7 +6,7 @@ import { DatabaseService } from '../../services/database';
 import { LeadForm } from './LeadForm';
 import type { Lead, Communication, Offer, MailboxConfig } from '../../types';
 import { supabase } from '../../lib/supabase';
-import { TelephonyService, type CallLog, type SMSLog } from '../../services/database/telephony.service';
+import { TelephonyService, getRecordingProxyUrl, type CallLog, type SMSLog } from '../../services/database/telephony.service';
 import { CommunicationTimeline } from '../crm/CommunicationTimeline';
 import { UnifiedTimeline, calculateEngagementScore } from '../crm/UnifiedTimeline';
 import { OffersList } from '../OffersList';
@@ -30,6 +30,7 @@ import { ManualContractModal } from '../contracts/ManualContractModal';
 import { LostLeadModal } from './LostLeadModal';
 import { WonLeadModal } from './WonLeadModal';
 import { OfferMessagesWidget } from './OfferMessagesWidget';
+import { AgentActivityPanel } from './AgentActivityPanel';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { StructuralZonesService } from '../../services/structural-zones.service';
@@ -41,6 +42,9 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> =
     contacted: { bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500' },
     measurement_scheduled: { bg: 'bg-cyan-100', text: 'text-cyan-800', dot: 'bg-cyan-500' },
     measurement_completed: { bg: 'bg-teal-100', text: 'text-teal-800', dot: 'bg-teal-500' },
+    offer_agent: { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500' },
+    offer_agent_sent: { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', dot: 'bg-fuchsia-500' },
+    needs_info: { bg: 'bg-orange-100', text: 'text-orange-800', dot: 'bg-orange-500' },
     offer_sent: { bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500' },
     contact_after_offer: { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-500' },
     negotiation: { bg: 'bg-orange-100', text: 'text-orange-800', dot: 'bg-orange-500' },
@@ -56,6 +60,8 @@ const STATUS_LABELS: Record<string, string> = {
     new: 'Neu', contacted: 'Kontaktiert', measurement_scheduled: 'Aufmaß geplant',
     measurement_completed: 'Aufmaß erledigt', offer_sent: 'Angebot gesendet',
     contact_after_offer: 'Kontakt nach Angebot',
+    offer_agent: 'Agent 🤖 wycenia', offer_agent_sent: 'Agent-Angebot gesendet',
+    needs_info: 'Brakuje danych ⚠️',
     negotiation: 'Verhandlung', configuration_received: 'Konfiguration erhalten',
     won: 'Gewonnen', lost: 'Verloren', fair: 'Messe',
     formularz_sent: 'Formular gesendet', formularz: 'Formular ausgefüllt',
@@ -465,6 +471,9 @@ export const LeadDetailsPage: React.FC = () => {
                         </div>
                     )}
                     {activeTab === 'overview' && (<div className="space-y-4">
+
+                        {/* ═══ AGENT ACTIVITY PANEL ═══ */}
+                        {lead && <AgentActivityPanel leadId={lead.id} leadStatus={lead.status} />}
 
                         {/* ═══ 2. CONTACT + LEAD META (side-by-side) ═══ */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -967,11 +976,6 @@ export const LeadDetailsPage: React.FC = () => {
                                                     neutral: <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px]">=</span>,
                                                     negative: <span className="w-4 h-4 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-[10px]">−</span>
                                                 };
-                                                const SUPABASE_URL_VAL = import.meta.env.VITE_SUPABASE_URL || 'https://whgjsppyuvglhbdgdark.supabase.co';
-                                                const getProxyUrl = (url: string) => {
-                                                    if (!url || !url.includes('twilio.com')) return url;
-                                                    return `${SUPABASE_URL_VAL}/functions/v1/recording-proxy?url=${encodeURIComponent(url)}`;
-                                                };
                                                 return (
                                                     <div key={call.id} className="border border-slate-200 rounded-lg overflow-hidden">
                                                         <button onClick={() => setExpandedCallId(isExpanded ? null : call.id)} className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 transition-colors text-left">
@@ -994,7 +998,7 @@ export const LeadDetailsPage: React.FC = () => {
                                                                 {call.recording_url && (
                                                                     <div className="bg-white rounded-lg border border-slate-200 p-2">
                                                                         <p className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> Aufnahme</p>
-                                                                        <audio controls src={getProxyUrl(call.recording_url)} className="w-full h-8" />
+                                                                        <audio controls src={getRecordingProxyUrl(call.recording_url)} className="w-full h-8" />
                                                                     </div>
                                                                 )}
                                                                 {call.summary && (

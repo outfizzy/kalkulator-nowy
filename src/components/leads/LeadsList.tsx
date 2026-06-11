@@ -13,6 +13,7 @@ import { LeadsFunnelChart } from './LeadsFunnelChart';
 import { LeadsStats } from './LeadsStats';
 import { LeadsMap } from './LeadsMap';
 import { ConfiguratorService } from '../../services/database/configurator.service';
+import { supabase } from '../../lib/supabase';
 import { BarChart3, List, LayoutGrid, MapPin, Search, Trash2, Flame, ClipboardCheck, Building2, Globe, Calendar, Clock, User as UserIcon, Plus, ArrowDownUp, CheckCircle2, FileText, X, Loader2, UserPlus, Users, Trophy } from 'lucide-react';
 
 
@@ -110,6 +111,29 @@ export const LeadsList: React.FC = () => {
     useEffect(() => {
         loadData();
     }, []);
+
+    // ── Realtime: świeży lead (formularz/mail/chat) pojawia się na tablicy sam ──
+    // Tabela leads jest w publikacji supabase_realtime (migracja 20260611120000).
+    // Debounce 1,5 s — zbiorcze zmiany (np. auto-move formularzy) to jeden refetch.
+    useEffect(() => {
+        let debounce: ReturnType<typeof setTimeout> | null = null;
+        const channel = supabase
+            .channel('leads-board')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    const cd = (payload.new as any)?.customer_data || {};
+                    const name = [cd.firstName, cd.lastName].filter(Boolean).join(' ') || 'Nowy lead';
+                    toast(`🔥 Nowy lead: ${name}`, { duration: 5000 });
+                }
+                if (debounce) clearTimeout(debounce);
+                debounce = setTimeout(() => handleLeadUpdate(), 1500);
+            })
+            .subscribe();
+        return () => {
+            if (debounce) clearTimeout(debounce);
+            supabase.removeChannel(channel);
+        };
+    }, [handleLeadUpdate]);
 
     // Sales reps see all leads by default (including unassigned new leads from forms)
 
@@ -342,10 +366,13 @@ export const LeadsList: React.FC = () => {
     const quickKpis = React.useMemo(() => {
         const total = filteredLeads.length;
         const newLeads = filteredLeads.filter(l => ['new', 'formularz_sent', 'formularz'].includes(l.status)).length;
-        const inProcess = filteredLeads.filter(l => ['contacted', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
+        // Statusy agenta (offer_agent/needs_info/offer_agent_sent) też są "w procesie" —
+        // wcześniej nie wpadały do żadnego licznika
+        const inProcess = filteredLeads.filter(l => ['contacted', 'offer_agent', 'needs_info', 'offer_agent_sent', 'measurement_scheduled', 'measurement_completed', 'offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
         const won = filteredLeads.filter(l => l.status === 'won').length;
         const lost = filteredLeads.filter(l => l.status === 'lost').length;
-        const offerSent = filteredLeads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
+        // Oferta wysłana przez agenta to też wysłana oferta
+        const offerSent = filteredLeads.filter(l => ['offer_sent', 'offer_agent_sent', 'contact_after_offer', 'negotiation'].includes(l.status)).length;
         const offerRate = total > 0 ? ((offerSent / total) * 100).toFixed(0) : '0';
         const totalClosed = won + lost;
         const winRate = totalClosed > 0 ? ((won / totalClosed) * 100).toFixed(0) : '—';
@@ -437,8 +464,28 @@ export const LeadsList: React.FC = () => {
                                             </span>
                                         ) : lead.source === 'website_pl' ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200 self-start">
-                                                <span className="text-sm">🇵🇱</span>
+                                                <span className="text-sm">PL</span>
                                                 zadaszto.pl
+                                            </span>
+                                        ) : lead.source === 'website_de' ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 self-start">
+                                                <span className="text-sm">DE</span>
+                                                polendach24.de
+                                            </span>
+                                        ) : lead.source === 'konfigurator_de' ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 self-start">
+                                                <span className="text-sm">DE</span>
+                                                Konfigurator
+                                            </span>
+                                        ) : lead.source === 'schnellanfrage_de' ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 self-start">
+                                                <span className="text-sm">DE</span>
+                                                Schnellanfrage
+                                            </span>
+                                        ) : lead.source === 'ai-berater_de' ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200 self-start">
+                                                <span className="text-sm">DE</span>
+                                                KI-Berater
                                             </span>
                                         ) : (
                                             <span className="text-xs text-slate-400">{lead.source || 'Inne'}</span>
@@ -717,6 +764,9 @@ export const LeadsList: React.FC = () => {
                         <option value="contacted">Skontaktowano</option>
                         <option value="formularz_sent">Formularz wysłany</option>
                         <option value="formularz">Formularz wypełniony</option>
+                        <option value="offer_agent">Oferta Agent 🤖</option>
+                        <option value="needs_info">Brakuje danych ⚠️</option>
+                        <option value="offer_agent_sent">Agent Wysłana ✅</option>
                         <option value="measurement_scheduled">Umówiony na pomiar</option>
                         <option value="measurement_completed">Pomiar odbył się</option>
                         <option value="offer_sent">Oferta wysłana</option>

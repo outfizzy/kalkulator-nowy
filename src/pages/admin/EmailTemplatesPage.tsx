@@ -9,7 +9,27 @@ import { EmailPreviewModal } from '../../components/mail/EmailPreviewModal';
 import { getSystemTemplates, wrapInBrandTemplate, textToEmailHtml } from '../../utils/emailBrandKit';
 import { getCampaignTemplates } from '../../components/campaigns/CampaignTemplates';
 import { generateLeadSalesEmailHtml } from '../../components/leads/leadSalesEmailTemplate';
+import { autoEmailTemplates } from '../../utils/autoEmailTemplates';
 import { toast } from 'react-hot-toast';
+
+type GalleryStatus = 'auto' | 'manual' | 'draft';
+
+interface GalleryItem {
+    id: string;
+    name: string;
+    description: string;
+    trigger: string;
+    category: string;
+    source: string;
+    status: GalleryStatus;
+    getPreview: () => string;
+}
+
+const STATUS_LABELS: Record<GalleryStatus, { label: string; cls: string }> = {
+    auto: { label: '🤖 Automat', cls: 'bg-green-100 text-green-700 border-green-200' },
+    manual: { label: '✋ Ręczny', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    draft: { label: '📝 Projekt — niepodpięty', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+};
 
 export const EmailTemplatesPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'gallery' | 'system' | 'templates' | 'footers'>('gallery');
@@ -120,6 +140,7 @@ export const EmailTemplatesPage: React.FC = () => {
     };
 
     const CATEGORY_LABELS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+        auto: { label: 'Automat', color: 'text-green-700', bg: 'bg-green-50 border-green-200', icon: '🤖' },
         offer: { label: 'Oferta', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', icon: '📄' },
         sales: { label: 'Sprzedaż', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '💰' },
         fair: { label: 'Targi', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: '🎪' },
@@ -129,31 +150,47 @@ export const EmailTemplatesPage: React.FC = () => {
         lead: { label: 'Lead', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200', icon: '🎯' },
     };
 
+    // Gallery: templates ACTUALLY sent automatically by the backend (1:1 copies from code)
+    const autoGalleryItems = useMemo<GalleryItem[]>(() =>
+        autoEmailTemplates.map(t => ({
+            id: t.id,
+            name: t.name,
+            description: `Temat: "${t.subject}" — kopia 1:1 z kodu backendu (źródła i linie: src/utils/autoEmailTemplates.ts).`,
+            trigger: `⚙️ ${t.trigger}`,
+            category: 'auto',
+            source: t.language === 'de' ? 'Backend (DE)' : 'Backend (PL)',
+            status: t.status,
+            getPreview: () => t.html,
+        })), []);
+
     // Build unified gallery items
     const allTemplates = useMemo(() => {
-        const items: { id: string; name: string; description: string; trigger: string; category: string; source: string; getPreview: () => string }[] = [];
+        const items: GalleryItem[] = [];
 
         // 1. System templates from emailBrandKit
+        // UWAGA: te szablony to PROJEKTY graficzne — getSystemTemplates() jest używane
+        // wyłącznie na tej stronie, żaden kod wysyłki w repo z nich nie korzysta.
         systemTemplates.forEach(t => {
             const triggers: Record<string, string> = {
-                system_offer: '⚙️ Automatycznie — przy wysyłce oferty PDF do klienta',
-                system_fair_catalog: '⚙️ Automatycznie — follow-up po targach z katalogiem',
-                system_welcome: '⚙️ Automatycznie — po pierwszym kontakcie klienta',
-                system_send_offer: '⚙️ Automatycznie — email z wycenąi ofertą',
-                system_followup: '⚙️ Automatycznie — follow-up po braku odpowiedzi',
-                system_service_ack: '⚙️ Automatycznie — potwierdzenie zgłoszenia serwisowego',
-                system_installation_confirm: '⚙️ Automatycznie — potwierdzenie terminu montażu',
-                system_installation_complete: '⚙️ Automatycznie — po zakończeniu montażu + prośba o opinię',
-                system_service_form_link: '⚙️ Automatycznie — link do formularza serwisowego',
-                system_feedback_request: '⚙️ Automatycznie — prośba o feedback po montażu',
+                system_offer: '📝 Projekt — NIEpodpięty do automatu (zamysł: wysyłka oferty PDF do klienta; żaden kod wysyłki nie używa tego szablonu)',
+                system_fair_catalog: '📝 Projekt — NIEpodpięty do automatu (zamysł: follow-up po targach z katalogiem)',
+                system_welcome: '📝 Projekt — NIEpodpięty do automatu (zamysł: powitanie po pierwszym kontakcie klienta)',
+                system_send_offer: '📝 Projekt — NIEpodpięty do automatu (zamysł: email z wyceną i ofertą)',
+                system_followup: '📝 Projekt — NIEpodpięty do automatu (zamysł: follow-up po braku odpowiedzi)',
+                system_service_ack: '📝 Projekt — NIEpodpięty do automatu (zamysł: potwierdzenie zgłoszenia serwisowego)',
+                system_installation_confirm: '📝 Projekt — NIEpodpięty do automatu (zamysł: potwierdzenie terminu montażu)',
+                system_installation_complete: '📝 Projekt — NIEpodpięty do automatu (zamysł: po zakończeniu montażu + prośba o opinię)',
+                system_service_form_link: '📝 Projekt — NIEpodpięty do automatu (zamysł: link do formularza serwisowego)',
+                system_feedback_request: '📝 Projekt — NIEpodpięty do automatu (zamysł: prośba o feedback po montażu; zbliżony mail wysyłany jest RĘCZNIE z widgetu Feedback na dashboardzie montaży — własny HTML, nie ten szablon)',
             };
             items.push({
                 id: t.id,
                 name: t.name,
                 description: t.description,
-                trigger: triggers[t.id] || '⚙️ Systemowy',
+                trigger: triggers[t.id] || '📝 Projekt — NIEpodpięty do automatu',
                 category: t.category,
                 source: 'System',
+                status: 'draft',
                 getPreview: () => t.previewHtml(),
             });
         });
@@ -173,6 +210,7 @@ export const EmailTemplatesPage: React.FC = () => {
                 trigger: campaignTriggers[t.id] || '📧 Ręcznie — kampania mailowa',
                 category: 'campaign',
                 source: 'Kampania',
+                status: 'manual',
                 getPreview: () => t.previewHtml({
                     projectTitle: 'Premium Terrassenüberdachung SkyStyle',
                     projectLocation: 'Berlin-Charlottenburg',
@@ -199,9 +237,10 @@ export const EmailTemplatesPage: React.FC = () => {
             id: 'lead_schneelast',
             name: 'Schneelastzone – Projektbestätigung',
             description: 'Powitalny email dla leada — potwierdza strefę śnieżną, prezentuje konfigurację i zespół doradców. Zachęca do skonfigurowania dachu online.',
-            trigger: '🎯 Automatycznie — po zapisaniu leada z Schneelastzone (formularz na stronie)',
+            trigger: '✋ Ręcznie — wysyłany przez handlowca z modala Schneelast przy leadzie (SnowZoneEmailModal) lub masowo (BulkWelcomeEmailModal); NIE jest wysyłany automatycznie',
             category: 'lead',
             source: 'Lead',
+            status: 'manual',
             getPreview: () => generateLeadSalesEmailHtml({
                 customerName: 'Max Mustermann',
                 postalCode: '03044',
@@ -213,6 +252,68 @@ export const EmailTemplatesPage: React.FC = () => {
 
         return items;
     }, [systemTemplates]);
+
+    // Shared gallery card renderer (identyczny wygląd kart dla obu sekcji)
+    const renderGalleryCard = (tmpl: GalleryItem, idx: number) => {
+        const cat = CATEGORY_LABELS[tmpl.category] || CATEGORY_LABELS.sales;
+        const status = STATUS_LABELS[tmpl.status];
+        return (
+            <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden group">
+                {/* Category stripe */}
+                <div className={`h-1.5 ${tmpl.category === 'auto' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : tmpl.category === 'campaign' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : tmpl.category === 'lead' ? 'bg-gradient-to-r from-cyan-500 to-blue-500' : tmpl.category === 'installation' ? 'bg-gradient-to-r from-violet-500 to-purple-500' : tmpl.category === 'service' ? 'bg-gradient-to-r from-rose-500 to-pink-500' : 'bg-gradient-to-r from-slate-700 via-blue-600 to-slate-700'}`} />
+
+                <div className="p-5">
+                    {/* Badges row */}
+                    <div className="flex items-start justify-between mb-3 gap-2">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${cat.bg} ${cat.color}`}>
+                            {cat.icon} {cat.label}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${status.cls}`}>
+                                {status.label}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-medium">
+                                {tmpl.source}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Number badge */}
+                    <div className="flex items-start gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 flex-shrink-0">
+                            {idx + 1}
+                        </div>
+                        <h3 className="font-bold text-slate-800 text-sm leading-tight">{tmpl.name}</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-3">{tmpl.description}</p>
+
+                    {/* Trigger info */}
+                    <div className="bg-slate-50 rounded-lg px-3 py-2 mb-4 border border-slate-100">
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                            <span className="font-bold text-slate-700">Wyzwalacz: </span>
+                            {tmpl.trigger}
+                        </p>
+                    </div>
+
+                    {/* Preview button */}
+                    <button
+                        onClick={() => {
+                            setPreviewTitle(tmpl.name);
+                            setPreviewHtml(tmpl.getPreview());
+                            setIsPreviewOpen(true);
+                        }}
+                        className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2 border border-blue-200 hover:border-blue-300"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Podgląd z przykładowymi danymi
+                    </button>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -289,68 +390,42 @@ export const EmailTemplatesPage: React.FC = () => {
                             <div>
                                 <h2 className="text-lg font-bold">Galeria Wszystkich Szablonów E-mail</h2>
                                 <p className="text-blue-200 text-sm mt-1">
-                                    Podgląd {allTemplates.length} szablonów z całego systemu — z przykładowymi danymi. Kliknij "Podgląd" aby zobaczyć co otrzymuje klient.
+                                    Podgląd {autoGalleryItems.length + allTemplates.length} szablonów z całego systemu — z przykładowymi danymi. Kliknij "Podgląd" aby zobaczyć co otrzymuje klient.
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Templates Grid */}
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {allTemplates.map((tmpl, idx) => {
-                            const cat = CATEGORY_LABELS[tmpl.category] || CATEGORY_LABELS.sales;
-                            return (
-                                <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden group">
-                                    {/* Category stripe */}
-                                    <div className={`h-1.5 ${tmpl.category === 'campaign' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : tmpl.category === 'lead' ? 'bg-gradient-to-r from-cyan-500 to-blue-500' : tmpl.category === 'installation' ? 'bg-gradient-to-r from-violet-500 to-purple-500' : tmpl.category === 'service' ? 'bg-gradient-to-r from-rose-500 to-pink-500' : 'bg-gradient-to-r from-slate-700 via-blue-600 to-slate-700'}`} />
+                    {/* ── SEKCJA 1: Wysyłane automatycznie (podgląd 1:1 z kodu) ── */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3 pt-2">
+                            <span className="text-xl">🤖</span>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800">Wysyłane automatycznie (podgląd 1:1 z kodu)</h3>
+                                <p className="text-xs text-slate-500">
+                                    Te maile backend wysyła sam, bez udziału użytkownika. Podgląd to kopia HTML z kodu — źródłem prawdy jest kod backendu (ścieżki i linie w src/utils/autoEmailTemplates.ts).
+                                </p>
+                            </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {autoGalleryItems.map((tmpl, idx) => renderGalleryCard(tmpl, idx))}
+                        </div>
+                    </div>
 
-                                    <div className="p-5">
-                                        {/* Badges row */}
-                                        <div className="flex items-start justify-between mb-3">
-                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${cat.bg} ${cat.color}`}>
-                                                {cat.icon} {cat.label}
-                                            </span>
-                                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-medium">
-                                                {tmpl.source}
-                                            </span>
-                                        </div>
-
-                                        {/* Number badge */}
-                                        <div className="flex items-start gap-3 mb-3">
-                                            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 flex-shrink-0">
-                                                {idx + 1}
-                                            </div>
-                                            <h3 className="font-bold text-slate-800 text-sm leading-tight">{tmpl.name}</h3>
-                                        </div>
-                                        <p className="text-xs text-slate-500 leading-relaxed mb-3">{tmpl.description}</p>
-
-                                        {/* Trigger info */}
-                                        <div className="bg-slate-50 rounded-lg px-3 py-2 mb-4 border border-slate-100">
-                                            <p className="text-[11px] text-slate-600 leading-relaxed">
-                                                <span className="font-bold text-slate-700">Wyzwalacz: </span>
-                                                {tmpl.trigger}
-                                            </p>
-                                        </div>
-
-                                        {/* Preview button */}
-                                        <button
-                                            onClick={() => {
-                                                setPreviewTitle(tmpl.name);
-                                                setPreviewHtml(tmpl.getPreview());
-                                                setIsPreviewOpen(true);
-                                            }}
-                                            className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2 border border-blue-200 hover:border-blue-300"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                            Podgląd z przykładowymi danymi
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    {/* ── SEKCJA 2: Projekty i szablony wysyłane ręcznie ── */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
+                            <span className="text-xl">📋</span>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800">Projekty i szablony wysyłane ręcznie</h3>
+                                <p className="text-xs text-slate-500">
+                                    Szablony oznaczone "Projekt — niepodpięty" to wyłącznie projekty graficzne — żaden automat ich obecnie nie wysyła.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {allTemplates.map((tmpl, idx) => renderGalleryCard(tmpl, idx))}
+                        </div>
                     </div>
                 </div>
             )}

@@ -51,6 +51,7 @@ const actionGroups = [
         items: [
             { title: 'Nowa oferta', path: '/new-offer', icon: <PenLine className="w-4 h-4" /> },
             { title: 'Lista ofert', path: '/offers', icon: <Archive className="w-4 h-4" /> },
+            { title: 'Live Chat', path: '/chat', icon: <Zap className="w-4 h-4" /> },
             { title: 'Leady', path: '/leads', icon: <Flame className="w-4 h-4" /> },
             { title: 'Umowy', path: '/contracts', icon: <FileText className="w-4 h-4" /> },
             { title: 'Baza klientów', path: '/customers', icon: <UserPlus className="w-4 h-4" /> },

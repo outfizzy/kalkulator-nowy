@@ -32,6 +32,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const connection = await imaps.connect(imapConfig);
+        // home.pl zrywa sockety po stronie serwera — bez handlera nieobsłużony
+        // event 'error' ubija całą funkcję (HTTP 500)
+        connection.on('error', (err: any) => console.warn('IMAP connection error (ignored):', err?.message));
         await connection.openBox(box);
 
         if (action === 'markRead') {

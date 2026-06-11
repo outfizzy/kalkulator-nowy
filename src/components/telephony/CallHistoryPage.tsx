@@ -1,14 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { TelephonyService, type CallLog } from '../../services/database/telephony.service';
+import { TelephonyService, getRecordingProxyUrl, type CallLog } from '../../services/database/telephony.service';
 import { TaskService } from '../../services/database/task.service';
 import { supabase } from '../../lib/supabase';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://whgjsppyuvglhbdgdark.supabase.co';
-
-const getRecordingProxyUrl = (recordingUrl: string) => {
-    if (!recordingUrl || !recordingUrl.includes('twilio.com')) return recordingUrl;
-    return `${SUPABASE_URL}/functions/v1/recording-proxy?url=${encodeURIComponent(recordingUrl)}`;
-};
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { QuickSMSModal } from './QuickSMSModal';

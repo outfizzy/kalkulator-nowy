@@ -176,7 +176,8 @@ Odpowiedz TYLKO poprawnym JSON-em.`;
         }
 
         // ── MODE 2: Full recording analysis ──
-        const { callSid, recordingUrl } = body;
+        // voicemailId (optional): when set, the transcription is also saved to voicemails.transcription
+        const { callSid, recordingUrl, voicemailId } = body;
 
         if (!callSid || !recordingUrl) {
             return new Response(JSON.stringify({ error: 'Missing callSid or recordingUrl' }), {
@@ -237,6 +238,20 @@ Odpowiedz TYLKO poprawnym JSON-em.`;
             console.log(`[analyze] Saved analysis to call_log ${existing[0].id}`);
         } else {
             console.warn(`[analyze] No call_log found for CallSid=${callSid}`);
+        }
+
+        // 5. Save transcription to voicemails table (when triggered for a voicemail)
+        if (voicemailId) {
+            const { error: vmError } = await supabase
+                .from('voicemails')
+                .update({ transcription })
+                .eq('id', voicemailId);
+
+            if (vmError) {
+                console.error(`[analyze] Failed to save transcription to voicemail ${voicemailId}:`, vmError);
+            } else {
+                console.log(`[analyze] Saved transcription to voicemail ${voicemailId}`);
+            }
         }
 
         return new Response(JSON.stringify({

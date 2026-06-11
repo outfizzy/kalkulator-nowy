@@ -90,6 +90,83 @@ export const ContractService = {
         });
     },
 
+    async getById(id: string): Promise<Contract | null> {
+        const { data: row, error } = await supabase
+            .from('contracts')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!row) return null;
+
+        // Fetch profiles for signed_by and sales_rep_id
+        const userIds = new Set<string>();
+        if (row.signed_by) userIds.add(row.signed_by);
+        if (row.sales_rep_id) userIds.add(row.sales_rep_id);
+        if (row.advance_paid_by) userIds.add(row.advance_paid_by);
+
+        const profileMap = new Map<string, { full_name: string }>();
+        if (userIds.size > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', Array.from(userIds));
+            profiles?.forEach(p => profileMap.set(p.id, p));
+        }
+
+        const signedProfile = row.signed_by ? profileMap.get(row.signed_by) : undefined;
+        const salesRepProfile = row.sales_rep_id ? profileMap.get(row.sales_rep_id) : undefined;
+
+        return {
+            id: row.id,
+            offerId: row.offer_id,
+            contractNumber: row.contract_data.contractNumber,
+            status: row.status as Contract['status'],
+            client: row.contract_data.client,
+            product: row.contract_data.product,
+            pricing: {
+                ...row.contract_data.pricing,
+                paymentMethod: row.contract_data.pricing?.paymentMethod,
+                advancePayment: row.contract_data.pricing?.advancePayment,
+                advancePaymentDate: row.contract_data.pricing?.advancePaymentDate ? new Date(row.contract_data.pricing.advancePaymentDate) : undefined,
+            },
+            commission: row.contract_data.commission,
+            requirements: row.contract_data.requirements,
+            orderedItems: row.contract_data.orderedItems || [],
+            comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
+            attachments: row.contract_data.attachments || [],
+            installationNotes: row.contract_data.installationNotes || '',
+            plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
+            dachrechnerData: row.contract_data.dachrechnerData || undefined,
+            createdAt: new Date(row.created_at),
+            signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
+            signedBy: row.signed_by,
+            signedByUser: signedProfile ? {
+                firstName: (signedProfile.full_name || '').split(' ')[0] || '',
+                lastName: (signedProfile.full_name || '').split(' ').slice(1).join(' ') || ''
+            } : undefined,
+            salesRepId: row.sales_rep_id,
+            salesRep: salesRepProfile ? {
+                firstName: (salesRepProfile.full_name || '').split(' ')[0] || '',
+                lastName: (salesRepProfile.full_name || '').split(' ').slice(1).join(' ') || ''
+            } : undefined,
+            advanceAmount: (row.advance_amount && Number(row.advance_amount) > 0)
+                ? Number(row.advance_amount)
+                : (row.contract_data?.pricing?.advancePayment
+                    ? Number(row.contract_data.pricing.advancePayment)
+                    : undefined),
+            advancePaid: row.advance_paid ?? false,
+            advancePaidAt: row.advance_paid_at || undefined,
+            advancePaidBy: row.advance_paid_by || undefined,
+            advancePaidByUser: row.advance_paid_by ? (() => {
+                const p = profileMap.get(row.advance_paid_by);
+                return p ? { firstName: (p.full_name || '').split(' ')[0] || '', lastName: (p.full_name || '').split(' ').slice(1).join(' ') || '' } : undefined;
+            })() : undefined,
+            advanceNotes: row.advance_notes || undefined,
+        };
+    },
+
     async getNextContractNumber(): Promise<string> {
         const { data, error } = await supabase.rpc('get_next_contract_number');
         if (error) throw error;
