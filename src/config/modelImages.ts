@@ -45,29 +45,43 @@ loadImageOverrides();
 
 // Model hero image mapping - primary image for each model
 export const MODEL_IMAGES: Record<string, string> = {
-    // Roof Models - Capitalized
+    // Roof Models - Capitalized (internal names)
     'Trendline': '/images/models/trendline.jpg',
-    'Trendline+': '/images/models/trendline.jpg',
+    'Trendline+': '/images/models/trendline-plus.jpg',
     'Topline': '/images/models/topline.jpg',
-    'Topline XL': '/images/models/topline.jpg',
+    'Topline XL': '/images/models/topline-xl.jpg',
     'Designline': '/images/models/designline.jpg',
     'Skyline': '/images/models/skyline.jpg',
     'Orangeline': '/images/models/orangeline.jpg',
-    'Orangeline+': '/images/models/orangeline.jpg',
+    'Orangeline+': '/images/models/orangeline-plus.jpg',
     'Ultraline': '/images/models/ultraline.jpg',
     'Carport': '/images/models/carport.jpg',
     'Pergola': '/images/models/pergola.jpg',
     'Pergola Deluxe': '/images/models/pergola-deluxe.jpg',
 
+    // Brand names (customer-facing, from worker)
+    'Trendstyle 15': '/images/models/trendline.jpg',
+    'Trendstyle': '/images/models/trendline.jpg',
+    'Topstyle 20': '/images/models/topline.jpg',
+    'Topstyle': '/images/models/topline.jpg',
+    'Orangestyle 10': '/images/models/orangeline.jpg',
+    'Orangestyle': '/images/models/orangeline.jpg',
+    'Ultrastyle Classic': '/images/models/ultraline.jpg',
+    'Ultrastyle': '/images/models/ultraline.jpg',
+    'Skystyle': '/images/models/skyline.jpg',
+    'Teranda TR15': '/images/models/teranda-tr15.jpg',
+    'Teranda TR20': '/images/models/teranda-tr20.jpg',
+    'Teranda TR10': '/images/models/teranda-tr10.jpg',
+
     // Roof Models - Lowercase (for modelId matching)
     'trendline': '/images/models/trendline.jpg',
-    'trendline+': '/images/models/trendline.jpg',
+    'trendline+': '/images/models/trendline-plus.jpg',
     'topline': '/images/models/topline.jpg',
-    'topline xl': '/images/models/topline.jpg',
+    'topline xl': '/images/models/topline-xl.jpg',
     'designline': '/images/models/designline.jpg',
     'skyline': '/images/models/skyline.jpg',
     'orangeline': '/images/models/orangeline.jpg',
-    'orangeline+': '/images/models/orangeline.jpg',
+    'orangeline+': '/images/models/orangeline-plus.jpg',
     'ultraline': '/images/models/ultraline.jpg',
     'carport': '/images/models/carport.jpg',
     'pergola': '/images/models/pergola.jpg',
@@ -88,10 +102,20 @@ export const MODEL_GALLERY: Record<string, string[]> = {
         '/images/models/trendline-4.webp',
     ],
     'Trendline+': [
+        '/images/models/trendline-plus.jpg',
+        '/images/models/trendline-2.webp',
+        '/images/models/trendline-panorama.webp',
+    ],
+    // Brand names → same galleries
+    'Trendstyle 15': [
         '/images/models/trendline.jpg',
         '/images/models/trendline-2.webp',
         '/images/models/trendline-3.webp',
-        '/images/models/trendline-4.webp',
+    ],
+    'Trendstyle': [
+        '/images/models/trendline.jpg',
+        '/images/models/trendline-2.webp',
+        '/images/models/trendline-3.webp',
     ],
     'Topline': [
         '/images/models/topline.jpg',
@@ -100,9 +124,19 @@ export const MODEL_GALLERY: Record<string, string[]> = {
         '/images/models/topline-4.webp',
     ],
     'Topline XL': [
-        '/images/models/topline.jpg',
+        '/images/models/topline-xl.jpg',
         '/images/models/topline-2.webp',
         '/images/models/topline-4.webp',
+    ],
+    'Topstyle 20': [
+        '/images/models/topline.jpg',
+        '/images/models/topline-2.webp',
+        '/images/models/topline-3.webp',
+    ],
+    'Topstyle': [
+        '/images/models/topline.jpg',
+        '/images/models/topline-2.webp',
+        '/images/models/topline-3.webp',
     ],
     'Designline': [
         '/images/models/designline.jpg',
@@ -117,11 +151,20 @@ export const MODEL_GALLERY: Record<string, string[]> = {
         '/images/models/skyline-5.jpg',
         '/images/models/skyline-render.jpg',
     ],
+    'Skystyle': [
+        '/images/models/skyline.jpg',
+        '/images/models/skyline-2.jpg',
+        '/images/models/skyline-3.jpg',
+    ],
     'Orangeline': [
         '/images/models/orangeline.jpg',
         '/images/models/orangeline-2.webp',
     ],
     'Orangeline+': [
+        '/images/models/orangeline-plus.jpg',
+        '/images/models/orangeline-2.webp',
+    ],
+    'Orangestyle 10': [
         '/images/models/orangeline.jpg',
         '/images/models/orangeline-2.webp',
     ],
@@ -129,6 +172,11 @@ export const MODEL_GALLERY: Record<string, string[]> = {
         '/images/models/ultraline.jpg',
         '/images/models/ultraline-2.jpg',
         '/images/models/ultraline-3.jpg',
+        '/images/models/ultraline-4.webp',
+    ],
+    'Ultrastyle Classic': [
+        '/images/models/ultraline.jpg',
+        '/images/models/ultraline-2.jpg',
         '/images/models/ultraline-4.webp',
     ],
     'Carport': [
@@ -142,6 +190,22 @@ export const MODEL_GALLERY: Record<string, string[]> = {
     'Pergola Deluxe': [
         '/images/models/pergola-deluxe.jpg',
     ],
+};
+
+/**
+ * Cross-sell category images — used in the interactive offer cross-sell section
+ */
+export const CROSS_SELL_IMAGES: Record<string, string> = {
+    markise: '/images/models/markise-aufdach.jpg',
+    panorama: '/images/models/glazing-panoramisch-real.jpg',
+    senkrechtmarkise: '/images/models/senkrechtmarkise-real.png',
+    zip: '/images/models/senkrechtmarkise-real.png',
+    led: '/images/models/led.jpg',
+    heater: '/images/models/heizstrahler.webp',
+    sliding_wall: '/images/models/schiebewand.jpg',
+    roof_upgrade: '/images/models/roof-glass.jpg',
+    glass_wall: '/images/models/glazing-alu-wand-real.jpg',
+    fixed_wall: '/images/models/glazing-fest.jpg',
 };
 
 /**

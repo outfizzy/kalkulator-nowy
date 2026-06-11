@@ -68,13 +68,66 @@ serve(async (req) => {
                 contentType: a.contentType || 'application/pdf'
             }));
 
-            await transporter.sendMail({
+            const info = await transporter.sendMail({
                 from: `${fromName || 'System Polendach'} <${smtpUser}>`,
                 to: to,
                 subject: subject,
                 html: html,
                 attachments: mailAttachments.length > 0 ? mailAttachments : undefined,
+                headers: {
+                    'List-Unsubscribe': `<mailto:${smtpUser}?subject=Unsubscribe>`,
+                    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                },
             });
+
+            // Try to save to IMAP Sent folder
+            try {
+                const ImapClient = (await import("npm:imapflow@1.0.162")).ImapFlow;
+                // home.pl uses same hostname for SMTP and IMAP
+                // For other providers: smtp.xxx.de → imap.xxx.de
+                const imapHost = smtpHost!.includes('home.pl') 
+                    ? smtpHost! 
+                    : smtpHost!.replace('smtp.', 'imap.');
+                const imapConfig = {
+                    host: imapHost,
+                    port: 993,
+                    secure: true,
+                    auth: { user: smtpUser!, pass: smtpPass! },
+                    logger: false,
+                };
+                const client = new ImapClient(imapConfig);
+                await client.connect();
+                
+                // Build raw email for IMAP append
+                const rawEmail = [
+                    `From: ${fromName || 'System Polendach'} <${smtpUser}>`,
+                    `To: ${to}`,
+                    `Subject: ${subject}`,
+                    `Date: ${new Date().toUTCString()}`,
+                    `Message-ID: ${info.messageId}`,
+                    `MIME-Version: 1.0`,
+                    `Content-Type: text/html; charset=utf-8`,
+                    ``,
+                    html,
+                ].join('\r\n');
+                
+                // Try common Sent folder names
+                const sentFolders = ['Sent', 'INBOX.Sent', 'Sent Items', 'Gesendet', 'INBOX.Gesendet'];
+                let appended = false;
+                for (const folder of sentFolders) {
+                    try {
+                        await client.append(folder, rawEmail, ['\\Seen']);
+                        console.log(`✅ Email saved to IMAP folder: ${folder}`);
+                        appended = true;
+                        break;
+                    } catch { /* try next folder */ }
+                }
+                if (!appended) console.log('⚠️ Could not find Sent folder in IMAP');
+                
+                await client.logout();
+            } catch (imapErr: any) {
+                console.log(`⚠️ IMAP Sent save skipped: ${imapErr.message?.substring(0, 80)}`);
+            }
 
             return new Response(
                 JSON.stringify({ success: true, message: 'Email sent via SMTP (Nodemailer)' }),

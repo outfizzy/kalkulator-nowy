@@ -4,8 +4,8 @@ import {
     MessageCircle, Trophy, XCircle, Building2, Check, CalendarPlus,
     Trash2, AlertTriangle, MapPin, Package, Info, User, Flame, Moon,
     MoreHorizontal, Zap, Star, RefreshCw, Euro, Eye, EyeOff, FileText,
-    Inbox, TrendingUp, Target, Timer, Wallet, Send, Hourglass,
-    Ruler, Palette, Wrench, MessageSquare, Users
+    Send, Hourglass,
+    Ruler, Palette, Wrench, MessageSquare, Users, Bot, Rocket
 } from 'lucide-react';
 import { normalizePhone } from '../../utils/phone';
 import {
@@ -56,6 +56,9 @@ const COLUMNS: { id: LeadStatus; title: string; color: string }[] = [
     { id: 'formularz_sent', title: 'Formularz wysłany', color: 'bg-sky-50 border-sky-100 text-sky-700' },
     { id: 'formularz', title: 'Formularz wypełniony', color: 'bg-teal-50 border-teal-100 text-teal-700' },
     { id: 'contacted', title: 'Skontaktowano', color: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
+    { id: 'offer_agent', title: 'Oferta Agent 🤖', color: 'bg-violet-50 border-violet-100 text-violet-700' },
+    { id: 'needs_info', title: 'Brakuje danych ⚠️', color: 'bg-orange-50 border-orange-200 text-orange-700' },
+    { id: 'offer_agent_sent', title: 'Agent Wysłana ✅', color: 'bg-fuchsia-50 border-fuchsia-100 text-fuchsia-700' },
     { id: 'offer_sent', title: 'Wysłano Ofertę', color: 'bg-yellow-50 border-yellow-100 text-yellow-700' },
     { id: 'contact_after_offer', title: 'Kontakt po ofercie', color: 'bg-amber-50 border-amber-100 text-amber-700' },
     { id: 'measurement_scheduled', title: 'Umówiony na pomiar', color: 'bg-cyan-50 border-cyan-100 text-cyan-700' },
@@ -71,6 +74,9 @@ const COLUMN_ICONS: Record<LeadStatus, React.ReactNode> = {
     formularz_sent: <Send className="w-4 h-4" />,
     formularz: <ClipboardCheck className="w-4 h-4" />,
     contacted: <Phone className="w-4 h-4" />,
+    offer_agent: <Bot className="w-4 h-4" />,
+    needs_info: <AlertTriangle className="w-4 h-4" />,
+    offer_agent_sent: <Rocket className="w-4 h-4" />,
     offer_sent: <Mail className="w-4 h-4" />,
     contact_after_offer: <MessageSquare className="w-4 h-4" />,
     measurement_scheduled: <CalendarDays className="w-4 h-4" />,
@@ -83,8 +89,11 @@ const COLUMN_ICONS: Record<LeadStatus, React.ReactNode> = {
 
 
 // Stage-specific stale thresholds (days without contact)
-const STALE_THRESHOLDS: Record<string, number> = {
+// Eksportowane — LeadsStats liczy "Zagrożone" z TEJ SAMEJ mapy (wcześniej miały
+// rozjechane progi i liczby się nie zgadzały między statystykami a badge'ami kart).
+export const STALE_THRESHOLDS: Record<string, number> = {
     new: 1, formularz_sent: 3, formularz: 2, contacted: 3,
+    offer_agent: 1, needs_info: 2, offer_agent_sent: 3,
     measurement_scheduled: 2, measurement_completed: 3,
     offer_sent: 5, contact_after_offer: 4, negotiation: 7
 };
@@ -173,11 +182,19 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
             window.open(`tel:${normalizePhone(phone)}`, '_self');
         }
         try {
-            // For formularz_sent: only update lastContactDate (follow-up), don't change status
-            // The lead should stay in formularz_sent until the customer fills the form
-            if (lead.status === 'formularz_sent') {
+            // Statusy ZAAWANSOWANE (pomiar/negocjacje/oferty/agent): telefon to follow-up —
+            // aktualizujemy tylko lastContactDate. Wcześniej bezwarunkowe status='contacted'
+            // COFAŁO leada np. z "Negocjacje" do "Skontaktowano".
+            const followUpOnlyStatuses: Lead['status'][] = [
+                'formularz_sent', 'formularz',
+                'offer_agent', 'offer_agent_sent', 'needs_info',
+                'offer_sent', 'contact_after_offer',
+                'measurement_scheduled', 'measurement_completed',
+                'negotiation', 'won', 'lost', 'fair',
+            ];
+            if (followUpOnlyStatuses.includes(lead.status)) {
                 await DatabaseService.updateLead(lead.id, { lastContactDate: new Date() });
-                toast.success('📞 Follow-up — czekamy na formularz');
+                toast.success('📞 Follow-up zanotowany');
             } else {
                 await DatabaseService.updateLead(lead.id, { status: 'contacted', lastContactDate: new Date() });
                 toast.success('📞 Oznaczono jako skontaktowano');
@@ -230,12 +247,12 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
             <div className="flex justify-between items-start mb-2">
                 <div className="pr-6">
                     <h4 className="font-semibold text-slate-900 text-[13px] leading-tight">
-                        {lead.customerData.firstName} {lead.customerData.lastName}
+                        {lead.customerData?.firstName} {lead.customerData?.lastName}
                     </h4>
-                    {lead.customerData.companyName && (
+                    {lead.customerData?.companyName && (
                         <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-1">
                             <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{lead.customerData.companyName}</span>
+                            <span className="truncate">{lead.customerData?.companyName}</span>
                         </div>
                     )}
                 </div>
@@ -277,16 +294,16 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
             )}
 
             <div className="text-[11px] text-slate-500 space-y-0.5 mb-2.5">
-                {(lead.customerData.address || (lead.customerData as any).street) && (
+                {(lead.customerData?.address || (lead.customerData as any)?.street) && (
                     <div className="flex items-center gap-1.5">
                         <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span className="truncate">{lead.customerData.address || (lead.customerData as any).street}</span>
+                        <span className="truncate">{lead.customerData?.address || (lead.customerData as any)?.street}</span>
                     </div>
                 )}
-                {(lead.customerData.city || lead.customerData.postalCode) && (
+                {(lead.customerData?.city || lead.customerData?.postalCode) && (
                     <div className="flex items-center gap-1.5 pl-[18px]">
-                        <span className="text-slate-400 font-mono text-[10px]">{lead.customerData.postalCode}</span>
-                        <span>{lead.customerData.city}</span>
+                        <span className="text-slate-400 font-mono text-[10px]">{lead.customerData?.postalCode}</span>
+                        <span>{lead.customerData?.city}</span>
                     </div>
                 )}
             </div>
@@ -422,6 +439,43 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
                 </div>
             )}
 
+            {/* 🤖 Agent Status Badges */}
+            {lead.status === 'offer_agent' && (
+                <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-violet-100 text-violet-800 border border-violet-200 animate-pulse">
+                    <Bot className="w-4 h-4 text-violet-500" />
+                    <span>Agent pracuje... 🔄</span>
+                </div>
+            )}
+            {lead.status === 'offer_agent_sent' && (
+                <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-200">
+                    <Rocket className="w-4 h-4 text-fuchsia-500" />
+                    <span>Agent wysłał ofertę! 🎉</span>
+                </div>
+            )}
+            {lead.status === 'needs_info' && (
+                <div className="mb-3 space-y-1.5">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                        <AlertTriangle className="w-4 h-4 text-orange-500" />
+                        <span>⚠️ Brakuje danych — potrzebna akcja</span>
+                    </div>
+                    {(lead as any).ai_analysis?.missingInfo && (
+                        <div className="flex flex-wrap gap-1 px-1">
+                            {((lead as any).ai_analysis.missingInfo as string[]).slice(0, 3).map((item: string, i: number) => (
+                                <span key={i} className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-semibold rounded border border-orange-200">
+                                    {item}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    {((lead as any).ai_draft_email || (lead as any).ai_draft_sms) && (
+                        <div className="flex items-center gap-1.5 px-2.5 text-[10px] text-orange-600">
+                            {(lead as any).ai_draft_email && <span>📧 Email gotowy</span>}
+                            {(lead as any).ai_draft_sms && <span>📱 SMS gotowy</span>}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Offer value badge — for leads in offer_sent/contact_after_offer/negotiation */}
             {['offer_sent', 'contact_after_offer', 'negotiation'].includes(lead.status) && (offerValue || (lead as any).wonValue) && (() => {
                 const val = offerValue?.lastNet || offerValue?.total || (lead as any).wonValue || 0;
@@ -450,10 +504,10 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
                     {lead.assignee ? (
                         <>
                             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
-                                {lead.assignee.firstName[0]}{lead.assignee.lastName[0]}
+                                {lead.assignee.firstName?.[0]}{lead.assignee.lastName?.[0]}
                             </div>
                             <span className="text-slate-600 font-medium truncate max-w-[90px] text-[11px]">
-                                {lead.assignee.firstName} {lead.assignee.lastName[0]}.
+                                {lead.assignee.firstName} {lead.assignee.lastName?.[0]}.
                             </span>
                             {(lead.additionalAssigneesProfiles?.length || 0) > 0 && (
                                 <span className="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full" title={(lead.additionalAssigneesProfiles || []).map(p => `${p.firstName} ${p.lastName}`).join(', ')}>+{lead.additionalAssigneesProfiles!.length}</span>
@@ -477,7 +531,7 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
                             sla.level === 'yellow' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
                             sla.level === 'red' ? 'bg-red-50 text-red-600 border border-red-200' :
                             'bg-red-100 text-red-700 border border-red-300'
-                        } ${sla.pulse ? 'animate-pulse' : ''}`} title={`Czas od utworzenia leada: ${sla.label}`}>
+                        } ${sla.pulse ? 'animate-pulse' : ''}`} title={`Czas od ostatniego kontaktu: ${sla.label}`}>
                             <span className={`w-1.5 h-1.5 rounded-full inline-block ${sla.level === 'green' ? 'bg-emerald-500' : sla.level === 'yellow' ? 'bg-amber-500' : sla.level === 'red' ? 'bg-red-500' : 'bg-red-700'}`} />
                             {sla.label}
                         </span>
@@ -550,7 +604,7 @@ const KanbanCard = React.memo(({ lead, onClick, onUpdate, onSchedule, onDelete, 
                             <button
                                 onClick={handleQuickEmail}
                                 className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-200 transition-all hover:shadow-sm"
-                                title="Wysłałem mail"
+                                title="Napisz mail do klienta (otwiera szczegóły leada)"
                             >
                                 <Mail className="w-3 h-3" />
                                 Mail
@@ -857,6 +911,25 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const navigate = useNavigate();
     const [activeId, setActiveId] = useState<string | null>(null);
 
+    // Optymistyczna nakładka statusów: po przeciągnięciu karta od razu zostaje
+    // w docelowej kolumnie (bez skoku do starej w oczekiwaniu na refetch);
+    // przy błędzie zapisu nakładka jest zdejmowana i karta wraca
+    const [statusOverrides, setStatusOverrides] = useState<Record<string, LeadStatus>>({});
+    const effectiveLeads = useMemo(
+        () => leads.map(l => statusOverrides[l.id] && statusOverrides[l.id] !== l.status ? { ...l, status: statusOverrides[l.id] } : l),
+        [leads, statusOverrides]
+    );
+    // Zdejmij nakładkę, gdy dane z serwera już zawierają nowy status
+    useEffect(() => {
+        setStatusOverrides(prev => {
+            const stale = Object.keys(prev).filter(id => leads.find(l => l.id === id)?.status === prev[id]);
+            if (stale.length === 0) return prev;
+            const next = { ...prev };
+            stale.forEach(id => delete next[id]);
+            return next;
+        });
+    }, [leads]);
+
     // Modal State
     const [wonModalOpen, setWonModalOpen] = useState(false);
     const [pendingWonLeadId, setPendingWonLeadId] = useState<string | null>(null);
@@ -875,38 +948,6 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
 
     // Cache of lead -> total offer values from system
     const [leadOfferValues, setLeadOfferValues] = useState<Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }>>({});
-    useEffect(() => {
-        const relevantLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation', 'measurement_scheduled', 'measurement_completed'].includes(l.status));
-        if (relevantLeads.length === 0) return;
-        const fetchValues = async () => {
-            const ids = relevantLeads.map(l => l.id);
-            const { data } = await supabase
-                .from('offers')
-                .select('lead_id, pricing, created_at')
-                .in('lead_id', ids)
-                .order('created_at', { ascending: false });
-            if (!data) return;
-            const map: Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }> = {};
-            for (const o of data) {
-                const net = (o.pricing as any)?.sellingPriceNet || 0;
-                if (!map[o.lead_id]) {
-                    // First result = latest offer (ordered by created_at desc)
-                    map[o.lead_id] = { total: net, count: 1, lastNet: net, lastSentAt: o.created_at };
-                } else {
-                    // Only count, don't add to total — we show last offer only
-                    map[o.lead_id].count += 1;
-                }
-            }
-            // Also include wonValue from leads that have it manually set
-            for (const l of relevantLeads) {
-                if ((l as any).wonValue && !map[l.id]) {
-                    map[l.id] = { total: (l as any).wonValue, count: 0, lastNet: (l as any).wonValue };
-                }
-            }
-            setLeadOfferValues(map);
-        };
-        fetchValues();
-    }, [leads]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -925,6 +966,9 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             contacted: [],
             formularz_sent: [],
             formularz: [],
+            offer_agent: [],
+            needs_info: [],
+            offer_agent_sent: [],
             measurement_scheduled: [],
             measurement_completed: [],
             offer_sent: [],
@@ -934,13 +978,13 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             lost: [],
             fair: []
         };
-        leads.forEach(lead => {
+        effectiveLeads.forEach(lead => {
             if (cols[lead.status]) {
                 cols[lead.status].push(lead);
             }
         });
         return cols;
-    }, [leads]);
+    }, [effectiveLeads]);
 
     // Track which leads have completed configurator forms (check ALL leads, not just formularz)
     // HYBRID: instant zero-query from customerData + background DB fallback for missed syncs
@@ -957,7 +1001,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
     const [dbFormIds, setDbFormIds] = useState<Set<string>>(new Set());
     useEffect(() => {
         // Check both formularz AND formularz_sent leads for completed forms
-        const formLeads = leads.filter(l =>
+        const formLeads = effectiveLeads.filter(l =>
             (l.status === 'formularz' || l.status === 'formularz_sent') &&
             !instantFormIds.has(l.id)
         );
@@ -977,7 +1021,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             }
         };
         checkMissedSyncs();
-    }, [leads, instantFormIds]);
+    }, [effectiveLeads, instantFormIds]);
 
     const completedFormLeadIds = useMemo(() => {
         const merged = new Set(instantFormIds);
@@ -993,7 +1037,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         if (autoMoveRunningRef.current) return; // Prevent concurrent runs
 
         // Forward: formularz_sent → formularz (form completed)
-        const forwardIds = leads
+        const forwardIds = effectiveLeads
             .filter(l => l.status === 'formularz_sent' && completedFormLeadIds.has(l.id) && !autoMoveDoneRef.current.has(l.id))
             .map(l => l.id);
 
@@ -1020,47 +1064,81 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             autoMoveRunningRef.current = false;
         };
         bulkMove();
-    }, [completedFormLeadIds, leads]);
+    }, [completedFormLeadIds, effectiveLeads]);
 
     // Track offer view status + customer interactions for offer_sent/negotiation leads
     const [offerViewMap, setOfferViewMap] = useState<Record<string, OfferCardInfo>>({});
+
+    // JEDEN przebieg po tabeli offers dla wartości ofert (badge € na kartach
+    // i sumy w nagłówkach kolumn) ORAZ statusu wyświetleń — wcześniej dwa
+    // osobne useEffecty odpytywały offers niemal o to samo przy każdym odświeżeniu
     useEffect(() => {
-        const relevantLeads = leads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation'].includes(l.status));
-        if (relevantLeads.length === 0) { setOfferViewMap({}); return; }
+        const valueStatuses = ['offer_sent', 'contact_after_offer', 'negotiation', 'measurement_scheduled', 'measurement_completed'];
+        const interactionStatuses = ['offer_sent', 'contact_after_offer', 'negotiation'];
+        const relevantLeads = effectiveLeads.filter(l => valueStatuses.includes(l.status));
+        if (relevantLeads.length === 0) {
+            setLeadOfferValues({});
+            setOfferViewMap({});
+            return;
+        }
 
-        const fetchOfferViews = async () => {
-            const viewMap: Record<string, OfferCardInfo> = {};
+        const fetchOfferData = async () => {
+            const ids = relevantLeads.map(l => l.id);
+            const interactionLeads = relevantLeads.filter(l => interactionStatuses.includes(l.status));
+            const interactionIds = interactionLeads.map(l => l.id);
 
-            // BATCH: fetch all offers for all relevant leads in one query
-            const leadIds = relevantLeads.map(l => l.id);
-            const { data: allOffers } = await supabase
-                .from('offers')
-                .select('id, lead_id, view_count, last_viewed_at')
-                .in('lead_id', leadIds)
-                .order('created_at', { ascending: false });
+            const [offersRes, interactionsRes] = await Promise.all([
+                supabase
+                    .from('offers')
+                    .select('lead_id, pricing, created_at, view_count, last_viewed_at')
+                    .in('lead_id', ids)
+                    .order('created_at', { ascending: false }),
+                interactionIds.length > 0
+                    // (interakcje klienta zapisują się do offer_interactions — poprzednia
+                    //  nazwa 'lead_interactions' wskazywała nieistniejącą tabelę, przez co
+                    //  badge'e "Zaakceptowana!"/"Pomiar proszony"/"Wiadomość" nigdy nie działały)
+                    ? supabase.from('offer_interactions').select('lead_id, event_type, event_data').in('lead_id', interactionIds)
+                    : Promise.resolve({ data: [] as any[] }),
+            ]);
+            const allOffers = offersRes.data || [];
+            const allInteractions = (interactionsRes as any).data || [];
 
-            // BATCH: fetch all interactions for all relevant leads in one query
-            const { data: allInteractions } = await supabase
-                .from('lead_interactions')
-                .select('lead_id, event_type, event_data')
-                .in('lead_id', leadIds);
+            // ── Wartości ofert ──
+            const valueMap: Record<string, { total: number; count: number; lastNet: number; lastSentAt?: string }> = {};
+            for (const o of allOffers) {
+                const net = (o.pricing as any)?.sellingPriceNet || 0;
+                if (!valueMap[o.lead_id]) {
+                    // First result = latest offer (ordered by created_at desc)
+                    valueMap[o.lead_id] = { total: net, count: 1, lastNet: net, lastSentAt: o.created_at };
+                } else {
+                    // Only count, don't add to total — we show last offer only
+                    valueMap[o.lead_id].count += 1;
+                }
+            }
+            // Also include wonValue from leads that have it manually set
+            for (const l of relevantLeads) {
+                if ((l as any).wonValue && !valueMap[l.id]) {
+                    valueMap[l.id] = { total: (l as any).wonValue, count: 0, lastNet: (l as any).wonValue };
+                }
+            }
 
-            // Group by lead
+            // ── Wyświetlenia + interakcje klienta ──
             const offersByLead = new Map<string, any[]>();
-            (allOffers || []).forEach((o: any) => {
+            allOffers.forEach((o: any) => {
                 const list = offersByLead.get(o.lead_id) || [];
                 list.push(o);
                 offersByLead.set(o.lead_id, list);
             });
 
             const interactionsByLead = new Map<string, any[]>();
-            (allInteractions || []).forEach((i: any) => {
+            allInteractions.forEach((i: any) => {
                 const list = interactionsByLead.get(i.lead_id) || [];
                 list.push(i);
                 interactionsByLead.set(i.lead_id, list);
             });
 
-            for (const lead of relevantLeads) {
+            const viewMap: Record<string, OfferCardInfo> = {};
+            for (const lead of interactionLeads) {
                 const offers = offersByLead.get(lead.id) || [];
                 const latest = offers[0] || null;
                 const interactions = interactionsByLead.get(lead.id) || [];
@@ -1081,10 +1159,12 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                     interactionCount: interactions.length + ((latest?.view_count || 0) > 0 ? 1 : 0)
                 };
             }
+
+            setLeadOfferValues(valueMap);
             setOfferViewMap(viewMap);
         };
-        fetchOfferViews();
-    }, [leads]);
+        fetchOfferData();
+    }, [effectiveLeads]);
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string);
@@ -1106,14 +1186,14 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             newStatus = overId as LeadStatus;
         } else {
             // Dropped on another card? Find that card's status
-            const overLead = leads.find(l => l.id === overId);
+            const overLead = effectiveLeads.find(l => l.id === overId);
             if (overLead) {
                 newStatus = overLead.status;
             }
         }
 
         if (newStatus) {
-            const lead = leads.find(l => l.id === activeId);
+            const lead = effectiveLeads.find(l => l.id === activeId);
             if (lead && lead.status !== newStatus) {
 
                 // Special handling for 'won' status -> Open WonLeadModal
@@ -1128,6 +1208,60 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                     setPendingLostLeadId(activeId);
                     setLostModalOpen(true);
                     return; // Stop default Update, wait for modal confirm
+                }
+
+                // Special handling for 'measurement_scheduled' -> Open MeasurementModal.
+                // Goly update statusu zostawial leada "umowionego" BEZ terminu w kalendarzu
+                // pomiarow; modal tworzy pomiar, a createMeasurement sam ustawia status.
+                if (newStatus === 'measurement_scheduled') {
+                    setMeasurementLead(lead);
+                    return;
+                }
+
+                // 🤖 OFFER AGENT: Trigger pricing automation when dropped into offer_agent
+                if (newStatus === 'offer_agent' && lead.status !== 'offer_agent') {
+                    // Check if lead already has agent-generated offers
+                    const { data: existingOffers } = await supabase
+                        .from('offers')
+                        .select('id, offer_number, created_at')
+                        .eq('lead_id', activeId)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (existingOffers && existingOffers.length > 0) {
+                        const lastOffer = existingOffers[0];
+                        const ago = Math.round((Date.now() - new Date(lastOffer.created_at).getTime()) / 60000);
+                        const agoText = ago < 60 ? `${ago} min temu` : ago < 1440 ? `${Math.round(ago/60)}h temu` : `${Math.round(ago/1440)}d temu`;
+                        const confirmed = window.confirm(
+                            `Ten lead ma już ofertę (${lastOffer.offer_number}, ${agoText}).\n\nCzy na pewno wygenerować NOWĄ ofertę?\nPoprzednia oferta pozostanie w systemie.`
+                        );
+                        if (!confirmed) return;
+                    }
+
+                    await updateLeadStatus(activeId, 'offer_agent');
+                    toast.success('🤖 Agent rozpoczął wycenę! Śledzę postęp...', { duration: 5000 });
+                    
+                    // Trigger the pricing edge function asynchronously
+                    try {
+                        const { data, error } = await supabase.functions.invoke('trigger-offer-agent', {
+                            body: {
+                                leadId: activeId,
+                                customerData: lead.customerData,
+                                notes: lead.notes,
+                                fairProducts: (lead as any).fairProducts,
+                            },
+                        });
+                        if (error) {
+                            console.error('Agent trigger error:', error);
+                            toast.error('⚠️ Agent nie mógł się uruchomić: ' + (error.message || 'Unknown error'));
+                        } else {
+                            console.log('Agent triggered:', data);
+                        }
+                    } catch (err) {
+                        console.error('Agent trigger failed:', err);
+                        // Don't revert status — agent might still process via queue
+                    }
+                    return;
                 }
 
                 // Moving to offer_sent or negotiation -> auto-fill offer value or ask
@@ -1168,12 +1302,15 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         const lead = leads.find(l => l.id === leadId);
         const updates: Partial<Lead> = { status, ...extraUpdates };
 
-        // Auto-assign only if lead has NO current owner and going to non-'new' status
-        if (currentUser && status !== 'new' && !lead?.assignedTo) {
+        // Auto-assign only if lead has NO current owner and going to non-'new' / non-agent status
+        const skipAutoAssign: LeadStatus[] = ['new', 'offer_agent', 'offer_agent_sent'];
+        if (currentUser && !skipAutoAssign.includes(status) && !lead?.assignedTo) {
             updates.assignedTo = currentUser.id;
             toast.success('Przejąłeś opiekę nad tym leadem');
-        } else if (lead?.assignedTo) {
         }
+
+        // Karta od razu ląduje w docelowej kolumnie
+        setStatusOverrides(prev => ({ ...prev, [leadId]: status }));
 
         try {
             await DatabaseService.updateLead(leadId, updates);
@@ -1185,6 +1322,12 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             }
         } catch (error) {
             console.error('Failed to update lead status:', error);
+            // Rollback — karta wraca do poprzedniej kolumny
+            setStatusOverrides(prev => {
+                const next = { ...prev };
+                delete next[leadId];
+                return next;
+            });
             toast.error('Błąd aktualizacji statusu');
         }
     };
@@ -1228,9 +1371,29 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
             notes: notes ? ((leads.find(l => l.id === pendingWonLeadId)?.notes || '') + '\n\n[Wygrana]: ' + notes) : undefined
         };
 
+        const wonLead = leads.find(l => l.id === pendingWonLeadId);
         await updateLeadStatus(pendingWonLeadId, 'won', updateData);
 
         toast.success('🏆 Gratulacje! Lead wygrany!');
+
+        // CTA: wygrana → umowa. Dotąd lead znikał z tablicy i nikt nie tworzył
+        // umowy "od razu" — teraz podpowiadamy następny krok.
+        const wonCustomerId = (wonLead as any)?.customerId;
+        toast((t) => (
+            <div className="flex items-center gap-3">
+                <span className="text-sm">📝 Utworzyć umowę dla klienta?</span>
+                <button
+                    onClick={() => {
+                        toast.dismiss(t.id);
+                        navigate(wonCustomerId ? `/customers/${wonCustomerId}` : '/contracts');
+                    }}
+                    className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg"
+                >
+                    Utwórz umowę
+                </button>
+            </div>
+        ), { duration: 12000 });
+
         setPendingWonLeadId(null);
     };
 
@@ -1257,106 +1420,10 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
         }
     };
 
-    // === MINI-DASHBOARD ===
-    const pipelineStats = useMemo(() => {
-        // New leads = early funnel only (aligned with LeadsList.tsx)
-        const newLeads = leads.filter(l => ['new', 'formularz_sent', 'formularz'].includes(l.status));
-        // Advanced = past the contact stage (including contacted, aligned with LeadsList.tsx)
-        const advancedLeads = leads.filter(l => ['contacted', 'offer_sent', 'contact_after_offer', 'measurement_scheduled', 'measurement_completed', 'negotiation'].includes(l.status));
-        const wonLeads = leads.filter(l => l.status === 'won');
-        const lostLeads = leads.filter(l => l.status === 'lost');
-
-        // Win Rate: won / (won + lost) — only closed deals
-        const totalClosed = wonLeads.length + lostLeads.length;
-        const winRate = totalClosed > 0 ? Math.round((wonLeads.length / totalClosed) * 100) : 0;
-
-        // Offer conversion: leads that got at least to offer_sent / total non-fair leads
-        const allReal = leads.filter(l => l.status !== 'fair');
-        const pastOffer = leads.filter(l => ['offer_sent', 'contact_after_offer', 'negotiation', 'measurement_scheduled', 'measurement_completed', 'won', 'lost'].includes(l.status));
-        const offerRate = allReal.length > 0 ? Math.round((pastOffer.length / allReal.length) * 100) : 0;
-
-        // Average pipeline time for won leads
-        let avgDays = 0;
-        if (wonLeads.length > 0) {
-            const totalDays = wonLeads.reduce((sum, l) => {
-                const endDate = l.wonAt ? new Date(l.wonAt) : new Date(l.updatedAt);
-                return sum + differenceInDays(endDate, new Date(l.createdAt));
-            }, 0);
-            avgDays = Math.round(totalDays / wonLeads.length);
-        }
-
-        // Total won value this month
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthWonValue = wonLeads
-            .filter(l => new Date(l.wonAt || l.updatedAt) >= monthStart)
-            .reduce((sum, l) => sum + ((l as any).wonValue || 0), 0);
-
-        return {
-            newCount: newLeads.length,
-            advancedCount: advancedLeads.length,
-            wonCount: wonLeads.length,
-            winRate,
-            offerRate,
-            avgDays,
-            monthWonValue
-        };
-    }, [leads]);
+    // Mini-dashboard usunięty — dublował pasek KPI z LeadsList widoczny tuż nad tablicą
 
     return (
         <>
-            {/* Pipeline Mini-Dashboard */}
-            <div className="mb-5 px-2">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                            <Inbox className="w-[18px] h-[18px] text-blue-500" />
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Nowe leady</div>
-                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.newCount}</div>
-                        <div className="text-[10px] text-blue-500 mt-0.5">oczekujące</div>
-                    </div>
-                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
-                            <TrendingUp className="w-[18px] h-[18px] text-amber-500" />
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">W procesie</div>
-                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.advancedCount}</div>
-                    </div>
-                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                            <Target className="w-[18px] h-[18px] text-slate-500" />
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Oferta %</div>
-                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.offerRate}%</div>
-                    </div>
-                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-                            <Trophy className="w-[18px] h-[18px] text-emerald-500" />
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Win Rate</div>
-                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.winRate}%</div>
-                    </div>
-                    <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-                        <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                            <Timer className="w-[18px] h-[18px] text-slate-500" />
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Śr. pipeline</div>
-                        <div className="text-xl font-bold text-slate-800 mt-0.5">{pipelineStats.avgDays}d</div>
-                    </div>
-                    {pipelineStats.monthWonValue > 0 && (
-                        <div className="relative bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-                            <div className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-                                <Wallet className="w-[18px] h-[18px] text-emerald-500" />
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Wygrane</div>
-                            <div className="text-xl font-bold text-emerald-700 mt-0.5">€{pipelineStats.monthWonValue.toLocaleString()}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">ten miesiąc</div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
             <DndContext
                 sensors={sensors}
                 collisionDetection={closestCorners}
@@ -1391,7 +1458,7 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                 <DragOverlay>
                     {activeId ? (
                         (() => {
-                            const lead = leads.find(l => l.id === activeId);
+                            const lead = effectiveLeads.find(l => l.id === activeId);
                             return lead ? (
                                 <div className="opacity-90 rotate-3 cursor-grabbing transform scale-105">
                                     <KanbanCard
@@ -1427,9 +1494,13 @@ export const LeadsKanban: React.FC<LeadsKanbanProps> = ({ leads, onLeadUpdate })
                     measurement={null}
                     initialData={{
                         leadId: measurementLead.id,
-                        customerName: `${measurementLead.customerData.firstName} ${measurementLead.customerData.lastName}`,
-                        customerAddress: `${measurementLead.customerData.address}, ${measurementLead.customerData.postalCode} ${measurementLead.customerData.city}`,
-                        customerPhone: undefined, // Phone not directly in flat structure? check customerData
+                        customerName: [measurementLead.customerData?.firstName, measurementLead.customerData?.lastName].filter(Boolean).join(' '),
+                        // Bez sklejania undefined — brakujące pola adresu są pomijane
+                        customerAddress: [
+                            measurementLead.customerData?.address || (measurementLead.customerData as any)?.street,
+                            [measurementLead.customerData?.postalCode, measurementLead.customerData?.city].filter(Boolean).join(' ')
+                        ].filter(Boolean).join(', '),
+                        customerPhone: measurementLead.customerData?.phone || (measurementLead.customerData as any)?.telefon || undefined,
                         notes: `Lead: ${measurementLead.source}` + (measurementLead.notes ? `\n\n${measurementLead.notes}` : '')
                     }}
                     onSave={handleSaveMeasurement}

@@ -75,6 +75,8 @@ import { MarketingDashboard } from './components/admin/MarketingDashboard';
 import { KnowledgeBaseManager } from './components/admin/KnowledgeBaseManager';
 import { TechnicalAssistant } from './components/chat/TechnicalAssistant';
 import { VisualizerPage } from './pages/VisualizerPage';
+import ChatDashboardPage from './pages/ChatDashboardPage';
+import ChatConversationPage from './pages/ChatConversationPage';
 import ServiceRequestPage from './pages/public/ServiceRequestPage';
 import ServiceClientFormPage from './pages/public/ServiceClientFormPage';
 import CustomerFeedbackPage from './pages/public/CustomerFeedbackPage';
@@ -120,6 +122,7 @@ import { B2BCreditAdminPage } from './pages/admin/B2BCreditAdminPage';
 import { B2BPartnerAnalyticsPage } from './pages/admin/B2BPartnerAnalyticsPage';
 import { MarketingManagerPage } from './pages/admin/MarketingManagerPage';
 import { ProductImagesPage } from './pages/admin/ProductImagesPage';
+import { AgentDashboardPage } from './pages/admin/AgentDashboardPage';
 import FacebookAdsPage from './pages/admin/FacebookAdsPage';
 
 import { OfferPrintView } from './pages/print/OfferPrintView';
@@ -127,6 +130,9 @@ import { DachrechnerPage } from './pages/DachrechnerPage';
 import { ToolsPage } from './pages/ToolsPage';
 
 import { BlogPLPage } from './pages/BlogPLPage';
+import { BlogDEPage } from './pages/BlogDEPage';
+import { RealizationsDEPage } from './pages/RealizationsDEPage';
+import { RepresentativesDEPage } from './pages/RepresentativesDEPage';
 import AdsManagerPage from './pages/AdsManagerPage';
 
 // Lazy load heavy components to avoid module evaluation crashes
@@ -291,6 +297,8 @@ function App() {
               <Route path="/ai-assistant" element={<AIAssistantPage />} />
               <Route path="/admin/tech-assistant" element={<TechnicalAssistant />} />
               <Route path="/admin/knowledge" element={<KnowledgeBaseManager />} />
+              <Route path="/chat" element={<ChatDashboardPage />} />
+              <Route path="/chat/:sessionId" element={<ChatConversationPage />} />
               <Route path="/visualizer" element={<VisualizerPage />} />
               {/* Telephony Routes */}
               <Route path="/telephony" element={<CallHistoryPage />} />
@@ -304,7 +312,14 @@ function App() {
               <Route path="/campaigns" element={<EmailCampaignsPage />} />
               {/* Blog PL (zadaszto.pl) */}
               <Route path="/blog-pl" element={<ProtectedRoute allowedRoles={['admin', 'sales_rep_pl']}><BlogPLPage /></ProtectedRoute>} />
+              {/* Blog DE (polendach24.de) */}
+              <Route path="/blog-de" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'sales_rep', 'sales_rep_pl']}><BlogDEPage /></ProtectedRoute>} />
+              {/* Realizacje DE (polendach24.de/galerie) */}
+              <Route path="/realizations-de" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RealizationsDEPage /></ProtectedRoute>} />
+              {/* Przedstawiciele DE (polendach24.de/kontakt) */}
+              <Route path="/representatives-de" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RepresentativesDEPage /></ProtectedRoute>} />
               <Route path="/ads-manager" element={<ProtectedRoute allowedRoles={['admin']}><AdsManagerPage /></ProtectedRoute>} />
+              <Route path="/admin/offer-agent" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AgentDashboardPage /></ProtectedRoute>} />
               <Route path="/admin/configurator-trainer" element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>}>

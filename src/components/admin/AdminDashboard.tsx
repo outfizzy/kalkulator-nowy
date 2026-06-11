@@ -14,6 +14,7 @@ import { MorningCoffeeAI } from './MorningCoffeeAI';
 import { LiveCostWidget } from './LiveCostWidget';
 import { ServiceTicketsWidget } from './ServiceTicketsWidget';
 import { OfferActivityWidget } from './OfferActivityWidget';
+import { OfferFunnelWidget } from './OfferFunnelWidget';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
@@ -51,6 +52,7 @@ const actionGroups = [
         items: [
             { title: 'Nowa oferta', path: '/new-offer', icon: <PenLine className="w-4 h-4" /> },
             { title: 'Lista ofert', path: '/offers', icon: <Archive className="w-4 h-4" /> },
+            { title: 'Live Chat', path: '/chat', icon: <Zap className="w-4 h-4" /> },
             { title: 'Leady', path: '/leads', icon: <Flame className="w-4 h-4" /> },
             { title: 'Umowy', path: '/contracts', icon: <FileText className="w-4 h-4" /> },
             { title: 'Baza klientów', path: '/customers', icon: <UserPlus className="w-4 h-4" /> },
@@ -643,6 +645,9 @@ export const AdminDashboard: React.FC = () => {
                     <MiniTelephonyWidget />
                 </div>
             </div>
+
+            {/* ═══ LEJEK OFERT + STEROWANIE FOLLOW-UPAMI ═══ */}
+            <OfferFunnelWidget />
 
             {/* ═══ OFFER ACTIVITY WIDGET ═══ */}
             <OfferActivityWidget />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -29,7 +30,8 @@ interface EmailDetails {
         contentType: string;
         size: number;
         contentId?: string;
-        content: string; // Base64
+        partIndex?: number;
+        content: string | null; // Base64; null = za duży na inline, pobierany na żądanie
     }>;
 }
 
@@ -616,6 +618,11 @@ export const MailPage: React.FC = () => {
             const { supabase } = await import('../lib/supabase');
 
             for (const att of email.attachments) {
+                // Załączniki bez treści (za duże na inline) pomijamy przy tworzeniu leada
+                if (!att.content) {
+                    console.warn(`Pominięto załącznik ${att.filename} — za duży`);
+                    continue;
+                }
                 // Decode Base64 to Blob
                 const byteCharacters = atob(att.content);
                 const byteNumbers = new Array(byteCharacters.length);
@@ -848,8 +855,34 @@ export const MailPage: React.FC = () => {
         setComposeData(prev => ({ ...prev, body: prev.body + (prev.body ? '\n' : '') + linkHtml }));
     };
 
-    const downloadAttachment = (att: { filename: string, content: string, contentType: string }) => {
-        const byteCharacters = atob(att.content);
+    const downloadAttachment = async (att: { filename: string, content: string | null, contentType: string, partIndex?: number }) => {
+        let content = att.content;
+        // Duże załączniki nie przychodzą z treścią maila — dociągamy je osobno
+        if (!content) {
+            const toastId = toast.loading(`Pobieranie ${att.filename}...`);
+            try {
+                const response = await fetch('/api/fetch-attachment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        config: activeConfig,
+                        box: boxName,
+                        uid: selectedEmail?.id,
+                        partIndex: att.partIndex,
+                        filename: att.filename
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Nie udało się pobrać załącznika');
+                content = data.content;
+                toast.dismiss(toastId);
+            } catch (e: any) {
+                toast.error(e.message, { id: toastId });
+                return;
+            }
+        }
+        if (!content) return;
+        const byteCharacters = atob(content);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -2306,7 +2339,14 @@ export const MailPage: React.FC = () => {
                                             <div className="px-6 py-5">
                                                 <div className="prose prose-sm prose-slate max-w-none [&_img]:max-w-full [&_img]:h-auto [&_table]:text-sm [&_a]:text-blue-600 [&_a]:underline">
                                                     {selectedEmail.html ? (
-                                                        <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                                                        // Sanityzacja: mail przychodzi od obcych nadawców — bez tego
+                                                        // dowolny <img onerror=...> wykonuje JS w sesji CRM.
+                                                        // data: dopuszczone, bo backend osadza tak obrazki inline (cid:)
+                                                        <div dangerouslySetInnerHTML={{
+                                                            __html: DOMPurify.sanitize(selectedEmail.html, {
+                                                                ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|cid|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i
+                                                            })
+                                                        }} />
                                                     ) : (
                                                         <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">{selectedEmail.text}</pre>
                                                     )}

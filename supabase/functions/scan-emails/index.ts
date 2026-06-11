@@ -419,18 +419,43 @@ Deno.serve(async (req) => {
                     // [2026-05-06] Never auto-assign — leads remain without opiekun
                     const assignedTo = null;
 
-                    const { error } = await supabaseAdmin.from('leads').insert({
+                    const { data: newLead, error } = await supabaseAdmin.from('leads').insert({
                         status: 'new',
                         source: 'email',
                         customer_data: leadData,
                         notes: `[AI Import] Źródło: Email "${subject}"\nPodsumowanie: ${analysis.summary}\n\n--- Treść wiadomości ---\n${analysis.cleaned_content || text}`,
                         email_message_id: uniqueId,
                         assigned_to: assignedTo
-                    });
+                    }).select('id').single();
 
                     if (!error) {
                         if (!targetIds) await client.markSeen(id); // Only mark seen if auto-mode
                         results.push({ status: 'created_lead', subject });
+
+                        // Powiadomienie zespołu — lead jest nieprzypisany (never auto-assign,
+                        // trigger DB wyłączony 2026-06-11), bez tego nikt go nie zauważy
+                        try {
+                            const { data: team } = await supabaseAdmin
+                                .from('profiles')
+                                .select('id')
+                                .in('role', ['sales_rep', 'manager'])
+                                .eq('status', 'active');
+                            if (team && team.length > 0 && newLead?.id) {
+                                const clientLabel = [leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || senderEmail;
+                                await supabaseAdmin.from('notifications').insert(
+                                    team.map((p: { id: string }) => ({
+                                        user_id: p.id,
+                                        type: 'info',
+                                        title: `🔥 Nowy lead z maila: ${clientLabel}`,
+                                        message: analysis.summary || subject,
+                                        link: `/leads/${newLead.id}`,
+                                        metadata: { leadId: newLead.id, source: 'email' },
+                                    }))
+                                );
+                            }
+                        } catch (notifyErr) {
+                            console.error('[scan-emails] Notification error:', notifyErr);
+                        }
 
                         // ═══ AUTO FOLLOW-UP EMAIL (DE) ═══
                         const clientEmail = leadData.email;
@@ -515,6 +540,62 @@ Deno.serve(async (req) => {
                     if (!error) {
                         if (!targetIds) await client.markSeen(id);
                         results.push({ status: 'created_ticket', subject });
+                    }
+                } else if (analysis.type === 'reply') {
+                    // Match sender to the most recent lead by e-mail address
+                    const { data: matchedLead } = await supabaseAdmin
+                        .from('leads')
+                        .select('id, assigned_to, customer_data')
+                        .ilike('customer_data->>email', senderEmail)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    const content = analysis.cleaned_content || text;
+
+                    // Saved without lead_id when no match — keeps the content and
+                    // stops re-paying GPT for the same mail on every scan.
+                    // trg_touch_lead_comm bumps leads.last_contact_date — intended.
+                    const { error: commError } = await supabaseAdmin
+                        .from('customer_communications')
+                        .insert({
+                            lead_id: matchedLead?.id || null,
+                            type: 'email',
+                            direction: 'inbound',
+                            subject,
+                            content,
+                            date: new Date().toISOString(),
+                            metadata: {
+                                source: 'scan_emails_reply',
+                                sender: senderEmail,
+                                senderName,
+                                messageId: uniqueId,
+                                summary: analysis.summary || null,
+                            },
+                        });
+
+                    if (commError) {
+                        console.error(`Reply save failed (${senderEmail}):`, commError.message);
+                        results.push({ status: 'error_db', subject, error: commError.message });
+                    } else {
+                        if (matchedLead?.assigned_to) {
+                            const cd = matchedLead.customer_data || {};
+                            const clientLabel = [cd.firstName, cd.lastName].filter(Boolean).join(' ') || senderEmail;
+                            await supabaseAdmin.from('notifications').insert({
+                                user_id: matchedLead.assigned_to,
+                                type: 'info',
+                                title: `📩 Odpowiedź klienta: ${clientLabel}`,
+                                message: `${subject}\n${(analysis.summary || content).substring(0, 200)}`,
+                                link: `/leads/${matchedLead.id}`,
+                                metadata: { leadId: matchedLead.id, sender: senderEmail },
+                            });
+                        }
+                        if (!targetIds) await client.markSeen(id);
+                        results.push({
+                            status: matchedLead ? 'saved_reply' : 'saved_reply_no_lead',
+                            subject,
+                            leadId: matchedLead?.id || null
+                        });
                     }
                 } else {
                     console.log(`Skipped (Type: ${analysis.type}): ${subject}`);

@@ -17,10 +17,16 @@ interface CustomerActivityTimelineProps {
 const EVENT_CONFIG: Record<string, { icon: string; label: string; colorClass: string }> = {
     offer_view: { icon: '👁️', label: 'Wyświetlono ofertę', colorClass: 'bg-blue-100 text-blue-700 border-blue-200' },
     pdf_click: { icon: '📄', label: 'Kliknięto "Akceptuj/PDF"', colorClass: 'bg-green-100 text-green-700 border-green-200' },
+    pdf_download: { icon: '📄', label: 'Pobrano PDF pakietu', colorClass: 'bg-green-100 text-green-700 border-green-200' },
     measurement_request: { icon: '📏', label: 'Prośba o pomiar', colorClass: 'bg-amber-100 text-amber-700 border-amber-200' },
     message_sent: { icon: '💬', label: 'Wysłano wiadomość', colorClass: 'bg-purple-100 text-purple-700 border-purple-200' },
     addon_inquiry: { icon: '➕', label: 'Zapytanie o dodatki', colorClass: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
     contact_request: { icon: '📞', label: 'Prośba o kontakt', colorClass: 'bg-teal-100 text-teal-700 border-teal-200' },
+    tier_selected: { icon: '⭐', label: 'Wybrano pakiet', colorClass: 'bg-blue-100 text-blue-700 border-blue-200' },
+    cart_extra_added: { icon: '🛒', label: 'Dodano extra do konfiguracji', colorClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    cart_extra_removed: { icon: '➖', label: 'Usunięto extra z konfiguracji', colorClass: 'bg-slate-100 text-slate-600 border-slate-200' },
+    extra_request: { icon: '➕', label: 'Pytanie o extra', colorClass: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+    offer_accept: { icon: '✅', label: 'Potwierdzono konfigurację', colorClass: 'bg-green-100 text-green-700 border-green-200' },
 };
 
 export const CustomerActivityTimeline: React.FC<CustomerActivityTimelineProps> = ({ leadId, customerId }) => {
@@ -103,6 +109,24 @@ export const CustomerActivityTimeline: React.FC<CustomerActivityTimelineProps> =
                                         {interaction.eventData?.preferredDays && (
                                             <div className="text-xs text-slate-500">
                                                 Dni: {Array.isArray(interaction.eventData.preferredDays) ? interaction.eventData.preferredDays.join(', ') : String(interaction.eventData.preferredDays)}
+                                            </div>
+                                        )}
+                                        {/* Koszyk / wybór pakietu — pokaż co dokładnie klient skonfigurował */}
+                                        {interaction.eventData?.extra && (
+                                            <div className="text-xs text-slate-500 truncate">
+                                                {String(interaction.eventData.extra)}
+                                                {interaction.eventData?.priceGross ? ` · ${Math.round(Number(interaction.eventData.priceGross)).toLocaleString('pl-PL')} € brutto` : ''}
+                                            </div>
+                                        )}
+                                        {interaction.eventData?.label && (
+                                            <div className="text-xs text-slate-500 truncate">
+                                                {String(interaction.eventData.label)}
+                                                {interaction.eventData?.totalGross ? ` · ${Math.round(Number(interaction.eventData.totalGross)).toLocaleString('pl-PL')} € brutto` : ''}
+                                            </div>
+                                        )}
+                                        {interaction.eventData?.configSummary && (
+                                            <div className="text-xs text-slate-500 whitespace-pre-line mt-0.5">
+                                                {String(interaction.eventData.configSummary)}
                                             </div>
                                         )}
                                     </div>

@@ -33,13 +33,20 @@ export interface PriceRequest {
   // Extras
   led?: string;           // LED product ID
   ledQty?: number;
+
+  // Markise (Bovendak/Onderdak zonwering — jeden produkt, wybór selectem #markise)
+  markiseType?: 'aufdach' | 'unterdach';
+  /** Kod modelu dachu dla markizy (#rooftype): OL, OL+, TR, TR+, TL, TLXL, DL, UL classic/style/compact */
+  roofModelCode?: string;
 }
 
 export interface PriceResponse {
   success: boolean;
   
   // Aluxe data (transport wliczony w cenę)
-  aluxeNetPrice: number | null;
+  aluxeNetPrice: number | null;       // Gesamtpreis (cumulative cart total)
+  lastItemPrice: number | null;       // Price of the LAST added item (individual)
+  cartItems: { name: string; price: number }[];  // All items currently in cart
   
   // Polendach24 pricing
   pricing: PricingResult | null;
@@ -93,6 +100,7 @@ const PRODUCT_LINE_MAP = {
   frontwand: ALUXE_PRODUCTS.frontwand,
   // Other
   markise: ALUXE_PRODUCTS.markise,
+  markise_unterdach: ALUXE_PRODUCTS.markise, // ten sam produkt — wariant wybiera markiseType
   senkrechtmarkise: ALUXE_PRODUCTS.verticale_zonwering,
   orangeline_poly: ALUXE_PRODUCTS.orangeline_poly,
   orangeline_glas: ALUXE_PRODUCTS.orangeline_glas,
@@ -122,11 +130,64 @@ export class AluxePricingService {
   private isReady: boolean = false;
   private lastActivity: number = 0;
   private sessionTimeout = 30 * 60 * 1000; // 30 min session
+  private customerLabel: string = '';  // e.g. 'BOT - Ralf Büchner'
 
   constructor(
     private credentials: { username: string; password: string },
   ) {}
 
+  /** Set customer label for order naming — call BEFORE getPrice */
+  setCustomerName(name: string): void {
+    this.customerLabel = name ? `BOT - ${name}` : '';
+    console.log(`[AluxePricing] 👤 Customer label: ${this.customerLabel}`);
+  }
+
+  /** Save current order in Aluxe (click Offerte Speichern) — call AFTER all getPrice calls */
+  async saveCurrentOrder(): Promise<string | null> {
+    if (!this.page || !this.cookieKey) return null;
+    try {
+      // Navigate to Übersicht (cart overview) — same as getMultiProductPrice
+      const overzichtLink = await this.page.$('.rel-overzicht');
+      if (overzichtLink) {
+        await overzichtLink.click();
+        await this.page.waitForLoadState('networkidle').catch(() => {});
+        await this.page.waitForTimeout(1000);
+      } else {
+        // Fallback: try direct navigation
+        await this.page.goto(
+          `https://bestellen.aluxe.nl/dealer/dealer-order/overzicht/?cookie_key=${this.cookieKey}`,
+          { waitUntil: 'networkidle', timeout: 15000 }
+        );
+      }
+      
+      // Click save (#save) — matches the working getMultiProductPrice flow
+      const saveBtn = await this.page.$('#save');
+      if (saveBtn) {
+        await saveBtn.click();
+        await this.page.waitForLoadState('networkidle').catch(() => {});
+        await this.page.waitForTimeout(2000);
+        console.log('[AluxePricing] 💾 Offerte gespeichert');
+      } else {
+        // Fallback selectors
+        const altBtn = await this.page.$('button:has-text("Opslaan"), input[value="Opslaan"], a:has-text("Offerte opslaan"), button:has-text("Speichern")');
+        if (altBtn) {
+          await altBtn.click();
+          await this.page.waitForLoadState('networkidle').catch(() => {});
+          console.log('[AluxePricing] 💾 Offerte gespeichert (alt)');
+        } else {
+          console.log('[AluxePricing] ⚠️ No save button found');
+        }
+      }
+      
+      // Capture order URL for linking
+      const orderUrl = this.page.url();
+      console.log(`[AluxePricing] 🔗 Order URL: ${orderUrl}`);
+      return orderUrl;
+    } catch (err) {
+      console.log(`[AluxePricing] ⚠️ Save order failed: ${(err as Error).message}`);
+      return null;
+    }
+  }
   // ---- Initialize persistent session ----
   async init(): Promise<void> {
     if (this.isReady && this.page && (Date.now() - this.lastActivity < this.sessionTimeout)) {
@@ -137,7 +198,10 @@ export class AluxePricingService {
     await this.close();
     
     console.log('[AluxePricing] 🔑 Initializing browser session...');
-    this.browser = await chromium.launch({ headless: true });
+    this.browser = await chromium.launch({ 
+      headless: true,
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+    });
     this.context = await this.browser.newContext({
       viewport: { width: 1280, height: 900 },
       locale: 'de-DE',
@@ -167,6 +231,45 @@ export class AluxePricingService {
     console.log(`[AluxePricing] ✅ Session ready (cookie: ${this.cookieKey})`);
   }
 
+  /** Create a brand new order with a fresh cookie_key.
+   *  Call AFTER saveCurrentOrder() to start clean for the next model. */
+  async startFreshOrder(): Promise<void> {
+    if (!this.page) return;
+    
+    // Navigate to dealer main page — clicking "Neue Bestellung" or finding the new order link
+    await this.page.goto('https://bestellen.aluxe.nl/dealer/', {
+      waitUntil: 'networkidle', timeout: 15000,
+    });
+    await this.page.waitForTimeout(1000);
+    
+    // Look for "new order" link — Aluxe uses various labels
+    const newOrderBtn = await this.page.$('a:has-text("Neue Bestellung"), a:has-text("Nieuwe bestelling"), a:has-text("New order"), a.new-order, a[href*="informatie"]');
+    if (newOrderBtn) {
+      await newOrderBtn.click();
+      await this.page.waitForLoadState('networkidle').catch(() => {});
+      await this.page.waitForTimeout(1000);
+    } else {
+      // Fallback: navigate to informatie WITHOUT cookie_key — should create new order
+      await this.page.goto('https://bestellen.aluxe.nl/dealer/dealer-order/informatie/', {
+        waitUntil: 'networkidle', timeout: 15000,
+      });
+      await this.page.waitForTimeout(1000);
+    }
+    
+    // Capture new cookie_key from URL
+    const url = this.page.url();
+    const match = url.match(/cookie_key=(\d+)/);
+    if (match) {
+      const oldKey = this.cookieKey;
+      this.cookieKey = match[1];
+      console.log(`[AluxePricing] 🔄 New order (cookie: ${oldKey} → ${this.cookieKey})`);
+    } else {
+      console.log(`[AluxePricing] ⚠️ No cookie_key in URL after new order: ${url}`);
+    }
+    
+    this.lastActivity = Date.now();
+  }
+
   // ---- Start a fresh order ----
   private async startOrder(customerName: string): Promise<void> {
     await this.page!.goto(`https://bestellen.aluxe.nl/dealer/dealer-order/informatie/?cookie_key=${this.cookieKey}`, {
@@ -193,10 +296,80 @@ export class AluxePricingService {
     await this.page!.waitForTimeout(500);
   }
 
+  // ═══ DIMENSION LIMITS per product line (from Aluxe configurator) ═══
+  private static readonly DIMENSION_LIMITS: Record<string, { minW: number; maxW: number; minD: number; maxD: number }> = {
+    // Trendline / Trendstyle
+    trendstyle_poly:       { minW: 3000, maxW: 7950, minD: 2000, maxD: 5000 },
+    trendstyle_glas:       { minW: 3000, maxW: 7950, minD: 2000, maxD: 5000 },
+    trendstyle_plus_poly:  { minW: 3000, maxW: 7950, minD: 2500, maxD: 5000 },
+    trendstyle_plus_glas:  { minW: 3000, maxW: 7950, minD: 2500, maxD: 5000 },
+    // Topline / Topstyle
+    topstyle_poly:         { minW: 3000, maxW: 7950, minD: 2500, maxD: 5000 },
+    topstyle_glas:         { minW: 3000, maxW: 7950, minD: 2500, maxD: 5000 },
+    topstyle_xl_poly:      { minW: 3000, maxW: 7950, minD: 2500, maxD: 5000 },
+    topstyle_xl_glas:      { minW: 3000, maxW: 7950, minD: 2500, maxD: 5000 },
+    // Orangeline / Orangestyle
+    orangestyle_poly:      { minW: 3000, maxW: 6000, minD: 2000, maxD: 4000 },
+    orangestyle_glas:      { minW: 3000, maxW: 6000, minD: 2000, maxD: 4000 },
+    orangeline_poly:       { minW: 3000, maxW: 6000, minD: 2000, maxD: 4000 },
+    orangeline_glas:       { minW: 3000, maxW: 6000, minD: 2000, maxD: 4000 },
+    orangeline_plus_poly:  { minW: 3000, maxW: 6000, minD: 2000, maxD: 4000 },
+    orangeline_plus_glas:  { minW: 3000, maxW: 6000, minD: 2000, maxD: 4000 },
+    // Premium
+    designstyle:           { minW: 3000, maxW: 6000, minD: 2000, maxD: 4500 },
+    designline:            { minW: 3000, maxW: 6000, minD: 2000, maxD: 4500 },
+    ultrastyle:            { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultrastyle_classic:    { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultrastyle_style:      { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultrastyle_compact:    { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultraline:             { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    skystyle:              { minW: 3000, maxW: 6000, minD: 3000, maxD: 5000 },
+    skyline:               { minW: 3000, maxW: 6000, minD: 3000, maxD: 5000 },
+    skyline_frei:          { minW: 3000, maxW: 6000, minD: 3000, maxD: 5000 },
+    // Carport — Aluxe max width 6000, max depth 5000
+    carport:               { minW: 3000, maxW: 6000, minD: 2500, maxD: 5000 },
+    carport_frei:          { minW: 3000, maxW: 6000, minD: 2500, maxD: 5000 },
+    // Accessories (walls, panorama) — use parent product limits
+    panorama_al22:         { minW: 1000, maxW: 7000, minD: 500,  maxD: 3000 },
+    panorama_al23:         { minW: 1000, maxW: 7000, minD: 500,  maxD: 3000 },
+    panorama_al24:         { minW: 1000, maxW: 7000, minD: 500,  maxD: 3000 },
+    panorama_al25:         { minW: 1000, maxW: 7000, minD: 500,  maxD: 3000 },
+    panorama_al26:         { minW: 1000, maxW: 7000, minD: 500,  maxD: 3000 },
+    keilfenster:           { minW: 500,  maxW: 5000, minD: 500,  maxD: 3000 },
+    feste_seitenelemente:  { minW: 500,  maxW: 5000, minD: 500,  maxD: 3000 },
+    senkrechtmarkise:      { minW: 1500, maxW: 3500, minD: 1000, maxD: 3000 }, // selecty skokowe co 250mm (zmierzone)
+    markise:               { minW: 2000, maxW: 7000, minD: 1500, maxD: 4000 },
+    markise_unterdach:     { minW: 2000, maxW: 7000, minD: 1500, maxD: 4000 },
+  };
+
+  /** Validate dimensions against product limits */
+  private validateDimensions(request: PriceRequest): string | null {
+    const limits = AluxePricingService.DIMENSION_LIMITS[request.productLine];
+    if (!limits) return null; // No limits known → allow
+    
+    const w = request.width;
+    const d = request.depth;
+    
+    if (w && (w < limits.minW || w > limits.maxW)) {
+      return `Breite ${w}mm außerhalb des Bereichs für ${request.productLine} (${limits.minW}–${limits.maxW}mm)`;
+    }
+    if (d && (d < limits.minD || d > limits.maxD)) {
+      return `Tiefe ${d}mm außerhalb des Bereichs für ${request.productLine} (${limits.minD}–${limits.maxD}mm)`;
+    }
+    return null;
+  }
+
   // ---- Add a single product to current cart ----
   private async addProductToCart(request: PriceRequest): Promise<{ success: boolean; error?: string }> {
     const productId = PRODUCT_LINE_MAP[request.productLine];
     if (!productId) return { success: false, error: `Unknown product: ${request.productLine}` };
+
+    // ═══ VALIDATE DIMENSIONS before sending to configurator ═══
+    const dimError = this.validateDimensions(request);
+    if (dimError) {
+      console.warn(`[AluxePricing] ⚠️ Dimension validation failed: ${dimError}`);
+      return { success: false, error: dimError };
+    }
     
     // Navigate to product
     await this.page!.goto(
@@ -211,7 +384,8 @@ export class AluxePricingService {
       await this.fillWallConfig(request, configUsed);
     } else if (PANORAMA_PRODUCTS.has(request.productLine)) {
       await this.fillPanoramaConfig(request, configUsed);
-    } else if (request.productLine === 'markise') {
+    } else if (request.productLine === 'markise' || request.productLine === 'markise_unterdach') {
+      if (request.productLine === 'markise_unterdach' && !request.markiseType) request.markiseType = 'unterdach';
       await this.fillMarkiseConfig(request, configUsed);
     } else if (SENKRECHTMARKISE_PRODUCTS.has(request.productLine)) {
       await this.fillSenkrechtmarkiseConfig(request, configUsed);
@@ -238,6 +412,8 @@ export class AluxePricingService {
   }
 
   // ---- Get price for a single configuration ----
+  // Uses CART DIFF approach: snapshots Gesamtpreis before and after adding
+  // the product to get the exact cost of this individual item.
   async getPrice(request: PriceRequest): Promise<PriceResponse> {
     const startTime = Date.now();
     
@@ -249,29 +425,60 @@ export class AluxePricingService {
         return this.errorResponse(request, `Unknown product: ${request.productLine}`, startTime);
       }
       
-      // 1. Start fresh order
-      await this.startOrder(`BOT - ${Date.now()}`);
+      // 1. Start fresh order with customer name (falls back to timestamp)
+      const orderName = this.customerLabel || `BOT - ${Date.now()}`;
+      await this.startOrder(orderName);
       
-      // 2. Add product to cart
+      // 2. Snapshot cart BEFORE adding product
+      const beforeCart = await this.extractCartItems();
+      const beforeTotal = beforeCart.gesamtpreis || 0;
+      const beforeCount = beforeCart.items.length;
+      
+      // 3. Add product to cart
       const addResult = await this.addProductToCart(request);
       if (!addResult.success) {
         return this.errorResponse(request, addResult.error || 'Failed to add product', startTime);
       }
       
-      // 3. Extract price (Gesamtpreis)
-      const aluxePrice = await this.extractPrice();
+      // 4. Snapshot cart AFTER adding product
+      const afterCart = await this.extractCartItems();
+      const afterTotal = afterCart.gesamtpreis || 0;
+      const afterCount = afterCart.items.length;
       this.lastActivity = Date.now();
       
-      if (!aluxePrice || aluxePrice <= 0) {
+      // 5. Compute this product's price as the DELTA
+      const deltaPrice = afterTotal - beforeTotal;
+      
+      // 6. Also check for new cart item (if count increased)
+      let newItemPrice: number | null = null;
+      if (afterCount > beforeCount) {
+        // A new item appeared — find it by comparing item lists
+        const beforeNames = new Set(beforeCart.items.map(i => `${i.name}|${i.price}`));
+        const newItems = afterCart.items.filter(i => !beforeNames.has(`${i.name}|${i.price}`));
+        if (newItems.length > 0) {
+          newItemPrice = newItems[newItems.length - 1].price;
+        }
+      }
+      
+      // 7. Pick best price: prefer new item price, then delta, then last item
+      const lastItem = afterCart.items.length > 0 ? afterCart.items[afterCart.items.length - 1] : null;
+      const bestPrice = newItemPrice && newItemPrice > 0 ? newItemPrice
+        : deltaPrice > 0 ? deltaPrice
+        : lastItem?.price && lastItem.price > 0 ? lastItem.price
+        : afterTotal;
+      
+      if (!bestPrice || bestPrice <= 0) {
         return this.errorResponse(request, 'No price returned from Aluxe', startTime);
       }
       
-      // 4. Calculate customer price
-      const pricing = calculateCustomerPrice({ aluxeNetPrice: aluxePrice });
+      // 8. Calculate customer price
+      const pricing = calculateCustomerPrice({ aluxeNetPrice: bestPrice });
       
       return {
         success: true,
-        aluxeNetPrice: aluxePrice,
+        aluxeNetPrice: afterTotal,    // Cumulative Gesamtpreis
+        lastItemPrice: bestPrice,     // This product's individual price
+        cartItems: afterCart.items,
         pricing,
         productLine: request.productLine,
         productId,
@@ -328,6 +535,8 @@ export class AluxePricingService {
       const overviewData = await this.page!.evaluate(`(function() {
         var details = [];
         var gesamtpreis = null;
+        var transportValue = null;
+        var pfandValue = null;
         
         var tables = document.querySelectorAll('table');
         tables.forEach(function(table) {
@@ -348,10 +557,18 @@ export class AluxePricingService {
                 return;
               }
               
-              // Skip Zwischensumme, Transport, Pfand labels
+              // Capture Transport value
+              if (cells[0] === 'Transport') {
+                transportValue = cells[cells.length - 1];
+                return;
+              }
+              // Capture Pfand value
+              if (cells[0].indexOf('Pfand') !== -1 || cells[0].indexOf('Statiegeld') !== -1) {
+                pfandValue = cells[cells.length - 1];
+                return;
+              }
+              // Skip Zwischensumme
               if (cells[0] === 'Zwischensumme' || cells[0] === 'Subtotaal') return;
-              if (cells[0] === 'Transport') return;
-              if (cells[0].indexOf('Pfand') !== -1 || cells[0].indexOf('Statiegeld') !== -1) return;
               
               // Product detail row
               if (cells[0].length > 2) {
@@ -366,8 +583,8 @@ export class AluxePricingService {
           });
         });
         
-        return { details: details, gesamtpreis: gesamtpreis };
-      })()`) as { details: { name: string; unitPrice: string | null; qty: string; total: string }[]; gesamtpreis: string | null };
+        return { details: details, gesamtpreis: gesamtpreis, transportValue: transportValue, pfandValue: pfandValue };
+      })()`) as { details: { name: string; unitPrice: string | null; qty: string; total: string }[]; gesamtpreis: string | null; transportValue: string | null; pfandValue: string | null };
       
       // 5. Parse breakdown into structured data
       const details = overviewData.details.map(d => ({
@@ -396,21 +613,37 @@ export class AluxePricingService {
         return { success: false, items, details, gesamtpreis: null, pricing: null, durationMs: Date.now() - startTime, errors: [...errors, 'No Gesamtpreis'] };
       }
       
-      // 8. Calculate offer price from Gesamtpreis
+      // 8. Parse Transport & Pfand — exclude from customer pricing
+      const aluxeTransport = overviewData.transportValue ? this.parseEurPrice(overviewData.transportValue) : 0;
+      const aluxePfand = overviewData.pfandValue ? this.parseEurPrice(overviewData.pfandValue) : 0;
+      
+      // Clean Gesamtpreis: subtract Aluxe transport & pfand (we add our own 25€ transport)
+      const cleanGesamtpreis = gesamtpreis - aluxeTransport - aluxePfand;
+      
+      console.log(`[MultiProduct] 💰 Gesamtpreis: ${gesamtpreis}€ (Transport: ${aluxeTransport}€, Pfand: ${aluxePfand}€ → Clean: ${cleanGesamtpreis}€)`);
+      
+      // 9. Calculate offer price from CLEAN Gesamtpreis (without Aluxe transport/pfand)
       const { calculateOfferPrice } = await import('./pricing-engine');
-      const lineItems = items.map(item => ({
+      
+      // Filter out Pfand/Transport from cart items (they sometimes appear as line items)
+      const cleanItems = items.filter(item => {
+        const lc = item.name.toLowerCase();
+        return !lc.includes('pfand') && !lc.includes('statiegeld') && !lc.includes('transport') && !lc.includes('verzend');
+      });
+      
+      const lineItems = cleanItems.map(item => ({
         name: this.translateToGerman(item.name),
         aluxeNetPrice: item.price,
         quantity: 1,
       }));
       
-      const pricing = calculateOfferPrice({ lineItems });
+      const pricing = calculateOfferPrice({ lineItems, transportAluxe: 25 });
       
       return {
         success: true,
-        items: items.map(i => ({ ...i, name: this.translateToGerman(i.name) })),
+        items: cleanItems.map(i => ({ ...i, name: this.translateToGerman(i.name) })),
         details,
-        gesamtpreis,
+        gesamtpreis: cleanGesamtpreis,  // Return CLEAN price (without Aluxe Pfand & Transport)
         pricing,
         durationMs: Date.now() - startTime,
         errors,
@@ -425,13 +658,13 @@ export class AluxePricingService {
   // ---- Polendach24 naming + Dutch → German translation ----
   private translateToGerman(text: string): string {
     const translations: [RegExp, string][] = [
-      // ═══ POLENDACH24 BRAND NAMES (must be first!) ═══
-      [/\bTrendline plus\b/gi, 'Trendstyle 15 Plus'],
-      [/\bTrendline\b/gi, 'Trendstyle 15'],
-      [/\bTopline XL\b/gi, 'Topstyle 20'],
-      [/\bTopline\b/gi, 'Topstyle 20'],
-      [/\bOrangeline plus\b/gi, 'Orangestyle 10 Plus'],
-      [/\bOrangeline\b/gi, 'Orangestyle 10'],
+      // ═══ POLENDACH24 BRAND NAMES — Aluxe: NO numbers ═══
+      [/\bTrendline plus\b/gi, 'Trendstyle Plus'],
+      [/\bTrendline\b/gi, 'Trendstyle'],
+      [/\bTopline XL\b/gi, 'Topstyle XL'],
+      [/\bTopline\b/gi, 'Topstyle'],
+      [/\bOrangeline plus\b/gi, 'Orangestyle Plus'],
+      [/\bOrangeline\b/gi, 'Orangestyle'],
       [/\bUltraline\b/gi, 'Ultrastyle'],
       [/\bSkyline\b/gi, 'Skystyle'],
       [/\bDesignline\b/gi, 'Designstyle'],
@@ -499,8 +732,28 @@ export class AluxePricingService {
       await p.selectOption('#ultra_type', variant).catch(() => {});
       cfg.ultra_type = variant;
       await p.waitForTimeout(300); // Wait for form update
+
+      // Ultraline przyjmuje WYLACZNIE wymiary z progow (zmierzone skanem formularza):
+      // szerokosc {5000, 6000, 7000}, glebokosc {3000, 3500, 4000, 4500, 5000, 6000}.
+      // Wpisanie wartosci spoza progow = walidacja odrzuca (stad bylo ~20% skutecznosci).
+      const snapTo = (v: number, steps: number[]) => {
+        const up = steps.find(st => st >= v);
+        return String(up ?? steps[steps.length - 1]);
+      };
+      req = { ...req,
+        width: parseInt(snapTo(req.width, [5000, 6000, 7000])),
+        depth: parseInt(snapTo(req.depth, [3000, 3500, 4000, 4500, 5000, 6000])),
+      };
+      // formularz ma tez pomocnicze selecty progow — ustaw oba zrodla
+      const stepSelects = await p.$$('select:not([id])');
+      if (stepSelects.length >= 2) {
+        await stepSelects[0].selectOption(String(req.width)).catch(() => {});
+        await p.waitForTimeout(200);
+        await stepSelects[1].selectOption(String(req.depth)).catch(() => {});
+        await p.waitForTimeout(200);
+      }
     }
-    
+
     await p.fill('#width', String(req.width));
     cfg.width = String(req.width);
     
@@ -627,27 +880,53 @@ export class AluxePricingService {
   // ---- Fill markise config ----
   private async fillMarkiseConfig(req: PriceRequest, cfg: Record<string, string>) {
     const p = this.page!;
-    
+
+    // Model dachu, pod ktory robiona jest markiza — wczesniej hardcode 'TR'
+    // (Trendline), przez co markiza byla wyceniana pod NIEWLASCIWY model.
+    const roofCode = req.roofModelCode || 'TR';
     const rooftype = await p.$('#rooftype');
-    if (rooftype) { await p.selectOption('#rooftype', 'TR').catch(() => {}); cfg.rooftype = 'TR'; }
-    
+    if (rooftype) { await p.selectOption('#rooftype', roofCode).catch(() => {}); cfg.rooftype = roofCode; }
+
+    // Aufdach / Unterdach — jeden produkt Aluxe, wybor selectem #markise
+    // (opcje: 'Aufdachmarkise W350' / 'Unterdachmarkise T350')
+    const variant = req.markiseType === 'unterdach' ? 'Unterdachmarkise' : 'Aufdachmarkise';
+    const markiseSel = await p.$('#markise');
+    if (markiseSel) {
+      await p.selectOption('#markise', { label: `${variant} ZIP` }).catch(async () => {
+        // fallback: dopasuj po prefiksie wartosci
+        const val = await p.evaluate(`(function(){
+          var s = document.querySelector('#markise');
+          if (!s) return '';
+          for (var o of s.options) if (o.value.indexOf('${variant}') === 0) return o.value;
+          return '';
+        })()`);
+        if (val) await p.selectOption('#markise', String(val)).catch(() => {});
+      });
+      cfg.markise = variant;
+      await p.waitForTimeout(300);
+    }
+
     await p.fill('#roofwidth', String(req.width)).catch(() => {});
     await p.fill('#roofdepth', String(req.depth)).catch(() => {});
     cfg.roofwidth = String(req.width);
     cfg.roofdepth = String(req.depth);
-    
+
     // Number of fields (required!)
     const nf = await p.$('#numberoffields');
     if (nf) { await p.fill('#numberoffields', '1'); cfg.numberoffields = '1'; }
-    
-    // Motor
+
+    // Motor + sterowanie (iO) — bez czujnikow i pilota w wycenie bazowej
     await p.selectOption('#motor', 'links').catch(() => {});
     cfg.motor = 'links';
-    
+    await p.selectOption('#motortype', 'iO').catch(() => {});
+    await p.selectOption('#panoramaanlage', '0').catch(() => {});
+    await p.selectOption('#remotecontrol', '0').catch(() => {});
+    await p.selectOption('#sensor', '2').catch(() => {});
+
     // Cloth color (required text field)
     await p.fill('#colorcloth', 'grau').catch(() => {});
     cfg.colorcloth = 'grau';
-    
+
     await p.selectOption('#color', req.color || '7016').catch(() => {});
     cfg.color = req.color || '7016';
   }
@@ -655,20 +934,51 @@ export class AluxePricingService {
   // ---- Fill Senkrechtmarkise / ZIP Screen config ----
   private async fillSenkrechtmarkiseConfig(req: PriceRequest, cfg: Record<string, string>) {
     const p = this.page!;
-    
-    await p.fill('#width', String(req.width)).catch(() => {});
-    cfg.width = String(req.width);
-    
-    // depth = height for ZIP screen
-    await p.fill('#depth', String(req.depth)).catch(() => {});
-    cfg.height = String(req.depth);
-    
-    await p.selectOption('#color', req.color || '7016').catch(() => {});
-    cfg.color = req.color || '7016';
-    
-    // Tuchfarbe (cloth color) — required! "x" as placeholder
-    await p.fill('#sun_color', 'x').catch(() => {});
-    cfg.sun_color = 'x';
+
+    // Formularz ma DWA bezimienne selecty skokowe (szer. 1500-3500, wys. 1000-3000,
+    // krok 250mm), ktore synchronizuja sie z #width/#depth. Wczesniejszy kod
+    // wpisywal tylko inputy tekstowe i nie ustawial koloru ('raw' to jedyna
+    // opcja) — walidacja 'Farbe noch nicht eingefuegt' blokowala KAZDA wycene.
+    const snap = (v: number, min: number, max: number) =>
+      String(Math.min(max, Math.max(min, Math.round(v / 250) * 250)));
+    const w = snap(req.width, 1500, 3500);
+    const h = snap(req.depth, 1000, 3000);
+
+    // UWAGA: kazda zmiana selecta moze PRZELADOWAC strone (uchwyty staja sie
+    // nieaktualne — 'Execution context was destroyed'). Dlatego: selektory
+    // tekstowe + waitForLoadState po kazdym kroku, bez trzymania uchwytow.
+    const safeStep = async (fn: () => Promise<unknown>) => {
+      await fn().catch(() => {});
+      await p.waitForLoadState('networkidle').catch(() => {});
+      await p.waitForTimeout(400);
+    };
+    await safeStep(() => p.selectOption('select:not([id]) >> nth=0', w));
+    await safeStep(() => p.selectOption('select:not([id]) >> nth=1', h));
+    cfg.width = w;
+    cfg.height = h;
+
+    // Kolor: jedyna opcja to 'raw' (RAL Strukturfarbe) → pojawia sie select #ral_color
+    await safeStep(() => p.selectOption('#color', 'raw'));
+    const ralSel = await p.$('#ral_color');
+    if (ralSel) {
+      const ralValue = await p.evaluate(`(function(){
+        var s = document.querySelector('#ral_color');
+        if (!s) return '';
+        var want = '${(req.color || '7016').replace(/[^0-9]/g, '')}';
+        for (var o of s.options) if (o.value.indexOf(want) === 0 || o.textContent.indexOf(want) !== -1) return o.value;
+        return s.options.length > 1 ? s.options[1].value : '';
+      })()`);
+      if (ralValue) await p.selectOption('#ral_color', String(ralValue)).catch(() => {});
+      cfg.ral_color = String(ralValue || 'default');
+    }
+    // dodatkowe pole tekstowe RAL (pojawia sie w niektorych wersjach formularza)
+    const colorRaw = await p.$('#color_raw');
+    if (colorRaw) await colorRaw.fill((req.color || '7016').replace(/[^0-9]/g, '')).catch(() => {});
+    cfg.color = 'raw/' + (req.color || '7016');
+
+    // Tuchfarbe (required)
+    await p.fill('#sun_color', 'Grau (Standard)').catch(() => {});
+    cfg.sun_color = 'Grau (Standard)';
   }
 
   // ---- Extract ALL prices from cart (line items + Gesamtpreis) ----
@@ -755,6 +1065,8 @@ export class AluxePricingService {
     return {
       success: false,
       aluxeNetPrice: null,
+      lastItemPrice: null,
+      cartItems: [],
       pricing: null,
       productLine: req.productLine,
       productId: PRODUCT_LINE_MAP[req.productLine] || '',

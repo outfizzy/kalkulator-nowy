@@ -42,6 +42,23 @@ Deno.serve(async (req) => {
 
             console.log(`[twilio-sms] INBOUND ${channel} from ${cleanFrom}: "${twilioBody.substring(0, 50)}..."`);
 
+            // Best-effort: dopasuj lead po numerze nadawcy (E.164 +49157… vs lokalny 0157…)
+            let inboundLeadId: string | null = null;
+            try {
+                const digits = cleanFrom.replace(/\D/g, '');
+                const last9 = digits.slice(-9);
+                const local = digits.startsWith('49') ? '0' + digits.slice(2) : digits;
+                const { data: matchedLeads } = await serviceClient
+                    .from('leads')
+                    .select('id')
+                    .or(`customer_data->>phone.eq.${cleanFrom},customer_data->>phone.eq.${local},customer_data->>phone.ilike.%${last9}`)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                if (matchedLeads && matchedLeads.length > 0) inboundLeadId = matchedLeads[0].id;
+            } catch (matchErr) {
+                console.error('[twilio-sms] Lead match error:', matchErr);
+            }
+
             // Log inbound message
             try {
                 await serviceClient.from('sms_logs').insert({
@@ -54,6 +71,7 @@ Deno.serve(async (req) => {
                     channel: channel,
                     media_urls: mediaUrls.length > 0 ? mediaUrls : null,
                     is_read: false,
+                    lead_id: inboundLeadId,
                 });
             } catch (logErr) {
                 console.error('[twilio-sms] Inbound log error:', logErr);
@@ -66,19 +84,28 @@ Deno.serve(async (req) => {
             );
         }
 
-        // ── OUTBOUND: CRM user sending message (JSON, with JWT) ──
-        const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-        )
+        // ── OUTBOUND: CRM user (JWT) LUB worker/system (service-role) ──
+        // Worker na Hetznerze wysyła SMS z linkiem do oferty kluczem service-role —
+        // wcześniej getUser() odrzucał go jako 'Unauthorized' i SMS NIGDY nie wychodził.
+        const authHeader = req.headers.get('Authorization') || '';
+        const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
+        const isServiceRole = !!bearerToken && bearerToken === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-        if (userError || !user) {
-            throw new Error('Unauthorized');
+        let userId: string | null = null;
+        if (!isServiceRole) {
+            const supabaseClient = createClient(
+                Deno.env.get('SUPABASE_URL') ?? '',
+                Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+                { global: { headers: { Authorization: authHeader } } }
+            );
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+            if (userError || !user) {
+                throw new Error('Unauthorized');
+            }
+            userId = user.id;
         }
 
-        const { to, body, fromNumberId, channel = 'sms' } = await req.json();
+        const { to, body, fromNumberId, channel = 'sms', leadId } = await req.json();
 
         if (!to || !body) {
             throw new Error('Missing required fields: to, body');
@@ -130,6 +157,9 @@ Deno.serve(async (req) => {
             From: twilioFrom,
             To: twilioTo,
             Body: body,
+            // Statusy doręczeń (queued→sent→delivered/failed) wracają webhookiem
+            // i aktualizują sms_logs — bez tego wszystko wisiało jako 'queued'
+            StatusCallback: `${Deno.env.get('SUPABASE_URL')}/functions/v1/twilio-message-status`,
         });
 
         const twilioResponse = await fetch(twilioUrl, {
@@ -148,7 +178,7 @@ Deno.serve(async (req) => {
             throw new Error(twilioResult.message || 'Failed to send message');
         }
 
-        // Log outbound message
+        // Log outbound message (z lead_id, żeby SMS pojawiał się przy leadzie)
         try {
             await serviceClient.from('sms_logs').insert({
                 twilio_message_sid: twilioResult.sid,
@@ -157,7 +187,8 @@ Deno.serve(async (req) => {
                 to_number: to,
                 body: body,
                 status: twilioResult.status || 'queued',
-                user_id: user.id,
+                user_id: userId,
+                lead_id: leadId || null,
                 channel: channel,
                 is_read: true,
             });

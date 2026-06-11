@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MessageSquare, Clock, ChevronDown } from 'lucide-react';
+import { MessageSquare, Clock, ChevronDown, Send } from 'lucide-react';
+import { LeadService } from '../../services/database/lead.service';
+import { toast } from 'react-hot-toast';
 
 interface LeadMessage {
     id: string;
@@ -32,6 +34,25 @@ export const OfferMessagesWidget: React.FC<OfferMessagesWidgetProps> = ({ leadId
     const [messages, setMessages] = useState<LeadMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [expanded, setExpanded] = useState(false);
+    const [reply, setReply] = useState('');
+    const [sending, setSending] = useState(false);
+
+    const handleSendReply = async () => {
+        const content = reply.trim();
+        if (content.length < 2 || sending) return;
+        setSending(true);
+        try {
+            await LeadService.sendUserMessage(leadId, content);
+            setReply('');
+            toast.success('Odpowiedź wysłana — klient zobaczy ją na stronie oferty');
+            fetchMessages();
+        } catch (e) {
+            console.error('[OfferMessagesWidget] Reply error:', e);
+            toast.error('Nie udało się wysłać odpowiedzi');
+        } finally {
+            setSending(false);
+        }
+    };
 
     const fetchMessages = async () => {
         try {
@@ -151,6 +172,32 @@ export const OfferMessagesWidget: React.FC<OfferMessagesWidgetProps> = ({ leadId
                     {expanded ? 'Weniger' : `Alle anzeigen (${messages.length})`}
                 </button>
             )}
+
+            {/* Odpowiedź handlowca — trafia do lead_messages (sender_type='user'),
+                klient widzi ją w wątku na publicznej stronie oferty */}
+            <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/60">
+                <div className="flex items-end gap-2">
+                    <textarea
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendReply();
+                        }}
+                        placeholder="Odpowiedz klientowi… (widoczne na stronie oferty)"
+                        rows={2}
+                        className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 resize-none bg-white"
+                    />
+                    <button
+                        onClick={handleSendReply}
+                        disabled={sending || reply.trim().length < 2}
+                        className="shrink-0 h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white flex items-center gap-1.5 text-xs font-bold transition-colors"
+                        title="Wyślij odpowiedź (Cmd+Enter)"
+                    >
+                        <Send className="w-3.5 h-3.5" />
+                        {sending ? 'Wysyłam…' : 'Wyślij'}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

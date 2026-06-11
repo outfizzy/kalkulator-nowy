@@ -20,11 +20,30 @@ export const Layout: React.FC = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [waUnread, setWaUnread] = useState(0);
     const [missedCalls, setMissedCalls] = useState(0);
+    const [liveChatCount, setLiveChatCount] = useState(0);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ crm: true });
     const toggleSection = (key: string) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
     // Activity tracking (heartbeat + page views)
     useActivityTracker();
+
+    // Live chat badge — count active AI sessions
+    useEffect(() => {
+        // Initial count
+        supabase.from('max_chat_sessions').select('id', { count: 'exact', head: true }).eq('status', 'ai')
+            .then(({ count }) => setLiveChatCount(count || 0));
+
+        // Realtime updates
+        const chatCh = supabase
+            .channel('layout-chat-badge')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'max_chat_sessions' }, () => {
+                supabase.from('max_chat_sessions').select('id', { count: 'exact', head: true }).eq('status', 'ai')
+                    .then(({ count }) => setLiveChatCount(count || 0));
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(chatCh); };
+    }, []);
 
     // Auto-logout after 15 min inactivity
     const handleIdleLogout = useCallback(async () => {
@@ -186,6 +205,8 @@ export const Layout: React.FC = () => {
                                 {hasPermission('crm_clients') && <NavLink to="/customers" label="Baza klientów" icon="users" />}
                                 {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa oferta" icon="plus" />}
                                 {hasPermission('offers_list') && <NavLink to="/offers" label="Lista ofert" icon="offers" />}
+                                {hasPermission('offers_list') && <NavLink to="/admin/offer-agent" label="🤖 Offer Agent" icon="dashboard" />}
+                                <NavLink to="/chat" label="💬 Live Chat" icon="chat" badge={liveChatCount} />
                             </>)}
                         </div>
                     )}
@@ -199,6 +220,7 @@ export const Layout: React.FC = () => {
                             </button>
                             {expandedSections.narzedziaSales && (<>
                                 {hasPermission('ai_assistant') && <NavLink to="/ai-assistant" label="Asystent AI" icon="chat" />}
+                                <NavLink to="/chat" label="Live Chat" icon="chat" badge={liveChatCount} />
                                 {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" />}
                                 <NavLink to="/dachrechner" label="Kalkulator dachowy" icon="clipboard" />
                                 <NavLink to="/tools" label="Narzędzia" icon="tools" />
@@ -273,7 +295,10 @@ export const Layout: React.FC = () => {
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/email-templates" label="Szablony wiadomości" icon="mail" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/facebook-ads" label="Facebook Ads Manager" icon="dashboard" />}
                                 {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/admin/facebook-ads?tab=contacts" label="Kontakty z Facebooka" icon="users" />}
-                                {hasPermission('blog_pl') && <NavLink to="/blog-pl" label="🇵🇱 Blog PL" icon="clipboard" />}
+                                {hasPermission('blog_pl') && <NavLink to="/blog-pl" label="Blog PL" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/blog-de" label="Blog DE" icon="clipboard" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/realizations-de" label="Realizacje DE" icon="offers" />}
+                                {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/representatives-de" label="Przedstawiciele DE" icon="users" />}
                                 {isAdmin() && <NavLink to="/ads-manager" label="🎯 Google Ads AI" icon="dashboard" />}
                             </>)}
                         </div>
@@ -410,6 +435,8 @@ export const Layout: React.FC = () => {
                                     {hasPermission('crm_clients') && <NavLink to="/customers" label="Klienci" icon="users" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('offers_create') && <NavLink to="/new-offer" label="Nowa Oferta" icon="plus" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('offers_list') && <NavLink to="/offers" label="Wszystkie Oferty" icon="offers" onClick={() => setMobileMenuOpen(false)} />}
+                                    {hasPermission('offers_list') && <NavLink to="/admin/offer-agent" label="🤖 Offer Agent" icon="dashboard" onClick={() => setMobileMenuOpen(false)} />}
+                                    <NavLink to="/chat" label="💬 Live Chat" icon="chat" badge={liveChatCount} onClick={() => setMobileMenuOpen(false)} />
                                     {hasPermission('visualizer') && <NavLink to="/visualizer" label="Wizualizator 3D" icon="map" onClick={() => setMobileMenuOpen(false)} />}
                                     <NavLink to="/dachrechner" label="Dachrechner" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />
                                     <NavLink to="/tools" label="Narzędzia" icon="tools" onClick={() => setMobileMenuOpen(false)} />
@@ -459,6 +486,7 @@ export const Layout: React.FC = () => {
                                     {hasPermission('pricing_management') && <NavLink to="/admin/pricing" label="Cenniki" icon="clipboard" onClick={() => setMobileMenuOpen(false)} />}
                                     {hasPermission('settings_general') && <NavLink to="/settings" label="Ustawienia" icon="settings" onClick={() => setMobileMenuOpen(false)} />}
                                     {(isAdmin() || currentUser?.role === 'manager') && <NavLink to="/campaigns" label="📧 Kampanie Mailowe" icon="mail" onClick={() => setMobileMenuOpen(false)} />}
+
                                 </div>
                             )}
 

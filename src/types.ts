@@ -147,10 +147,12 @@ export interface Communication {
 
 export type InstallationType = 'wall-mounted' | 'freestanding' | 'corner-left' | 'corner-right';
 export type RoofType = 'polycarbonate' | 'glass' | 'tin';
-export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted';
+export type OfferStatus = 'draft' | 'sent' | 'sold' | 'rejected' | 'accepted'
+    // Agent pricing lifecycle (set by trigger-offer-agent / pricing worker)
+    | 'pricing_pending' | 'pricing_failed' | 'pricing_error';
 
 // --- Leads Types ---
-export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'contact_after_offer' | 'negotiation' | 'won' | 'lost' | 'fair' | 'formularz_sent' | 'formularz';
+export type LeadStatus = 'new' | 'contacted' | 'measurement_scheduled' | 'measurement_completed' | 'offer_sent' | 'contact_after_offer' | 'negotiation' | 'won' | 'lost' | 'fair' | 'formularz_sent' | 'formularz' | 'offer_agent' | 'offer_agent_sent' | 'needs_info';
 export type LeadSource = 'email' | 'phone' | 'manual' | 'website' | 'website_pl' | 'targi' | 'other';
 
 export interface Lead {

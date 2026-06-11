@@ -64,6 +64,9 @@ export interface TerandaRequest {
   
   // Quantity (SH30)
   quantity?: number;
+  
+  // Customer label for Kommission
+  customerName?: string;
 }
 
 export class TerandaPricingService {
@@ -83,7 +86,10 @@ export class TerandaPricingService {
     await this.close();
 
     console.log('[Teranda] 🔑 Initializing browser session...');
-    this.browser = await chromium.launch({ headless: true });
+    this.browser = await chromium.launch({ 
+      headless: true,
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+    });
     this.context = await this.browser.newContext({
       viewport: { width: 1400, height: 900 },
       locale: 'de-DE',
@@ -391,18 +397,178 @@ export class TerandaPricingService {
     await this.page!.waitForTimeout(2000);
   }
 
-  // ---- Add current config to cart ----
-  private async addToCart(frame: Frame): Promise<boolean> {
+  // ---- Add current config to cart + save as concept ----
+  private async addToCart(frame: Frame, customerName?: string): Promise<boolean> {
     try {
-      const cartBtn = await frame.$('button:has-text("Im Warenkorb")');
+      // Step 1: Click "Im Warenkorb" button
+      const cartBtn = await frame.$('button:has-text("Im Warenkorb"), button:has-text("In den Warenkorb")');
       if (cartBtn) {
         await cartBtn.click();
-        await this.page!.waitForTimeout(3000);
+        await this.page!.waitForTimeout(4000);
         console.log('[Teranda] 🛒 Added to cart');
-        return true;
+      } else {
+        console.log('[Teranda] ⚠️ Cart button not found — skipping save');
+        return false;
       }
-      return false;
-    } catch {
+
+      // Step 2: Navigate to cart page
+      try {
+        // Try clicking cart icon/link in header
+        const cartLink = await this.page!.$('a[href*="cart"], a[href*="warenkorb"], a:has-text("Warenkorb"), [class*="cart"] a');
+        if (cartLink) {
+          await cartLink.click();
+          await this.page!.waitForTimeout(5000);
+        } else {
+          // Direct navigation to cart
+          await this.page!.goto('https://www.teranda.com/de/portal/cart', {
+            waitUntil: 'networkidle', timeout: 15000,
+          });
+          await this.page!.waitForTimeout(5000);
+        }
+        console.log('[Teranda] 📋 Navigated to cart');
+      } catch (navErr) {
+        console.log(`[Teranda] ⚠️ Cart navigation: ${(navErr as Error).message.substring(0, 60)}`);
+        // Try direct URL as fallback
+        try {
+          await this.page!.goto('https://www.teranda.com/de/portal/cart', {
+            waitUntil: 'networkidle', timeout: 15000,
+          });
+          await this.page!.waitForTimeout(5000);
+        } catch { }
+      }
+
+      // Step 3: Fill "Ihr Kommission" with BOT label
+      const kommissionLabel = customerName ? `BOT - ${customerName}` : 'BOT - Auto';
+      try {
+        // Try multiple selectors for the Kommission field
+        const kommissionSelectors = [
+          'input[placeholder*="Kommission"]',
+          'input[placeholder*="kommission"]',
+          'input[name*="kommission" i]',
+          'input[name*="commission" i]',
+          'input[id*="kommission" i]',
+        ];
+
+        let filled = false;
+        for (const sel of kommissionSelectors) {
+          const inp = await this.page!.$(sel);
+          if (inp) {
+            await inp.click({ clickCount: 3 });
+            await inp.fill(kommissionLabel);
+            console.log(`[Teranda] ✅ Kommission: "${kommissionLabel}" (via ${sel})`);
+            filled = true;
+            break;
+          }
+        }
+
+        if (!filled) {
+          // Fallback: look in iframe
+          for (const frame of this.page!.frames()) {
+            for (const sel of kommissionSelectors) {
+              const inp = await frame.$(sel);
+              if (inp) {
+                await inp.click({ clickCount: 3 });
+                await inp.fill(kommissionLabel);
+                console.log(`[Teranda] ✅ Kommission: "${kommissionLabel}" (via iframe)`);
+                filled = true;
+                break;
+              }
+            }
+            if (filled) break;
+          }
+        }
+
+        if (!filled) {
+          // Last resort: find by label text
+          const labels = await this.page!.$$('label');
+          for (const label of labels) {
+            const text = await label.textContent();
+            if (text && /kommission/i.test(text)) {
+              const forAttr = await label.getAttribute('for');
+              if (forAttr) {
+                const inp = await this.page!.$(`#${forAttr}`);
+                if (inp) {
+                  await inp.click({ clickCount: 3 });
+                  await inp.fill(kommissionLabel);
+                  console.log(`[Teranda] ✅ Kommission: "${kommissionLabel}" (via label[for])`);
+                  filled = true;
+                  break;
+                }
+              }
+              // Try sibling/parent input
+              const parentDiv = await label.$('xpath=..');
+              if (parentDiv) {
+                const inp = await parentDiv.$('input');
+                if (inp) {
+                  await inp.click({ clickCount: 3 });
+                  await inp.fill(kommissionLabel);
+                  console.log(`[Teranda] ✅ Kommission: "${kommissionLabel}" (via label sibling)`);
+                  filled = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (!filled) {
+          console.log('[Teranda] ⚠️ Kommission field not found — saving without label');
+        }
+        
+        await this.page!.waitForTimeout(1000);
+      } catch (fillErr) {
+        console.log(`[Teranda] ⚠️ Kommission fill error: ${(fillErr as Error).message.substring(0, 60)}`);
+      }
+
+      // Step 4: Click "Als Konzept speichern"
+      try {
+        const saveSelectors = [
+          'button:has-text("Als Konzept speichern")',
+          'a:has-text("Als Konzept speichern")',
+          'button:has-text("Konzept speichern")',
+          'button:has-text("Save as concept")',
+          '[class*="save"] button',
+        ];
+
+        let saved = false;
+        for (const sel of saveSelectors) {
+          const btn = await this.page!.$(sel);
+          if (btn) {
+            await btn.click();
+            await this.page!.waitForTimeout(5000);
+            console.log(`[Teranda] 💾 Saved as concept: "${kommissionLabel}"`);
+            saved = true;
+            break;
+          }
+        }
+
+        if (!saved) {
+          // Try in iframes
+          for (const frame of this.page!.frames()) {
+            for (const sel of saveSelectors) {
+              const btn = await frame.$(sel);
+              if (btn) {
+                await btn.click();
+                await this.page!.waitForTimeout(5000);
+                console.log(`[Teranda] 💾 Saved as concept (iframe): "${kommissionLabel}"`);
+                saved = true;
+                break;
+              }
+            }
+            if (saved) break;
+          }
+        }
+
+        if (!saved) {
+          console.log('[Teranda] ⚠️ "Als Konzept speichern" button not found');
+        }
+      } catch (saveErr) {
+        console.log(`[Teranda] ⚠️ Save error: ${(saveErr as Error).message.substring(0, 60)}`);
+      }
+
+      return true;
+    } catch (e) {
+      console.log(`[Teranda] ❌ addToCart error: ${(e as Error).message.substring(0, 80)}`);
       return false;
     }
   }
@@ -447,8 +613,8 @@ export class TerandaPricingService {
         return { success: false, product: productName, brutto: null, netto: null, rabatt: 37, pricing: null, durationMs: Date.now() - startTime, error: 'Could not read price' };
       }
 
-      // 4. Add to cart
-      await this.addToCart(configFrame);
+      // 4. Add to cart + save as concept
+      await this.addToCart(configFrame, req.customerName);
 
       // 5. Calculate customer price (margin from netto = our purchase price)
       const pricing = calculateOfferPrice({

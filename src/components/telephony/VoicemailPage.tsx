@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { TelephonyService, type Voicemail } from '../../services/database/telephony.service';
+import { TelephonyService, getRecordingProxyUrl, type Voicemail } from '../../services/database/telephony.service';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -109,7 +109,7 @@ export const VoicemailPage: React.FC = () => {
                                 <div className="mt-3 pt-3 border-t border-slate-100">
                                     <audio
                                         controls
-                                        src={vm.recording_url}
+                                        src={getRecordingProxyUrl(vm.recording_url)}
                                         className="w-full h-10"
                                         onPlay={() => setPlaying(vm.id)}
                                         onEnded={() => setPlaying(null)}

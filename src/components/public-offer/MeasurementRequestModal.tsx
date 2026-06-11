@@ -8,9 +8,13 @@ interface MeasurementRequestModalProps {
     offerToken: string;
     offerId?: string;
     onClose: () => void;
+    /** Zusammenfassung der Wunschkonfiguration des Kunden — wandert mit in die Anfrage. */
+    configSummary?: string;
+    /** Wird nach erfolgreichem Absenden aufgerufen (Seite merkt sich den ✓-Zustand). */
+    onSuccess?: () => void;
 }
 
-export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = ({ offerToken, offerId, onClose }) => {
+export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = ({ offerToken, offerId, onClose, configSummary, onSuccess }) => {
     const [selectedDays, setSelectedDays] = useState<string[]>([]);
     const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
     const [note, setNote] = useState('');
@@ -40,7 +44,7 @@ ANFRAGE AUFMASS
 Bevorzugte Tage: ${selectedDays.join(', ')}
 Bevorzugte Zeiten: ${selectedTimes.join(', ')}
 Notiz: ${note}
-
+${configSummary ? `\nGEWÄHLTE KONFIGURATION:\n${configSummary}\n` : ''}
 Bitte um Kontaktaufnahme zur Terminbestätigung.
         `.trim();
 
@@ -52,8 +56,10 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                 OfferService.notifyOfferAction(offerToken, 'measurement_requested', {
                     preferredDays: selectedDays.join(', '),
                     preferredTimes: selectedTimes.join(', '),
-                    note: note
+                    note: note,
+                    ...(configSummary ? { configSummary } : {}),
                 }).catch(() => { });
+                onSuccess?.();
                 onClose();
             } else {
                 toast.error('Fehler beim Senden.');
@@ -82,6 +88,14 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                     <p className="text-sm text-slate-600 leading-relaxed">
                         Schlagen Sie für Sie passende Termine vor. Unser Berater wird Sie telefonisch kontaktieren, um das genaue Datum und die Uhrzeit für den Technikerbesuch zu bestätigen.
                     </p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 -mt-2">
+                        {['Dauer ca. 30–45 Min.', '100% kostenlos', 'Unverbindlich'].map(t => (
+                            <span key={t} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                {t}
+                            </span>
+                        ))}
+                    </div>
 
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bevorzugte Tage</label>
@@ -92,8 +106,8 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                                     type="button"
                                     onClick={() => toggleSelection(day, selectedDays, setSelectedDays)}
                                     className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedDays.includes(day)
-                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                                        ? 'bg-[#1E6FD9] border-[#1E6FD9] text-white shadow-md shadow-[#6DB1FF]/40'
+                                        : 'bg-white border-[#E5E7EB] text-slate-600 hover:border-[#6DB1FF]'
                                         }`}
                                 >
                                     {day}
@@ -111,8 +125,8 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                                     type="button"
                                     onClick={() => toggleSelection(time, selectedTimes, setSelectedTimes)}
                                     className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTimes.includes(time)
-                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                                        ? 'bg-[#1E6FD9] border-[#1E6FD9] text-white shadow-md shadow-[#6DB1FF]/40'
+                                        : 'bg-white border-[#E5E7EB] text-slate-600 hover:border-[#6DB1FF]'
                                         }`}
                                 >
                                     {time}
@@ -127,14 +141,14 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                             value={note}
                             onChange={e => setNote(e.target.value)}
                             placeholder="z.B. bitte erst ab 16:00 Uhr anrufen..."
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm h-20 resize-none"
+                            className="w-full p-3 bg-slate-50 border border-[#E5E7EB] rounded-xl focus:ring-2 focus:ring-[#1E6FD9]/40 focus:border-[#1E6FD9] outline-none text-sm h-20 resize-none transition-colors"
                         />
                     </div>
 
                     <button
                         type="submit"
                         disabled={sending}
-                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-transform active:scale-95"
+                        className="w-full py-3 bg-[#1E6FD9] text-white rounded-full font-semibold shadow-cta hover:bg-[#195FC0] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E6FD9] focus-visible:ring-offset-2"
                     >
                         {sending ? 'Wird gesendet...' : 'Anfrage absenden'}
                     </button>

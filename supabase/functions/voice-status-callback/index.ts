@@ -116,7 +116,9 @@ async function upsertCallLog(supabase: any, callSid: string, newData: Record<str
     // 1. Try to find existing record
     const { data: existing } = await supabase
         .from('call_logs')
-        .select('id, status, recording_url, metadata, duration_seconds, from_number, to_number')
+        // lead_id/customer_id/user_id MUSZA byc w selekcie - merge nizej sprawdza
+        // existingRow.lead_id; bez nich kazdy callback nadpisywal reczne przypiecie
+        .select('id, status, recording_url, metadata, duration_seconds, from_number, to_number, lead_id, customer_id, user_id')
         .eq('twilio_call_sid', callSid)
         .limit(1);
 
@@ -304,8 +306,9 @@ Deno.serve(async (req) => {
             });
 
             // 2. Save to voicemails table
+            let voicemailId: string | null = null;
             try {
-                const { error: vmError } = await supabase
+                const { data: vmRow, error: vmError } = await supabase
                     .from('voicemails')
                     .insert({
                         call_log_id: logId,
@@ -313,15 +316,35 @@ Deno.serve(async (req) => {
                         duration_seconds: recordingDuration ? parseInt(recordingDuration) : null,
                         is_listened: false,
                         created_at: new Date().toISOString(),
-                    });
+                    })
+                    .select('id')
+                    .single();
 
                 if (vmError) {
                     console.error('[status-cb] Voicemail insert error:', vmError);
                 } else {
+                    voicemailId = vmRow?.id || null;
                     console.log(`[status-cb] ✅ Voicemail saved for call ${callSid} (${contact.name || from})`);
                 }
             } catch (vmErr) {
                 console.error('[status-cb] Voicemail save failed:', vmErr);
+            }
+
+            // 3. Trigger Whisper transcription asynchronously (same pattern as regular recordings).
+            // analyze-call-recording writes to call_logs (by callSid) and to voicemails.transcription (by voicemailId).
+            try {
+                const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-call-recording`;
+                fetch(analyzeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    },
+                    body: JSON.stringify({ callSid, recordingUrl: fullRecordingUrl, voicemailId }),
+                }).catch(e => console.warn('[status-cb] Async voicemail transcription trigger failed:', e));
+                console.log('[status-cb] Voicemail transcription triggered asynchronously');
+            } catch (e) {
+                console.warn('[status-cb] Could not trigger voicemail transcription:', e);
             }
 
             return new Response(emptyTwiml, { status: 200, headers: { 'Content-Type': 'application/xml' } });

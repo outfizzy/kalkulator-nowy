@@ -1867,7 +1867,25 @@ const ProtocolPDFButton: React.FC<{ contract: Contract }> = ({ contract }) => {
         setGenerating(true);
         setOpen(false);
         try {
-            await generateContractProtocolPDF(contract, layout);
+            // Load realization photos from DB to include in the protocol
+            let realizationPhotos: { url: string; name: string }[] = [];
+            try {
+                const { data } = await supabase
+                    .from('realizations')
+                    .select('photos')
+                    .eq('contract_id', contract.id)
+                    .eq('is_visible', true)
+                    .maybeSingle();
+                if (data?.photos && Array.isArray(data.photos)) {
+                    realizationPhotos = data.photos
+                        .filter((p: any) => p.url)
+                        .map((p: any) => ({ url: p.url, name: p.caption || 'Zdjecie realizacji' }));
+                }
+            } catch (err) {
+                console.warn('Could not load realization photos:', err);
+            }
+
+            await generateContractProtocolPDF(contract, layout, realizationPhotos);
             toast.success('PDF wygenerowany!');
         } catch (err) {
             console.error('PDF generation error:', err);

@@ -1,12 +1,29 @@
 import { supabase } from '../../lib/supabase';
 import type { Communication } from '../../types';
 
+// profiles ma TYLKO full_name (brak kolumn first_name/last_name) i brak relacji FK
+// z customer_communications — embedded join `profiles(first_name, last_name)` padał
+// z PGRST200 i cała oś czasu leada była zawsze pusta
+const splitName = (fullName?: string | null) => {
+    const [firstName, ...rest] = (fullName || '').trim().split(/\s+/);
+    return { firstName: firstName || '', lastName: rest.join(' ') };
+};
+
+const fetchProfilesMap = async (userIds: (string | null | undefined)[]): Promise<Record<string, { firstName: string; lastName: string }>> => {
+    const ids = [...new Set(userIds.filter(Boolean))] as string[];
+    if (ids.length === 0) return {};
+    const { data } = await supabase.from('profiles').select('id, full_name').in('id', ids);
+    const map: Record<string, { firstName: string; lastName: string }> = {};
+    (data || []).forEach((p: any) => { map[p.id] = splitName(p.full_name); });
+    return map;
+};
+
 export const CommunicationService = {
     async getLeadCommunications(leadId: string): Promise<Communication[]> {
         const [commsResult, messagesResult] = await Promise.all([
             supabase
                 .from('customer_communications')
-                .select(`*, user:profiles(first_name, last_name)`)
+                .select('*')
                 .eq('lead_id', leadId)
                 .order('created_at', { ascending: false }),
             supabase
@@ -21,7 +38,9 @@ export const CommunicationService = {
             return [];
         }
 
-        const comms: Communication[] = commsResult.data.map((row: any) => ({
+        const profilesMap = await fetchProfilesMap((commsResult.data || []).map((c: any) => c.user_id));
+
+        const comms: Communication[] = (commsResult.data || []).map((row: any) => ({
             id: row.id,
             userId: row.user_id,
             customerId: row.customer_id,
@@ -34,10 +53,7 @@ export const CommunicationService = {
             externalId: row.external_id,
             metadata: row.metadata,
             createdAt: new Date(row.created_at),
-            user: row.user ? {
-                firstName: row.user.first_name,
-                lastName: row.user.last_name
-            } : undefined
+            user: profilesMap[row.user_id]
         }));
 
         const messages: Communication[] = (messagesResult.data || []).map((msg: any) => ({
@@ -83,19 +99,7 @@ export const CommunicationService = {
         const commsData = commsResult.data || [];
 
         // 1b. Fetch User Profiles manually to avoid PGRST200
-        const userIds = [...new Set(commsData.map((c: any) => c.user_id).filter(Boolean))];
-        let profilesMap: Record<string, any> = {};
-
-        if (userIds.length > 0) {
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, first_name, last_name')
-                .in('id', userIds);
-
-            if (profiles) {
-                profilesMap = profiles.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
-            }
-        }
+        const profilesMap = await fetchProfilesMap(commsData.map((c: any) => c.user_id));
 
         const leadIds = (leadsResult.data || []).map(l => l.id);
         const offerIds = (offersResult.data || []).map(o => o.id);
@@ -122,27 +126,21 @@ export const CommunicationService = {
         }
 
         // 4. Map CRM Comms
-        const mappedComms = commsData.map((row: any) => {
-            const profile = profilesMap[row.user_id];
-            return {
-                id: row.id,
-                userId: row.user_id,
-                customerId: row.customer_id,
-                leadId: row.lead_id,
-                type: row.type,
-                direction: row.direction || 'outbound',
-                subject: row.subject,
-                content: row.content,
-                date: row.date,
-                externalId: row.external_id,
-                metadata: row.metadata,
-                createdAt: new Date(row.created_at),
-                user: profile ? {
-                    firstName: profile.first_name || '',
-                    lastName: profile.last_name || ''
-                } : undefined
-            };
-        });
+        const mappedComms = commsData.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            customerId: row.customer_id,
+            leadId: row.lead_id,
+            type: row.type,
+            direction: row.direction || 'outbound',
+            subject: row.subject,
+            content: row.content,
+            date: row.date,
+            externalId: row.external_id,
+            metadata: row.metadata,
+            createdAt: new Date(row.created_at),
+            user: profilesMap[row.user_id]
+        }));
 
         // 5. Map Client Messages
         const mappedMessages = messages.map((msg: any) => ({
@@ -167,40 +165,48 @@ export const CommunicationService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // Zapis do customer_communications — wcześniejsza tabela 'communications'
+        // nie istnieje w bazie, więc każdy wpis ginął z błędem.
         const { data, error } = await supabase
-            .from('communications')
+            .from('customer_communications')
             .insert({
-                lead_id: comm.leadId,
+                lead_id: comm.leadId || null,
+                customer_id: comm.customerId || null,
                 user_id: user.id,
                 type: comm.type,
-                title: comm.subject,
+                subject: comm.subject,
                 content: comm.content,
-                direction: comm.direction
+                direction: comm.direction,
+                date: comm.date || new Date().toISOString(),
+                metadata: comm.metadata || null,
             })
-            .select(`
-                *,
-                user:users!user_id (
-                    first_name,
-                    last_name
-                )
-            `)
+            .select('*')
             .single();
 
         if (error) throw error;
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+        const name = splitName(profile?.full_name);
 
         return {
             id: data.id,
             type: data.type,
             direction: data.direction,
-            subject: data.title,
+            subject: data.subject,
             content: data.content,
-            date: data.created_at,
+            date: data.date || data.created_at,
             createdAt: new Date(data.created_at),
             userId: data.user_id,
             leadId: data.lead_id,
+            customerId: data.customer_id,
+            metadata: data.metadata,
             user: {
-                firstName: data.user.first_name || '',
-                lastName: data.user.last_name || ''
+                firstName: name.firstName,
+                lastName: name.lastName
             }
         };
     }

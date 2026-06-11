@@ -75,6 +75,30 @@ const EVENT_CONFIG: Record<string, { icon: React.ReactNode; label: string; color
         color: 'text-amber-600',
         bgColor: 'bg-amber-50',
     },
+    tier_selected: {
+        icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+        label: 'Wybrano pakiet',
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50',
+    },
+    cart_extra_added: {
+        icon: <ArrowUpRight className="w-3.5 h-3.5" />,
+        label: 'Extra dodane do konfiguracji',
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50',
+    },
+    cart_extra_removed: {
+        icon: <MousePointerClick className="w-3.5 h-3.5" />,
+        label: 'Extra usunięte z konfiguracji',
+        color: 'text-slate-500',
+        bgColor: 'bg-slate-50',
+    },
+    extra_request: {
+        icon: <MessageSquare className="w-3.5 h-3.5" />,
+        label: 'Pytanie o extra',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
+    },
 };
 
 const DEFAULT_EVENT = {
@@ -403,6 +427,18 @@ export const OfferActivityWidget: React.FC = () => {
                                                                 )}
                                                                 {activity.eventType === 'upgrade_request' && activity.eventData?.upgradeTitle && (
                                                                     <span className="text-[10px] text-slate-400 ml-1">— {activity.eventData.upgradeTitle}</span>
+                                                                )}
+                                                                {activity.eventData?.extra && (
+                                                                    <span className="text-[10px] text-slate-400 ml-1">
+                                                                        — {String(activity.eventData.extra)}
+                                                                        {activity.eventData?.priceGross ? ` (${Math.round(Number(activity.eventData.priceGross)).toLocaleString('pl-PL')} €)` : ''}
+                                                                    </span>
+                                                                )}
+                                                                {activity.eventType === 'tier_selected' && activity.eventData?.label && (
+                                                                    <span className="text-[10px] text-slate-400 ml-1">
+                                                                        — {String(activity.eventData.label)}
+                                                                        {activity.eventData?.totalGross ? ` (${Math.round(Number(activity.eventData.totalGross)).toLocaleString('pl-PL')} €)` : ''}
+                                                                    </span>
                                                                 )}
                                                             </div>
                                                             <span className="text-[9px] text-slate-400 font-mono shrink-0">

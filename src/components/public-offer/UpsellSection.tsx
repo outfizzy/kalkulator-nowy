@@ -67,7 +67,7 @@ export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
     };
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 md:p-6">
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-card p-5 md:p-6">
             <div className="flex items-center gap-2.5 mb-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 text-slate-400">
                     <path d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -102,9 +102,9 @@ export const UpsellSection: React.FC<UpsellSectionProps> = ({ offer }) => {
                                 <button
                                     onClick={() => handleRequestUpgrade(item.id, item.title)}
                                     disabled={isRequesting || isRequested}
-                                    className={`w-full py-2 rounded-lg text-xs font-bold transition-all disabled:cursor-default flex items-center justify-center gap-1.5 ${isRequested
+                                    className={`w-full py-2.5 min-h-[40px] rounded-full text-xs font-semibold transition-all duration-300 disabled:cursor-default flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[#1E6FD9] ${isRequested
                                             ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                                            : 'bg-slate-800 text-white hover:bg-slate-700'
+                                            : 'bg-[#0A1628] text-white hover:bg-[#1B2B44] active:scale-[0.98]'
                                         }`}
                                 >
                                     {isRequested ? (

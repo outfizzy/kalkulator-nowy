@@ -1,0 +1,1598 @@
+{
+ "TR10 - Terrassendach": {
+  "groups": [
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "TR10 - Terrassendach Alles ausklappen Konstruktionsart WandmontageFreistehend Ab",
+     "Wandmontage",
+     "Freistehend",
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.07 °",
+     "Plattenlänge",
+     "2929 mm",
+     "Plattenbreite",
+     "960 mm",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Polycarbonat",
+     "Glas",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Exclusief Polycarbonat (16mm)",
+     "4 Dachfelder",
+     "Abweichende Menge Anzahl der Dachfelder",
+     "2 Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "TR10 - Terrassendach Alles ausklappen Konstruktionsart WandmontageFreistehend Ab",
+     "Wandmontage",
+     "Freistehend",
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.07 °",
+     "Plattenlänge",
+     "2929 mm",
+     "Plattenbreite",
+     "960 mm",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Polycarbonat",
+     "Glas",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Exclusief Polycarbonat (16mm)",
+     "4 Dachfelder",
+     "Abweichende Menge Anzahl der Dachfelder",
+     "2 Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "Wandmontage",
+     "Freistehend"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.07 °",
+     "Plattenlänge",
+     "2929 mm",
+     "Plattenbreite",
+     "960 mm"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Verglasungsart",
+    "options": [
+     "Polycarbonat",
+     "Glas"
+    ]
+   },
+   {
+    "title": "Dacheindeckung",
+    "options": [
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Exclusief Polycarbonat (16mm)"
+    ]
+   },
+   {
+    "title": "Anzahl der Dachfelder",
+    "options": [
+     "4 Dachfelder",
+     "Abweichende Menge Anzahl der Dachfelder"
+    ]
+   },
+   {
+    "title": "Anzahl Pfosten Rinnenseite",
+    "options": [
+     "2 Pfosten (Rinnenseite)",
+     "Abweichende menge Pfosten Rinnenseite"
+    ]
+   },
+   {
+    "title": "Länge Pfosten Rinnenseite",
+    "options": [
+     "2500 mm Pfosten (Rinnenseite)",
+     "3000 mm Pfosten (Rinnenseite)",
+     "3500 mm Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Pfostenbefestigung",
+    "options": [
+     "Alu L-Profil",
+     "Alu U-Profil + Kunststoffplatte",
+     "Pfostenträger (verzinkter Stahl)"
+    ]
+   },
+   {
+    "title": "Lieferoptionen",
+    "options": [
+     "Premium Vormontage",
+     "Lieferung als Heimwerkerbausatz",
+     "Zuschnitt Klickblenden (für gleichmäßige Feldverteilung)",
+     "Klickblenden 50 mm Überlänge (2 Stück)",
+     "Zuschnitt Polycarbonat (Breite)",
+     "Zuschnitt Polycarbonat (Länge)"
+    ]
+   },
+   {
+    "title": "Sonnenschutz",
+    "options": [
+     "Ohne Sonnenschutz",
+     "PL15 Plissee"
+    ]
+   },
+   {
+    "title": "Linke Seite (von Innen gesehen)",
+    "options": [
+     "Ohne Seitenwand LINKS",
+     "Seitenkeil (FW300 | LINKS)",
+     "Seitenwand (FW300 | LINKS)"
+    ]
+   },
+   {
+    "title": "Rechte Seite (von Innen gesehen)",
+    "options": [
+     "Ohne Seitenwand RECHTS",
+     "Seitenkeil (FW300 | RECHTS)",
+     "Seitenwand (FW300 | RECHTS)"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "1001",
+    "max": "7060",
+    "value": "4000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "501",
+    "max": "3500",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "1000",
+    "max": "3000",
+    "value": "2200",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "2255",
+    "max": "2695",
+    "value": "2500",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=1.973,00",
+   "netto=1.242,99"
+  ]
+ },
+ "TR15 - Terrassendach": {
+  "groups": [
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "TR15 - Terrassendach Alles ausklappen Konstruktionsart WandmontageFreistehend Ab",
+     "Wandmontage",
+     "Freistehend",
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.07 °",
+     "Plattenlänge",
+     "2929 mm",
+     "Plattenbreite",
+     "763 mm",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Glas",
+     "Polycarbonat",
+     "44.2 VSG KLAR",
+     "44.2 VSG MATT",
+     "Ohne Glas (44.2)",
+     "Ohne Glas (55.2)",
+     "5 Felder",
+     "Abweichende Menge Anzahl der Dachfelder",
+     "2 Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "TR15 - Terrassendach Alles ausklappen Konstruktionsart WandmontageFreistehend Ab",
+     "Wandmontage",
+     "Freistehend",
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.07 °",
+     "Plattenlänge",
+     "2929 mm",
+     "Plattenbreite",
+     "763 mm",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Glas",
+     "Polycarbonat",
+     "44.2 VSG KLAR",
+     "44.2 VSG MATT",
+     "Ohne Glas (44.2)",
+     "Ohne Glas (55.2)",
+     "5 Felder",
+     "Abweichende Menge Anzahl der Dachfelder",
+     "2 Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "Wandmontage",
+     "Freistehend"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.07 °",
+     "Plattenlänge",
+     "2929 mm",
+     "Plattenbreite",
+     "763 mm"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Verglasungsart",
+    "options": [
+     "Glas",
+     "Polycarbonat"
+    ]
+   },
+   {
+    "title": "Dacheindeckung",
+    "options": [
+     "44.2 VSG KLAR",
+     "44.2 VSG MATT",
+     "Ohne Glas (44.2)",
+     "Ohne Glas (55.2)"
+    ]
+   },
+   {
+    "title": "Anzahl der Dachfelder",
+    "options": [
+     "5 Felder"
+    ]
+   },
+   {
+    "title": "Anzahl Pfosten Rinnenseite",
+    "options": [
+     "2 Pfosten (Rinnenseite)",
+     "Abweichende menge Pfosten Rinnenseite"
+    ]
+   },
+   {
+    "title": "Länge Pfosten Rinnenseite",
+    "options": [
+     "2500 mm Pfosten (Rinnenseite)",
+     "3000 mm Pfosten (Rinnenseite)",
+     "3500 mm Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Pfostenbefestigung",
+    "options": [
+     "Alu L-Profil",
+     "Alu U-Profil + Kunststoffplatte",
+     "Pfostenträger (verzinkter Stahl)"
+    ]
+   },
+   {
+    "title": "Rinnenblende",
+    "options": [
+     "Gerade Blende Rinnenprofil",
+     "Runde Blende Rinnenprofil",
+     "Klassische Blende Rinnenprofil"
+    ]
+   },
+   {
+    "title": "LED-Beleuchtung",
+    "options": [
+     "Ohne Beleuchtung",
+     "Einbaustrahler (Aluminiumfarbe)",
+     "Einbaustrahler (schwarz)"
+    ]
+   },
+   {
+    "title": "LED-Beleuchtung (CNC-Bearbeitungen)",
+    "options": [
+     "Ohne Profilbearbeitungen",
+     "Vorbohren der Bohrungen für LED-Spots"
+    ]
+   },
+   {
+    "title": "Lieferoptionen",
+    "options": [
+     "Premium Vormontage",
+     "Lieferung als Heimwerkerbausatz",
+     "Klickblenden 50 mm überlänge (2 Stück)"
+    ]
+   },
+   {
+    "title": "Sonnenschutz",
+    "options": [
+     "Ohne Sonnenschutz",
+     "PL15 Plissee"
+    ]
+   },
+   {
+    "title": "Linke Seite (von Innen gesehen)",
+    "options": [
+     "Ohne Seitenwand LINKS",
+     "Seitenkeil (FW300 | LINKS)",
+     "Seitenwand (FW300 | LINKS)",
+     "Seitenkeil + Schiebewand (FW300 + SW450 | LINKS)",
+     "Seitenkeil + Schiebewand (FW300 + SW150 | LINKS)"
+    ]
+   },
+   {
+    "title": "Rechte Seite (von Innen gesehen)",
+    "options": [
+     "Ohne Seitenwand RECHTS",
+     "Seitenkeil (FW300 | RECHTS)",
+     "Seitenwand (FW300 | RECHTS)",
+     "Seitenkeil + Seitenwand (FW300 + SW450 | RECHTS)",
+     "Seitenkeil + Schiebewand (FW300 + SW150 | RECHTS)"
+    ]
+   },
+   {
+    "title": "Frontseite (FELD 1)",
+    "options": [
+     "Kein Element in Feld 1",
+     "Schiebewand (SW450)",
+     "Schiebewand (SW150)",
+     "Festwand (FW200)"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "1000",
+    "max": "12060",
+    "value": "4000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "500",
+    "max": "5000",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "1000",
+    "max": "3000",
+    "value": "2200",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "2255",
+    "max": "2695",
+    "value": "2500",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=2.996,00",
+   "netto=1.887,48"
+  ]
+ },
+ "TR20 - Terrassendach": {
+  "groups": [
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "TR20 - Terrassendach Alles ausklappen Konstruktionsart WandmontageFreistehend Ab",
+     "Wandmontage",
+     "Freistehend",
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.2 °",
+     "Plattenlänge",
+     "2912 mm",
+     "Plattenbreite",
+     "963 mm",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Glas",
+     "Polycarbonat",
+     "55.2 VSG KLAR",
+     "55.2 VSG MATT",
+     "44.2 VSG KLAR",
+     "44.2 VSG MATT",
+     "Ohne Glas 55.2",
+     "Ohne Glas 44.2",
+     "5 Felder"
+    ]
+   },
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "TR20 - Terrassendach Alles ausklappen Konstruktionsart WandmontageFreistehend Ab",
+     "Wandmontage",
+     "Freistehend",
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.2 °",
+     "Plattenlänge",
+     "2912 mm",
+     "Plattenbreite",
+     "963 mm",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Glas",
+     "Polycarbonat",
+     "55.2 VSG KLAR",
+     "55.2 VSG MATT",
+     "44.2 VSG KLAR",
+     "44.2 VSG MATT",
+     "Ohne Glas 55.2",
+     "Ohne Glas 44.2",
+     "5 Felder"
+    ]
+   },
+   {
+    "title": "Konstruktionsart",
+    "options": [
+     "Wandmontage",
+     "Freistehend"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "Breite",
+     "Tiefe",
+     "Höhe Unterkante Rinnenprofil",
+     "Höhe Unterkante Wandprofil",
+     "Gefälle",
+     "6.2 °",
+     "Plattenlänge",
+     "2912 mm",
+     "Plattenbreite",
+     "963 mm"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Verglasungsart",
+    "options": [
+     "Glas",
+     "Polycarbonat"
+    ]
+   },
+   {
+    "title": "Dacheindeckung",
+    "options": [
+     "55.2 VSG KLAR",
+     "55.2 VSG MATT",
+     "44.2 VSG KLAR",
+     "44.2 VSG MATT",
+     "Ohne Glas 55.2",
+     "Ohne Glas 44.2"
+    ]
+   },
+   {
+    "title": "Anzahl der Dachfelder",
+    "options": [
+     "5 Felder",
+     "Abweichende Menge Anzahl der Dachfelder"
+    ]
+   },
+   {
+    "title": "Anzahl Pfosten Rinnenseite",
+    "options": [
+     "2 Pfosten (Rinnenseite)",
+     "Abweichende menge Pfosten Rinnenseite"
+    ]
+   },
+   {
+    "title": "Länge Pfosten Rinnenseite",
+    "options": [
+     "2500 mm Pfosten (Rinnenseite)",
+     "3000 mm Pfosten (Rinnenseite)",
+     "3500 mm Pfosten (Rinnenseite)"
+    ]
+   },
+   {
+    "title": "Pfostenbefestigung",
+    "options": [
+     "Alu U-Profil",
+     "Pfostenträger (verzinkter Stahl)"
+    ]
+   },
+   {
+    "title": "LED-Beleuchtung",
+    "options": [
+     "Ohne Beleuchtung",
+     "Einbaustrahler (Aluminiumfarbe)",
+     "Einbaustrahler (schwarz)"
+    ]
+   },
+   {
+    "title": "LED-Beleuchtung (CNC-Bearbeitungen)",
+    "options": [
+     "Ohne Profilbearbeitungen",
+     "Vorbohren der Bohrungen für LED-Spots"
+    ]
+   },
+   {
+    "title": "Lieferoptionen",
+    "options": [
+     "Premium Vormontage",
+     "Lieferung als Heimwerkerbausatz",
+     "Klickblenden 50 mm Überlänge (2 Stück)"
+    ]
+   },
+   {
+    "title": "Sonnenschutz",
+    "options": [
+     "Ohne Sonnenschutz",
+     "Plisseesonnenschutz (PL15 Mano)"
+    ]
+   },
+   {
+    "title": "Linke Seite (von Innen gesehen)",
+    "options": [
+     "Ohne Seitenwand LINKS",
+     "Seitenkeil (FW300 | LINKS)",
+     "Seitenwand (FW300 | LINKS)",
+     "Seitenkeil + Schiebewand (FW300 + SW450 | LINKS)",
+     "Seitenkeil + Schiebewand (FW300 + SW150 | LINKS)"
+    ]
+   },
+   {
+    "title": "Rechte Seite (von Innen gesehen)",
+    "options": [
+     "Ohne Seitenwand RECHTS",
+     "Seitenkeil (FW300 | RECHTS)",
+     "Seitenwand (FW300 | RECHTS)",
+     "Seitenkeil + Schiebewand (FW300 + SW450 | RECHTS)",
+     "Seitenkeil + Schiebewand (FW300 + SW150 | RECHTS)"
+    ]
+   },
+   {
+    "title": "Frontseite (FELD 1)",
+    "options": [
+     "Ohne Element in Feld 1",
+     "Schiebewand (SW450)",
+     "Schiebewand (SW150)",
+     "Festwand (FW200)"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "2000",
+    "max": "12060",
+    "value": "5000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "1000",
+    "max": "6000",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "1000",
+    "max": "3000",
+    "value": "2200",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "2254",
+    "max": "2684",
+    "value": "2500",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=4.507,00",
+   "netto=2.839,41"
+  ]
+ },
+ "SW150 - Schiebewand": {
+  "groups": [
+   {
+    "title": "Abmessungen",
+    "options": [
+     "SW150 - Schiebewand Alles ausklappen Abmessungen Bestellbreite* (min 500 - max 6",
+     "Bestellbreite",
+     "Bestellhöhe",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Typ 2/2 (2 Schienen / 2 Elemente)",
+     "Typ 3/3 (3 Schienen / 3 Elemente)",
+     "Typ 2/4 (2 Schienen / 4 Elemente)",
+     "Links - Hauptelement von rechts nach links",
+     "Rechts - Hauptelement von links nach rechts",
+     "VSG 55.2 KLAR",
+     "VSG 55.2 MATT",
+     "Ohne Glas (55.2)",
+     "1 Rolle Kompriband (10 Meter)"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "SW150 - Schiebewand Alles ausklappen Abmessungen Bestellbreite* (min 500 - max 6",
+     "Bestellbreite",
+     "Bestellhöhe",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "Typ 2/2 (2 Schienen / 2 Elemente)",
+     "Typ 3/3 (3 Schienen / 3 Elemente)",
+     "Typ 2/4 (2 Schienen / 4 Elemente)",
+     "Links - Hauptelement von rechts nach links",
+     "Rechts - Hauptelement von links nach rechts",
+     "VSG 55.2 KLAR",
+     "VSG 55.2 MATT",
+     "Ohne Glas (55.2)",
+     "1 Rolle Kompriband (10 Meter)"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "Bestellbreite",
+     "Bestellhöhe"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Typ",
+    "options": [
+     "Typ 2/2 (2 Schienen / 2 Elemente)",
+     "Typ 3/3 (3 Schienen / 3 Elemente)",
+     "Typ 2/4 (2 Schienen / 4 Elemente)"
+    ]
+   },
+   {
+    "title": "Öffnungsrichtung",
+    "options": [
+     "Links - Hauptelement von rechts nach links",
+     "Rechts - Hauptelement von links nach rechts"
+    ]
+   },
+   {
+    "title": "Verglasung",
+    "options": [
+     "VSG 55.2 KLAR",
+     "VSG 55.2 MATT",
+     "Ohne Glas (55.2)"
+    ]
+   },
+   {
+    "title": "Weitere Zubehör",
+    "options": [
+     "1 Rolle Kompriband (10 Meter)"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "500",
+    "max": "6000",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "500",
+    "max": "2500",
+    "value": "2000",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=1.863,00",
+   "netto=1.173,69"
+  ]
+ },
+ "SW450 - Schiebewand": {
+  "groups": [
+   {
+    "title": "Abmessungen",
+    "options": [
+     "SW450 - Schiebewand Alles ausklappen Abmessungen Breite* (min 500 - max 11600 mm",
+     "Breite",
+     "Höhe",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "ESG KLAR (10mm)",
+     "ESG Dark Grey (10mm)",
+     "ESG Satinato (10mm)",
+     "Lieferung ohne Glas (10mm)",
+     "Typ 3/3 (3 Schienen / 3 Elemente)",
+     "Typ 4/4 (4 Schienen / 4 Elemente)",
+     "Typ 2/4 (2 Schienen / 4 Elemente)",
+     "Links - Hauptelement öffnen von rechts nach links",
+     "Rechts - Hauptelement öffnen von links nach rechts",
+     "Inkl. Mitnehmer",
+     "Ohne Mitnehmer",
+     "Hakenverschluss im Laufwagen",
+     "Hakenverschluss im Laufwagen 2x (Innenseite)",
+     "Hakenverschluss im Laufwagen 2x (Hauptflügel: innen, Nebenflügel: außen)",
+     "Hakenverschluss im Laufwagen + Reinigungsverschluss",
+     "Hakenverschluss auf Griffhöhe",
+     "Hakenverschluss auf Griffhöhe + Reinigungsverschluss",
+     "Ohne Verschluss",
+     "1x Muschelgriff (Edelstahl)"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "SW450 - Schiebewand Alles ausklappen Abmessungen Breite* (min 500 - max 11600 mm",
+     "Breite",
+     "Höhe",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "ESG KLAR (10mm)",
+     "ESG Dark Grey (10mm)",
+     "ESG Satinato (10mm)",
+     "Lieferung ohne Glas (10mm)",
+     "Typ 3/3 (3 Schienen / 3 Elemente)",
+     "Typ 4/4 (4 Schienen / 4 Elemente)",
+     "Typ 2/4 (2 Schienen / 4 Elemente)",
+     "Links - Hauptelement öffnen von rechts nach links",
+     "Rechts - Hauptelement öffnen von links nach rechts",
+     "Inkl. Mitnehmer",
+     "Ohne Mitnehmer",
+     "Hakenverschluss im Laufwagen",
+     "Hakenverschluss im Laufwagen 2x (Innenseite)",
+     "Hakenverschluss im Laufwagen 2x (Hauptflügel: innen, Nebenflügel: außen)",
+     "Hakenverschluss im Laufwagen + Reinigungsverschluss",
+     "Hakenverschluss auf Griffhöhe",
+     "Hakenverschluss auf Griffhöhe + Reinigungsverschluss",
+     "Ohne Verschluss",
+     "1x Muschelgriff (Edelstahl)"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "Breite",
+     "Höhe"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Glas",
+    "options": [
+     "ESG KLAR (10mm)",
+     "ESG Dark Grey (10mm)",
+     "ESG Satinato (10mm)",
+     "Lieferung ohne Glas (10mm)"
+    ]
+   },
+   {
+    "title": "Typ",
+    "options": [
+     "Typ 3/3 (3 Schienen / 3 Elemente)",
+     "Typ 4/4 (4 Schienen / 4 Elemente)",
+     "Typ 2/4 (2 Schienen / 4 Elemente)"
+    ]
+   },
+   {
+    "title": "Öffnungsrichtung (von Innen gesehen)",
+    "options": [
+     "Links - Hauptelement öffnen von rechts nach links",
+     "Rechts - Hauptelement öffnen von links nach rechts"
+    ]
+   },
+   {
+    "title": "Mitnehmerfunktion",
+    "options": [
+     "Inkl. Mitnehmer",
+     "Ohne Mitnehmer"
+    ]
+   },
+   {
+    "title": "Verschluss",
+    "options": [
+     "Hakenverschluss im Laufwagen",
+     "Hakenverschluss im Laufwagen 2x (Innenseite)",
+     "Hakenverschluss im Laufwagen 2x (Hauptflügel: innen, Nebenflügel: außen)",
+     "Hakenverschluss im Laufwagen + Reinigungsverschluss",
+     "Hakenverschluss auf Griffhöhe",
+     "Hakenverschluss auf Griffhöhe + Reinigungsverschluss",
+     "Ohne Verschluss"
+    ]
+   },
+   {
+    "title": "Griffe",
+    "options": [
+     "1x Muschelgriff (Edelstahl)",
+     "2x Muschelgriff (Edelstahl)",
+     "Muschelgriff an allen Elementen",
+     "Ohne Griff"
+    ]
+   },
+   {
+    "title": "Typ Laufschiene",
+    "options": [
+     "Flache Bodenschiene",
+     "Laufschiene hoch (mit integrierter Entwässerung)"
+    ]
+   },
+   {
+    "title": "Seitliche Führungsschienen",
+    "options": [
+     "Seitliche Führungsschienen (1-spurig)",
+     "Ohne seitliche Führungsschienen",
+     "Seitenführungen in Standardlänge 2600 mm"
+    ]
+   },
+   {
+    "title": "Staubschutzleisten",
+    "options": [
+     "Ohne Staubschutzleisten",
+     "Inkl. Staubschutzleisten"
+    ]
+   },
+   {
+    "title": "Staubschutzleisten",
+    "options": [
+     "Ohne Staubschutzleisten",
+     "Inkl. Staubschutzleisten"
+    ]
+   },
+   {
+    "title": "Seitliches Rahmenprofil",
+    "options": [
+     "Ohne Rahmenprofil",
+     "Inkl. Rahmenprofil"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "500",
+    "max": "11600",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "500",
+    "max": "2600",
+    "value": "2000",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=1.423,00",
+   "netto=896,49"
+  ]
+ },
+ "FW200 - Festwand": {
+  "groups": [
+   {
+    "title": "Afmetingen",
+    "options": [
+     "FW200 - Festwand Alles ausklappen Afmetingen Breite* (min 500 - max 6000 mm) mm ",
+     "Breite",
+     "Höhe",
+     "RAL7016st (Anthrazit)",
+     "RAL9007st (Graualuminium)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "VSG 44.2 KLAR",
+     "VSG 44.2 MATT",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Ohne Glas (44.2)",
+     "Ohne Polycarbonat (16mm)",
+     "Ohne vertikale Sprosse",
+     "1 vertikale Sprosse",
+     "2 vertikale Sprossen",
+     "3 vertikale Sprossen",
+     "4 vertikale Sprossen",
+     "Ohne horizontale Sprosse",
+     "1 horizontale Sprosse",
+     "Abdeckleiste links",
+     "Abdeckleiste rechts",
+     "Abdeckliste oben",
+     "Abdeckleiste Unterseite",
+     "Montageschrauben FW200"
+    ]
+   },
+   {
+    "title": "Afmetingen",
+    "options": [
+     "FW200 - Festwand Alles ausklappen Afmetingen Breite* (min 500 - max 6000 mm) mm ",
+     "Breite",
+     "Höhe",
+     "RAL7016st (Anthrazit)",
+     "RAL9007st (Graualuminium)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "VSG 44.2 KLAR",
+     "VSG 44.2 MATT",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Ohne Glas (44.2)",
+     "Ohne Polycarbonat (16mm)",
+     "Ohne vertikale Sprosse",
+     "1 vertikale Sprosse",
+     "2 vertikale Sprossen",
+     "3 vertikale Sprossen",
+     "4 vertikale Sprossen",
+     "Ohne horizontale Sprosse",
+     "1 horizontale Sprosse",
+     "Abdeckleiste links",
+     "Abdeckleiste rechts",
+     "Abdeckliste oben",
+     "Abdeckleiste Unterseite",
+     "Montageschrauben FW200"
+    ]
+   },
+   {
+    "title": "Afmetingen",
+    "options": [
+     "Breite",
+     "Höhe"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL9007st (Graualuminium)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Eindeckung",
+    "options": [
+     "VSG 44.2 KLAR",
+     "VSG 44.2 MATT",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Ohne Glas (44.2)",
+     "Ohne Polycarbonat (16mm)"
+    ]
+   },
+   {
+    "title": "Anzahl der vertikalen Sprossen",
+    "options": [
+     "Ohne vertikale Sprosse",
+     "1 vertikale Sprosse",
+     "2 vertikale Sprossen",
+     "3 vertikale Sprossen",
+     "4 vertikale Sprossen"
+    ]
+   },
+   {
+    "title": "Sprossen waagerecht",
+    "options": [
+     "Ohne horizontale Sprosse",
+     "1 horizontale Sprosse"
+    ]
+   },
+   {
+    "title": "Abdeckleiste Rahmenprofil",
+    "options": [
+     "Abdeckleiste links",
+     "Abdeckleiste rechts",
+     "Abdeckliste oben",
+     "Abdeckleiste Unterseite"
+    ]
+   },
+   {
+    "title": "Weitere Zubehör",
+    "options": [
+     "Montageschrauben FW200",
+     "1 Rolle Kompriband (10 Meter)"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "500",
+    "max": "6000",
+    "value": "1000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "127",
+    "max": "3000",
+    "value": "2000",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=549,00",
+   "netto=345,87"
+  ]
+ },
+ "FW300 - Festwand": {
+  "groups": [
+   {
+    "title": "Maße",
+    "options": [
+     "FW300 - Festwand Alles ausklappen Maße Breite* (min 400 - max 6000 mm) mm Höhe W",
+     "Breite",
+     "Höhe Wandseite (H1)",
+     "Höhe Rinnenseite (H2)",
+     "Links (von Innen gesehen)",
+     "Rechts (von Innen gesehen)",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "VSG 44.2 KLAR",
+     "VSG 44.2 MATT",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Ohne Glas (44.2)",
+     "Ohne Polycarbonat (16mm)",
+     "Ohne vertikale Sprosse",
+     "1 vertikale Sprosse",
+     "2 vertikale Sprossen",
+     "3 vertikale Sprossen",
+     "4 vertikale Sprossen",
+     "Fräsung Teranda-Überdachung (TR10/TR15/TR20)",
+     "Ohne Ausfräsung (andere Marken)",
+     "Anbindungsprofil 60x60 mm (TR10/TR15/TR20)",
+     "Ohne Anbindungsprofil Wandseite"
+    ]
+   },
+   {
+    "title": "Maße",
+    "options": [
+     "FW300 - Festwand Alles ausklappen Maße Breite* (min 400 - max 6000 mm) mm Höhe W",
+     "Breite",
+     "Höhe Wandseite (H1)",
+     "Höhe Rinnenseite (H2)",
+     "Links (von Innen gesehen)",
+     "Rechts (von Innen gesehen)",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe",
+     "VSG 44.2 KLAR",
+     "VSG 44.2 MATT",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Ohne Glas (44.2)",
+     "Ohne Polycarbonat (16mm)",
+     "Ohne vertikale Sprosse",
+     "1 vertikale Sprosse",
+     "2 vertikale Sprossen",
+     "3 vertikale Sprossen",
+     "4 vertikale Sprossen",
+     "Fräsung Teranda-Überdachung (TR10/TR15/TR20)",
+     "Ohne Ausfräsung (andere Marken)",
+     "Anbindungsprofil 60x60 mm (TR10/TR15/TR20)",
+     "Ohne Anbindungsprofil Wandseite"
+    ]
+   },
+   {
+    "title": "Maße",
+    "options": [
+     "Breite",
+     "Höhe Wandseite (H1)",
+     "Höhe Rinnenseite (H2)"
+    ]
+   },
+   {
+    "title": "Position in der Überdachung",
+    "options": [
+     "Links (von Innen gesehen)",
+     "Rechts (von Innen gesehen)"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Sonderfarbe"
+    ]
+   },
+   {
+    "title": "Eindeckung",
+    "options": [
+     "VSG 44.2 KLAR",
+     "VSG 44.2 MATT",
+     "Polycarbonat KLAR (16mm)",
+     "Polycarbonat OPAL (16mm)",
+     "Polycarbonat REFLEX PEARL (16mm)",
+     "Ohne Glas (44.2)",
+     "Ohne Polycarbonat (16mm)"
+    ]
+   },
+   {
+    "title": "Anzahl der vertikalen Sprossen",
+    "options": [
+     "Ohne vertikale Sprosse",
+     "1 vertikale Sprosse",
+     "2 vertikale Sprossen",
+     "3 vertikale Sprossen",
+     "4 vertikale Sprossen"
+    ]
+   },
+   {
+    "title": "Anbindung Rinnenprofil",
+    "options": [
+     "Fräsung Teranda-Überdachung (TR10/TR15/TR20)",
+     "Ohne Ausfräsung (andere Marken)"
+    ]
+   },
+   {
+    "title": "Anbindungsprofil Wandseite",
+    "options": [
+     "Anbindungsprofil 60x60 mm (TR10/TR15/TR20)",
+     "Ohne Anbindungsprofil Wandseite"
+    ]
+   },
+   {
+    "title": "Abdeckleiste Rahmenprofil",
+    "options": [
+     "Deckleiste H1 (links)",
+     "Deckleiste H2 (rechts)",
+     "Deckleiste Unterseite"
+    ]
+   },
+   {
+    "title": "Weitere Zubehör",
+    "options": [
+     "Montageschrauben FW300",
+     "1 Rolle Kompriband (10 Meter)",
+     "Kunststoff Abdeckkappe Anbindungsprofil"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "400",
+    "max": "6000",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "200",
+    "max": "3000",
+    "value": "500",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "127",
+    "max": "480",
+    "value": "130",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=668,00",
+   "netto=420,84"
+  ]
+ },
+ "PL15 - Plissee": {
+  "groups": [
+   {
+    "title": "Abmessungen",
+    "options": [
+     "PL15 - Plissee Alles ausklappen Abmessungen Breite* (min 400 - max 1000 mm) mm L",
+     "Breite",
+     "Länge",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Light Grey",
+     "Dark-Grey",
+     "Khaki",
+     "Off White",
+     "Medium Grey",
+     "Orange",
+     "Bedienstab 1200 mm",
+     "Ohne Bedienstab",
+     "Anzahl"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "PL15 - Plissee Alles ausklappen Abmessungen Breite* (min 400 - max 1000 mm) mm L",
+     "Breite",
+     "Länge",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Light Grey",
+     "Dark-Grey",
+     "Khaki",
+     "Off White",
+     "Medium Grey",
+     "Orange",
+     "Bedienstab 1200 mm",
+     "Ohne Bedienstab",
+     "Anzahl"
+    ]
+   },
+   {
+    "title": "Abmessungen",
+    "options": [
+     "Breite",
+     "Länge"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)"
+    ]
+   },
+   {
+    "title": "Tuchdessin",
+    "options": [
+     "Light Grey",
+     "Dark-Grey",
+     "Khaki",
+     "Off White",
+     "Medium Grey",
+     "Orange"
+    ]
+   },
+   {
+    "title": "Bedienung",
+    "options": [
+     "Bedienstab 1200 mm",
+     "Ohne Bedienstab"
+    ]
+   },
+   {
+    "title": "Anzahl der Felder",
+    "options": [
+     "Anzahl"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "400",
+    "max": "1000",
+    "value": "800",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "400",
+    "max": "5000",
+    "value": "3000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "1",
+    "max": "30",
+    "value": "1",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=297,00",
+   "netto=187,11"
+  ]
+ },
+ "SH30 - Shutter": {
+  "groups": [
+   {
+    "title": "Afmetingen",
+    "options": [
+     "SH30 - Shutter Alles ausklappen Afmetingen Bestellbreite* (min 200 - max 1200 mm",
+     "Bestellbreite",
+     "Bestellhöhe",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Menge"
+    ]
+   },
+   {
+    "title": "Afmetingen",
+    "options": [
+     "SH30 - Shutter Alles ausklappen Afmetingen Bestellbreite* (min 200 - max 1200 mm",
+     "Bestellbreite",
+     "Bestellhöhe",
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)",
+     "Menge"
+    ]
+   },
+   {
+    "title": "Afmetingen",
+    "options": [
+     "Bestellbreite",
+     "Bestellhöhe"
+    ]
+   },
+   {
+    "title": "Farbe",
+    "options": [
+     "RAL7016st (Anthrazit)",
+     "RAL7039st (Quarzgrau)",
+     "RAL9007st (Graualuminium)",
+     "RAL9006st (Weißaluminium)",
+     "RAL9005st (Tiefschwarz)",
+     "RAL9016 (Verkehrsweiß glänzend)",
+     "DB703 (Grau)"
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "label": "",
+    "min": "200",
+    "max": "1200",
+    "value": "1000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "200",
+    "max": "2400",
+    "value": "2000",
+    "placeholder": ""
+   },
+   {
+    "label": "",
+    "min": "0",
+    "max": "0",
+    "value": "1",
+    "placeholder": ""
+   }
+  ],
+  "prices": [
+   "brutto=508,00",
+   "netto=320,04"
+  ]
+ }
+}

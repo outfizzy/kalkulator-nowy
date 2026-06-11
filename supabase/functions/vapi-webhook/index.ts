@@ -483,6 +483,37 @@ async function sendSms(name: string, to: string, dateStr: string, salesRepName?:
             console.error('Twilio Error:', JSON.stringify(data));
         } else {
             console.log('SMS sent successfully:', data.sid);
+            // Log do sms_logs (z dopasowaniem leada po numerze) — wcześniej te SMS-y
+            // szły obok systemu i nie istniały w żadnej historii w CRM
+            try {
+                const sb = createClient(
+                    Deno.env.get('SUPABASE_URL')!,
+                    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+                );
+                let leadId: string | null = null;
+                const digits = to.replace(/\D/g, '');
+                const last9 = digits.slice(-9);
+                const { data: matched } = await sb
+                    .from('leads')
+                    .select('id')
+                    .ilike('customer_data->>phone', `%${last9}`)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                if (matched && matched.length > 0) leadId = matched[0].id;
+                await sb.from('sms_logs').insert({
+                    twilio_message_sid: data.sid,
+                    direction: 'outbound',
+                    from_number: 'Polendach24',
+                    to_number: to,
+                    body: messageBody,
+                    status: data.status || 'queued',
+                    channel: 'sms',
+                    is_read: true,
+                    lead_id: leadId,
+                });
+            } catch (logErr) {
+                console.error('SMS log error:', logErr);
+            }
         }
 
     } catch (err) {

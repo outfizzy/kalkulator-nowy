@@ -13,6 +13,14 @@
     {
       "path": "/api/cron/process-mail-queue",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/scan-emails",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/offer-followups",
+      "schedule": "0 8 * * *"
     }
   ]
 }
