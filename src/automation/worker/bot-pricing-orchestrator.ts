@@ -178,6 +178,10 @@ const DISPLAY_NAMES: Record<string, string> = {
   // Teranda → WITH numbers (10, 15, 20)
   teranda_tr15_poly: 'Trendstyle 15 mit Polycarbonat',
   teranda_tr15_glas: 'Trendstyle 15 mit Glas',
+  teranda_tr10_poly: 'Orangestyle 10 mit Polycarbonat',
+  teranda_tr10_glas: 'Orangestyle 10 mit Glas',
+  teranda_tr20_poly: 'Topstyle 20 mit Polycarbonat',
+  teranda_tr20_glas: 'Topstyle 20 mit Glas',
   panorama_al22: 'Panorama Schiebewand',
   panorama_al23: 'Panorama Schiebewand',
   senkrechtmarkise_aluxe: 'Senkrechtmarkise',
@@ -320,13 +324,25 @@ export class BotPricingOrchestrator {
         if (isFlatRoof) {
           aluxeProducts.push({ key: 'ultrastyle_classic', label: DISPLAY_NAMES['ultrastyle_classic'], category: 'roof', tier: 'premium', req: { productLine: 'ultrastyle_classic', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
           aluxeProducts.push({ key: 'skystyle', label: DISPLAY_NAMES['skystyle'], category: 'roof', tier: 'premium', req: { productLine: 'skystyle', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
+          if (req.freestanding) {
+            aluxeProducts.push({ key: 'skystyle_frei', label: 'Skystyle Freistehend (Flachdach)', category: 'roof', tier: 'premium', req: { productLine: 'skyline_frei', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000', freestanding: true } });
+          }
         } else {
           for (const rt of roofTypes) {
             aluxeProducts.push({ key: `orangestyle_${rt}`, label: DISPLAY_NAMES[`orangestyle_${rt}`], category: 'roof', tier: 'economy', cover: rt, req: { productLine: rt === 'glas' ? 'orangeline_glas' : 'orangeline_poly', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
           }
+          const wantsPlus = primaryModelId.includes('plus') || req.depth >= 4500;
+          const wantsXL = primaryModelId.includes('xl') || req.width >= 6000;
           for (const rt of roofTypes) {
             aluxeProducts.push({ key: `trendstyle_${rt}`, label: DISPLAY_NAMES[`trendstyle_${rt}`], category: 'roof', tier: 'mid', cover: rt, req: { productLine: rt === 'glas' ? 'trendstyle_glas' : 'trendstyle_poly', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
             aluxeProducts.push({ key: `topstyle_${rt}`, label: DISPLAY_NAMES[`topstyle_${rt}`], category: 'roof', tier: 'mid_premium', cover: rt, req: { productLine: rt === 'glas' ? 'topstyle_glas' : 'topstyle_poly', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
+            // Wzmocnione warianty: Plus (większe głębokości) i Topline XL (większe szerokości / na życzenie)
+            if (wantsPlus) {
+              aluxeProducts.push({ key: `trendstyle_plus_${rt}`, label: DISPLAY_NAMES[`trendstyle_plus_${rt}`], category: 'roof', tier: 'mid', cover: rt, req: { productLine: rt === 'glas' ? 'trendstyle_plus_glas' : 'trendstyle_plus_poly', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
+            }
+            if (wantsXL) {
+              aluxeProducts.push({ key: `topstyle_xl_${rt}`, label: DISPLAY_NAMES[`topstyle_xl_${rt}`], category: 'roof', tier: 'mid_premium', cover: rt, req: { productLine: rt === 'glas' ? 'topstyle_xl_glas' : 'topstyle_xl_poly', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
+            }
           }
           aluxeProducts.push({ key: 'ultrastyle_classic', label: DISPLAY_NAMES['ultrastyle_classic'], category: 'roof', tier: 'premium', req: { productLine: 'ultrastyle_classic', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
           aluxeProducts.push({ key: 'skystyle', label: DISPLAY_NAMES['skystyle'], category: 'roof', tier: 'premium', req: { productLine: 'skystyle', width: req.width, depth: req.depth, color: req.color || '7016', postHeight: '3000' } });
@@ -455,16 +471,24 @@ export class BotPricingOrchestrator {
       const glazings = req.roofType === 'glass' ? ['glas'] 
         : req.roofType === 'polycarbonate' ? ['polycarbonat']
         : ['polycarbonat', 'glas'];
-      
+
+      // TR15 zawsze; TR10/TR20 warunkowo (rodzina modelu klienta) — kazde zapytanie
+      // Teranda to ~30-60s SPA, wiec dokladamy tylko to, co potrzebne do trafienia
+      // w model. Pokrycie: przy jawnym zyczeniu tylko ono (oszczednosc czasu).
+      const trModels: { tr: 'tr10' | 'tr15' | 'tr20'; tier: LiveQuote['tier'] }[] = [{ tr: 'tr15', tier: 'mid' }];
+      if (primaryModelId.includes('orange')) trModels.push({ tr: 'tr10', tier: 'economy' });
+      if (primaryModelId.includes('top')) trModels.push({ tr: 'tr20', tier: 'mid_premium' });
+
+      for (const tm of trModels)
       for (const g of glazings) {
-        const key = `teranda_tr15_${g === 'glas' ? 'glas' : 'poly'}`;
+        const key = `teranda_${tm.tr}_${g === 'glas' ? 'glas' : 'poly'}`;
         const label = DISPLAY_NAMES[key] || key;
         console.log(`\n    🔄 ${label}...`);
         const t0 = Date.now();
         
         try {
           const priceResult = await svc.getPrice({
-            product: 'tr15', width: req.width, depth: req.depth,
+            product: tm.tr, width: req.width, depth: req.depth,
             heightRinne: req.height || 2500, color: req.color || 'RAL7016st',
             glazingType: g as 'glas' | 'polycarbonat',
             roofCover: g === 'glas' ? '44.2 VSG KLAR' : 'Polycarbonat OPAL',
@@ -476,12 +500,12 @@ export class BotPricingOrchestrator {
           if (priceResult.success && priceResult.netto && priceResult.netto > 0) {
             result.prices[key] = priceResult.netto;
             console.log(`    ✅ ${label}: EK ${priceResult.netto.toFixed(2)}€ [${(dur/1000).toFixed(1)}s]`);
-            result.quotes.push({ supplier: 'teranda', product: key, productLabel: label, category: 'roof', tier: 'mid', coverType: g === 'glas' ? 'glas' : 'poly', price: priceResult.netto, success: true, durationMs: dur, source: 'live_configurator', confidence: 1.0, dimensions: dimString });
+            result.quotes.push({ supplier: 'teranda', product: key, productLabel: label, category: 'roof', tier: tm.tier, coverType: g === 'glas' ? 'glas' : 'poly', price: priceResult.netto, success: true, durationMs: dur, source: 'live_configurator', confidence: 1.0, dimensions: dimString });
           } else {
-            result.quotes.push({ supplier: 'teranda', product: key, productLabel: label, category: 'roof', tier: 'mid', coverType: g === 'glas' ? 'glas' : 'poly', price: null, success: false, error: priceResult.error, durationMs: dur, source: 'live_configurator', confidence: 0 });
+            result.quotes.push({ supplier: 'teranda', product: key, productLabel: label, category: 'roof', tier: tm.tier, coverType: g === 'glas' ? 'glas' : 'poly', price: null, success: false, error: priceResult.error, durationMs: dur, source: 'live_configurator', confidence: 0 });
           }
         } catch (err) {
-          result.quotes.push({ supplier: 'teranda', product: key, productLabel: label, category: 'roof', tier: 'mid', price: null, success: false, error: (err as Error).message, durationMs: Date.now() - t0, source: 'live_configurator', confidence: 0 });
+          result.quotes.push({ supplier: 'teranda', product: key, productLabel: label, category: 'roof', tier: tm.tier, price: null, success: false, error: (err as Error).message, durationMs: Date.now() - t0, source: 'live_configurator', confidence: 0 });
         }
       }
       
@@ -1726,9 +1750,9 @@ export class BotPricingOrchestrator {
  * dach z tego samego TIERU, czyli potrafil dostac zupelnie inny model.
  */
 const MODEL_FAMILIES: Record<string, string[]> = {
-  orangestyle: ['orangestyle_'],
+  orangestyle: ['orangestyle_', 'teranda_tr10_'],
   trendstyle: ['trendstyle_', 'teranda_tr15_', 'mb_solid_'],
-  topstyle: ['topstyle_', 'mb_bold_'],
+  topstyle: ['topstyle_', 'teranda_tr20_', 'mb_bold_'],
   designstyle: ['designstyle'],
   designline: ['designstyle'],
   ultrastyle: ['ultrastyle_'],

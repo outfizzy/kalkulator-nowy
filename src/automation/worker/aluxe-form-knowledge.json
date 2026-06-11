@@ -1,0 +1,9585 @@
+{
+ "trendline_platten": {
+  "productId": "2908b3841950ae6",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     },
+     {
+      "v": "7950",
+      "t": "7950-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "staander_type",
+    "name": "staander_type",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Standard"
+     },
+     {
+      "v": "1",
+      "t": "Klassik"
+     },
+     {
+      "v": "2",
+      "t": "Rund"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "sierlijst",
+    "name": "sierlijst",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "1c5c8ca8edfdf23",
+      "t": "Zierleiste klassik (11344)"
+     },
+     {
+      "v": "e27a2addf3ed9ab",
+      "t": "Zierleiste rund (11345)"
+     },
+     {
+      "v": "a4b8e869a66ddb8",
+      "t": "Zierleiste flach hoch (standard)"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "03b0cbcc6aeddda",
+      "t": "Winkelstrebe"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_980_quantity",
+    "name": "dakplaten_980_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-7f86811bbc903e9-",
+    "name": "_fundering[7f86811bbc903e9]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_front",
+    "name": "height_front",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_back",
+    "name": "height_back",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "trendline_glas": {
+  "productId": "1f1d836c3cd094c",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     },
+     {
+      "v": "7950",
+      "t": "7950-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "staander_type",
+    "name": "staander_type",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Standard"
+     },
+     {
+      "v": "1",
+      "t": "Klassik"
+     },
+     {
+      "v": "2",
+      "t": "Rund"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "sierlijst",
+    "name": "sierlijst",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "1c5c8ca8edfdf23",
+      "t": "Zierleiste klassik (11344)"
+     },
+     {
+      "v": "e27a2addf3ed9ab",
+      "t": "Zierleiste rund (11345)"
+     },
+     {
+      "v": "a4b8e869a66ddb8",
+      "t": "Zierleiste flach hoch (standard)"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "03b0cbcc6aeddda",
+      "t": "Winkelstrebe"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-7f86811bbc903e9-",
+    "name": "_fundering[7f86811bbc903e9]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_front",
+    "name": "height_front",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_back",
+    "name": "height_back",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "trendline_plus_platten": {
+  "productId": "52832c55097922c",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "staander_type",
+    "name": "staander_type",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Standard"
+     },
+     {
+      "v": "1",
+      "t": "Klassik"
+     },
+     {
+      "v": "2",
+      "t": "Rund"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_980_quantity",
+    "name": "dakplaten_980_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-7f86811bbc903e9-",
+    "name": "_fundering[7f86811bbc903e9]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "trendline_plus_glas": {
+  "productId": "fe9c1a9c9ba700e",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "staander_type",
+    "name": "staander_type",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Standard"
+     },
+     {
+      "v": "1",
+      "t": "Klassik"
+     },
+     {
+      "v": "2",
+      "t": "Rund"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "topline_xl_platten": {
+  "productId": "78f60e9bef64493",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_980_quantity",
+    "name": "dakplaten_980_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-1ece8594b526c76-",
+    "name": "_fundering[1ece8594b526c76]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-c34dd42a9ba50d4-",
+    "name": "_fundering[c34dd42a9ba50d4]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "topline_xl_glas": {
+  "productId": "b49e5992a83fa62",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-1ece8594b526c76-",
+    "name": "_fundering[1ece8594b526c76]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-c34dd42a9ba50d4-",
+    "name": "_fundering[c34dd42a9ba50d4]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "topline_platten": {
+  "productId": "debe45b27eed176",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "eb5db27321ad810",
+      "t": "Winkelstrebe Topline"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_980_quantity",
+    "name": "dakplaten_980_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-7f86811bbc903e9-",
+    "name": "_fundering[7f86811bbc903e9]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_front",
+    "name": "height_front",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_back",
+    "name": "height_back",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "topline_glas": {
+  "productId": "d17713bc222de6d",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "schoren-id-",
+    "name": "schoren[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "eb5db27321ad810",
+      "t": "Winkelstrebe Topline"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-7f86811bbc903e9-",
+    "name": "_fundering[7f86811bbc903e9]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "schoren-quantity-",
+    "name": "schoren[quantity]",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_front",
+    "name": "height_front",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_back",
+    "name": "height_back",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "designline": {
+  "productId": "a64f6479443b84e",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "design_system_columns",
+    "name": "design_system_columns",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-1ece8594b526c76-",
+    "name": "_fundering[1ece8594b526c76]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-c34dd42a9ba50d4-",
+    "name": "_fundering[c34dd42a9ba50d4]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "ultraline": {
+  "productId": "27b0ad19ba6ad08",
+  "title": "",
+  "selects": [
+   {
+    "id": "ultra_type",
+    "name": "ultra_type",
+    "label": "",
+    "options": [
+     {
+      "v": "classic",
+      "t": "Classic"
+     },
+     {
+      "v": "style",
+      "t": "Style"
+     },
+     {
+      "v": "compact",
+      "t": "Compact"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "ultra_free",
+    "name": "ultra_free",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nicht freistehend"
+     },
+     {
+      "v": "1",
+      "t": "Freistand Stahlfundament mit Anker"
+     },
+     {
+      "v": "2",
+      "t": "Freistand, Stahlfundament mit Montageplatte"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "d5923718bad7bde",
+      "t": "Iso Glas Klar 6-10-44.2 24mm (12015)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "type": "text",
+    "value": "2400",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-1ece8594b526c76-",
+    "name": "_fundering[1ece8594b526c76]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-c34dd42a9ba50d4-",
+    "name": "_fundering[c34dd42a9ba50d4]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "carport": {
+  "productId": "8376d76d0b05843",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "c1385035d1e8676",
+      "t": "Trapezblech M85/280, 1mm"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "fundering-ef650f9ec1fd11b-",
+    "name": "_fundering[ef650f9ec1fd11b]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-29dd6b88cb3e854-",
+    "name": "_fundering[29dd6b88cb3e854]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "carport_frei": {
+  "productId": "0fd2e99d14d28fb",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "c1385035d1e8676",
+      "t": "Trapezblech M85/280, 1mm"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "fundering-ef650f9ec1fd11b-",
+    "name": "_fundering[ef650f9ec1fd11b]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-29dd6b88cb3e854-",
+    "name": "_fundering[29dd6b88cb3e854]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "panorama_al25_hoch": {
+  "productId": "1b10c45a15a241c",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2780",
+      "t": "3000"
+     },
+     {
+      "v": "3780",
+      "t": "4000"
+     },
+     {
+      "v": "4780",
+      "t": "5000"
+     },
+     {
+      "v": "5780",
+      "t": "6000"
+     },
+     {
+      "v": "6780",
+      "t": "7000"
+     }
+    ]
+   },
+   {
+    "id": "slide",
+    "name": "slide",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Nach links öffnend"
+     },
+     {
+      "v": "right",
+      "t": "Nach rechts öffnend"
+     },
+     {
+      "v": "center",
+      "t": "Mittig öffnend"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6b89385110fae4d",
+      "t": "Gehärtetes Glas ESG 10mm"
+     },
+     {
+      "v": "c81f86d63e52b00",
+      "t": "ESG Planibel Grey 10mm"
+     },
+     {
+      "v": "cc086a09c19be33",
+      "t": "Satinato ESG 10mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "track_qt",
+    "name": "track_qt",
+    "label": "",
+    "options": [
+     {
+      "v": "3",
+      "t": "3 Spuren, wenn möglich"
+     },
+     {
+      "v": "4",
+      "t": "4 Spuren, wenn möglich"
+     },
+     {
+      "v": "5",
+      "t": "5 sporen, indien mogelijk"
+     },
+     {
+      "v": "6",
+      "t": "6 sporen, indien mogelijk"
+     },
+     {
+      "v": "7",
+      "t": "Altijd 7 sporen"
+     }
+    ]
+   },
+   {
+    "id": "incl_sides",
+    "name": "incl_sides",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "spie",
+    "name": "spie",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "profiles",
+    "name": "profiles",
+    "label": "",
+    "options": [
+     {
+      "v": "none",
+      "t": "Nein"
+     },
+     {
+      "v": "brush",
+      "t": "Inkl. Bürstenprofiel"
+     },
+     {
+      "v": "steel",
+      "t": "Steel look"
+     }
+    ]
+   },
+   {
+    "id": "grip",
+    "name": "grip",
+    "label": "",
+    "options": [
+     {
+      "v": "round",
+      "t": "Rund"
+     },
+     {
+      "v": "knop",
+      "t": "Handknopf Edelstahl"
+     },
+     {
+      "v": "lock",
+      "t": "Edelstahlschloss"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "height",
+    "name": "height",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "panels_0",
+    "name": "panels[]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "panorama_al24": {
+  "productId": "2960ab840c58084",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2780",
+      "t": "3000"
+     },
+     {
+      "v": "3780",
+      "t": "4000"
+     },
+     {
+      "v": "4780",
+      "t": "5000"
+     },
+     {
+      "v": "5780",
+      "t": "6000"
+     },
+     {
+      "v": "6780",
+      "t": "7000"
+     }
+    ]
+   },
+   {
+    "id": "slide",
+    "name": "slide",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Nach links öffnend"
+     },
+     {
+      "v": "right",
+      "t": "Nach rechts öffnend"
+     },
+     {
+      "v": "center",
+      "t": "Mittig öffnend"
+     }
+    ]
+   },
+   {
+    "id": "splitted",
+    "name": "splitted",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Paneele gleichmäßig verteilen / kein Zwischenpfosten"
+     },
+     {
+      "v": "2",
+      "t": "Paneelverteilung konfigurieren / optional Zwischenpfosten"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6b89385110fae4d",
+      "t": "Gehärtetes Glas ESG 10mm"
+     },
+     {
+      "v": "c81f86d63e52b00",
+      "t": "ESG Planibel Grey 10mm"
+     },
+     {
+      "v": "cc086a09c19be33",
+      "t": "Satinato ESG 10mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "track_qt",
+    "name": "track_qt",
+    "label": "",
+    "options": [
+     {
+      "v": "3",
+      "t": "3 Spuren, wenn möglich"
+     },
+     {
+      "v": "4",
+      "t": "4 Spuren, wenn möglich"
+     },
+     {
+      "v": "5",
+      "t": "5 sporen, indien mogelijk"
+     },
+     {
+      "v": "6",
+      "t": "6 sporen, indien mogelijk"
+     },
+     {
+      "v": "7",
+      "t": "Altijd 7 sporen"
+     }
+    ]
+   },
+   {
+    "id": "free_glide",
+    "name": "free_glide",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "2",
+      "t": "Ja, mit extra Handgriff ( Aufpreis )"
+     }
+    ]
+   },
+   {
+    "id": "locker",
+    "name": "locker",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "panel",
+      "t": "Festes Paneel"
+     },
+     {
+      "v": "slide",
+      "t": "Schiebepaneel"
+     },
+     {
+      "v": "both",
+      "t": "Fest - und Schiebepaneel"
+     }
+    ]
+   },
+   {
+    "id": "incl_sides",
+    "name": "incl_sides",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "spie",
+    "name": "spie",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "profiles",
+    "name": "profiles",
+    "label": "",
+    "options": [
+     {
+      "v": "none",
+      "t": "Nein"
+     },
+     {
+      "v": "brush",
+      "t": "Inkl. Bürstenprofiel"
+     },
+     {
+      "v": "steel",
+      "t": "Steel look"
+     }
+    ]
+   },
+   {
+    "id": "grip",
+    "name": "grip",
+    "label": "",
+    "options": [
+     {
+      "v": "round",
+      "t": "Rund"
+     },
+     {
+      "v": "knop",
+      "t": "Handknopf Edelstahl"
+     },
+     {
+      "v": "lock",
+      "t": "Edelstahlschloss"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "height",
+    "name": "height",
+    "type": "text",
+    "value": "2190",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "panels_0",
+    "name": "panels[]",
+    "type": "text",
+    "value": "3",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "panorama_al26": {
+  "productId": "b380e0897cbdc62",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2780",
+      "t": "3000"
+     },
+     {
+      "v": "3780",
+      "t": "4000"
+     },
+     {
+      "v": "4780",
+      "t": "5000"
+     },
+     {
+      "v": "5780",
+      "t": "6000"
+     },
+     {
+      "v": "6780",
+      "t": "7000"
+     }
+    ]
+   },
+   {
+    "id": "slide",
+    "name": "slide",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Nach links öffnend"
+     },
+     {
+      "v": "right",
+      "t": "Nach rechts öffnend"
+     },
+     {
+      "v": "center",
+      "t": "Mittig öffnend"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6b89385110fae4d",
+      "t": "Gehärtetes Glas ESG 10mm"
+     },
+     {
+      "v": "c81f86d63e52b00",
+      "t": "ESG Planibel Grey 10mm"
+     },
+     {
+      "v": "cc086a09c19be33",
+      "t": "Satinato ESG 10mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "track_qt",
+    "name": "track_qt",
+    "label": "",
+    "options": [
+     {
+      "v": "3",
+      "t": "3 Spuren, wenn möglich"
+     },
+     {
+      "v": "4",
+      "t": "4 Spuren, wenn möglich"
+     },
+     {
+      "v": "5",
+      "t": "5 sporen, indien mogelijk"
+     },
+     {
+      "v": "6",
+      "t": "6 sporen, indien mogelijk"
+     },
+     {
+      "v": "7",
+      "t": "Altijd 7 sporen"
+     }
+    ]
+   },
+   {
+    "id": "incl_sides",
+    "name": "incl_sides",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "spie",
+    "name": "spie",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "profiles",
+    "name": "profiles",
+    "label": "",
+    "options": [
+     {
+      "v": "none",
+      "t": "Nein"
+     },
+     {
+      "v": "brush",
+      "t": "Inkl. Bürstenprofiel"
+     },
+     {
+      "v": "steel",
+      "t": "Steel look"
+     }
+    ]
+   },
+   {
+    "id": "grip",
+    "name": "grip",
+    "label": "",
+    "options": [
+     {
+      "v": "round",
+      "t": "Rund"
+     },
+     {
+      "v": "knop",
+      "t": "Handknopf Edelstahl"
+     },
+     {
+      "v": "lock",
+      "t": "Edelstahlschloss"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "height",
+    "name": "height",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "panels_0",
+    "name": "panels[]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "panorama_al23_hoch": {
+  "productId": "505157f4638687f",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2780",
+      "t": "3000"
+     },
+     {
+      "v": "3780",
+      "t": "4000"
+     },
+     {
+      "v": "4780",
+      "t": "5000"
+     },
+     {
+      "v": "5780",
+      "t": "6000"
+     },
+     {
+      "v": "6780",
+      "t": "7000"
+     }
+    ]
+   },
+   {
+    "id": "slide",
+    "name": "slide",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Nach links öffnend"
+     },
+     {
+      "v": "right",
+      "t": "Nach rechts öffnend"
+     },
+     {
+      "v": "center",
+      "t": "Mittig öffnend"
+     }
+    ]
+   },
+   {
+    "id": "splitted",
+    "name": "splitted",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Paneele gleichmäßig verteilen / kein Zwischenpfosten"
+     },
+     {
+      "v": "2",
+      "t": "Paneelverteilung konfigurieren / optional Zwischenpfosten"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6b89385110fae4d",
+      "t": "Gehärtetes Glas ESG 10mm"
+     },
+     {
+      "v": "c81f86d63e52b00",
+      "t": "ESG Planibel Grey 10mm"
+     },
+     {
+      "v": "cc086a09c19be33",
+      "t": "Satinato ESG 10mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "track_qt",
+    "name": "track_qt",
+    "label": "",
+    "options": [
+     {
+      "v": "3",
+      "t": "3 Spuren, wenn möglich"
+     },
+     {
+      "v": "4",
+      "t": "4 Spuren, wenn möglich"
+     },
+     {
+      "v": "5",
+      "t": "5 sporen, indien mogelijk"
+     },
+     {
+      "v": "6",
+      "t": "6 sporen, indien mogelijk"
+     },
+     {
+      "v": "7",
+      "t": "Altijd 7 sporen"
+     }
+    ]
+   },
+   {
+    "id": "free_glide",
+    "name": "free_glide",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "2",
+      "t": "Ja, mit extra Handgriff ( Aufpreis )"
+     }
+    ]
+   },
+   {
+    "id": "locker",
+    "name": "locker",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "panel",
+      "t": "Festes Paneel"
+     },
+     {
+      "v": "slide",
+      "t": "Schiebepaneel"
+     },
+     {
+      "v": "both",
+      "t": "Fest - und Schiebepaneel"
+     }
+    ]
+   },
+   {
+    "id": "incl_sides",
+    "name": "incl_sides",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "spie",
+    "name": "spie",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "profiles",
+    "name": "profiles",
+    "label": "",
+    "options": [
+     {
+      "v": "none",
+      "t": "Nein"
+     },
+     {
+      "v": "brush",
+      "t": "Inkl. Bürstenprofiel"
+     },
+     {
+      "v": "steel",
+      "t": "Steel look"
+     }
+    ]
+   },
+   {
+    "id": "grip",
+    "name": "grip",
+    "label": "",
+    "options": [
+     {
+      "v": "round",
+      "t": "Rund"
+     },
+     {
+      "v": "knop",
+      "t": "Handknopf Edelstahl"
+     },
+     {
+      "v": "lock",
+      "t": "Edelstahlschloss"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "height",
+    "name": "height",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "panels_0",
+    "name": "panels[]",
+    "type": "text",
+    "value": "3",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "panorama_al22_tief": {
+  "productId": "505157f4638687e",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2780",
+      "t": "3000"
+     },
+     {
+      "v": "3780",
+      "t": "4000"
+     },
+     {
+      "v": "4780",
+      "t": "5000"
+     },
+     {
+      "v": "5780",
+      "t": "6000"
+     }
+    ]
+   },
+   {
+    "id": "slide",
+    "name": "slide",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Nach links öffnend"
+     },
+     {
+      "v": "right",
+      "t": "Nach rechts öffnend"
+     },
+     {
+      "v": "center",
+      "t": "Mittig öffnend"
+     }
+    ]
+   },
+   {
+    "id": "splitted",
+    "name": "splitted",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Paneele gleichmäßig verteilen / kein Zwischenpfosten"
+     },
+     {
+      "v": "2",
+      "t": "Paneelverteilung konfigurieren / optional Zwischenpfosten"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "6b89385110fae4d",
+      "t": "Gehärtetes Glas ESG 10mm"
+     },
+     {
+      "v": "c81f86d63e52b00",
+      "t": "ESG Planibel Grey 10mm"
+     },
+     {
+      "v": "cc086a09c19be33",
+      "t": "Satinato ESG 10mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "track_qt",
+    "name": "track_qt",
+    "label": "",
+    "options": [
+     {
+      "v": "3",
+      "t": "3 Spuren, wenn möglich"
+     },
+     {
+      "v": "5",
+      "t": "Immer 5 Spuren"
+     }
+    ]
+   },
+   {
+    "id": "free_glide",
+    "name": "free_glide",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "2",
+      "t": "Ja, mit extra Handgriff ( Aufpreis )"
+     }
+    ]
+   },
+   {
+    "id": "locker",
+    "name": "locker",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "panel",
+      "t": "Festes Paneel"
+     },
+     {
+      "v": "slide",
+      "t": "Schiebepaneel"
+     },
+     {
+      "v": "both",
+      "t": "Fest - und Schiebepaneel"
+     }
+    ]
+   },
+   {
+    "id": "incl_sides",
+    "name": "incl_sides",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "spie",
+    "name": "spie",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "profiles",
+    "name": "profiles",
+    "label": "",
+    "options": [
+     {
+      "v": "none",
+      "t": "Nein"
+     },
+     {
+      "v": "brush",
+      "t": "Inkl. Bürstenprofiel"
+     }
+    ]
+   },
+   {
+    "id": "grip",
+    "name": "grip",
+    "label": "",
+    "options": [
+     {
+      "v": "round",
+      "t": "Rund"
+     },
+     {
+      "v": "knop",
+      "t": "Handknopf Edelstahl"
+     },
+     {
+      "v": "lock",
+      "t": "Edelstahlschloss"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "height",
+    "name": "height",
+    "type": "text",
+    "value": "2190",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "panels_0",
+    "name": "panels[]",
+    "type": "text",
+    "value": "3",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "keilfenster": {
+  "productId": "4b388c1d11993a8",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d19a7025c6278af",
+      "t": "Iso Glas 33.1-10-33.1 23mm (11508)"
+     }
+    ]
+   },
+   {
+    "id": "side",
+    "name": "side",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Links"
+     },
+     {
+      "v": "right",
+      "t": "Rechts"
+     }
+    ]
+   },
+   {
+    "id": "screws",
+    "name": "screws",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_1",
+    "name": "height_1",
+    "type": "text",
+    "value": "85",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_2",
+    "name": "height_2",
+    "type": "text",
+    "value": "85",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "feste_seitenelemente": {
+  "productId": "ca5707a0c10bf91",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "1000",
+      "t": "1000-mm"
+     },
+     {
+      "v": "1500",
+      "t": "1500-mm"
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d19a7025c6278af",
+      "t": "Iso Glas 33.1-10-33.1 23mm (11508)"
+     }
+    ]
+   },
+   {
+    "id": "side",
+    "name": "side",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "left",
+      "t": "Links"
+     },
+     {
+      "v": "right",
+      "t": "Rechts"
+     }
+    ]
+   },
+   {
+    "id": "screws",
+    "name": "screws",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_1",
+    "name": "height_1",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_2",
+    "name": "height_2",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_3",
+    "name": "height_3",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "frontwand": {
+  "productId": "1103a716fd08b8e",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "1000",
+      "t": "1000-mm"
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d19a7025c6278af",
+      "t": "Iso Glas 33.1-10-33.1 23mm (11508)"
+     }
+    ]
+   },
+   {
+    "id": "doors",
+    "name": "doors",
+    "label": "",
+    "options": [
+     {
+      "v": "none",
+      "t": "Keine Türen"
+     },
+     {
+      "v": "single-left-out",
+      "t": "Einzelne Tür, Rechts, nach außen öffnend"
+     },
+     {
+      "v": "single-left-in",
+      "t": "Einzelne Tür, Rechts, nach innen öffnend"
+     },
+     {
+      "v": "single-right-out",
+      "t": "Einzelne Tür, Links, nach außen öffnend"
+     },
+     {
+      "v": "single-right-in",
+      "t": "Einzelne Tür, Links, nach innen öffnend"
+     },
+     {
+      "v": "double-out",
+      "t": "doppelte Tür nach außen öffnend"
+     },
+     {
+      "v": "double-in",
+      "t": "doppelte Tür, nach innen öffnend"
+     }
+    ]
+   },
+   {
+    "id": "screws",
+    "name": "screws",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_1",
+    "name": "height_1",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_3",
+    "name": "height_3",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "rahmen_schiebeturen": {
+  "productId": "ed9ad01b6234f2a",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "5500",
+      "t": "5500-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "d19a7025c6278af",
+      "t": "Iso Glas 33.1-10-33.1 23mm (11508)"
+     }
+    ]
+   },
+   {
+    "id": "sdoors",
+    "name": "sdoors",
+    "label": "",
+    "options": [
+     {
+      "v": "2-r-l",
+      "t": "1x rechts schiebend, 1x links schiebend"
+     },
+     {
+      "v": "3-l-r-r",
+      "t": "1x links schiebend, 2x rechts schiebend"
+     },
+     {
+      "v": "3-r-l-l",
+      "t": "1x rechts schiebend, 2x links schiebend"
+     },
+     {
+      "v": "4-r-l-r-l",
+      "t": "Mittig schließend: 1x rechtsschiebend, 1x linksschiebend"
+     },
+     {
+      "v": "6-s-l-l-r-r-s",
+      "t": "Middensluitend: 2x rechts-schuivend, 2x links-schuivend"
+     }
+    ]
+   },
+   {
+    "id": "screws",
+    "name": "screws",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "height_1",
+    "name": "height_1",
+    "type": "text",
+    "value": "2200",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "masszuschnitt": {
+  "productId": "c18fcbae55b0a31",
+  "title": "",
+  "selects": [
+   {
+    "id": "dakplaten_custom",
+    "name": "dakplaten_custom",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "6b89385110fae4d",
+      "t": "Gehärtetes Glas ESG 10mm"
+     },
+     {
+      "v": "c81f86d63e52b00",
+      "t": "ESG Planibel Grey 10mm"
+     },
+     {
+      "v": "d19a7025c6278af",
+      "t": "Iso Glas 33.1-10-33.1 23mm (11508)"
+     },
+     {
+      "v": "d5923718bad7bde",
+      "t": "Iso Glas Klar 6-10-44.2 24mm (12015)"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "cc086a09c19be33",
+      "t": "Satinato ESG 10mm"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "verticale_zonwering": {
+  "productId": "fd60d47d74592d4",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "1500",
+      "t": "1500-mm"
+     },
+     {
+      "v": "1750",
+      "t": "1750-mm"
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2250",
+      "t": "2250-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "2750",
+      "t": "2750-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3250",
+      "t": "3250-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "3750",
+      "t": "3750-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4250",
+      "t": "4250-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "4750",
+      "t": "4750-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "5250",
+      "t": "5250-mm"
+     },
+     {
+      "v": "5500",
+      "t": "5500-mm"
+     },
+     {
+      "v": "5750",
+      "t": "5750-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "1000",
+      "t": "1000-mm"
+     },
+     {
+      "v": "1250",
+      "t": "1250-mm"
+     },
+     {
+      "v": "1500",
+      "t": "1500-mm"
+     },
+     {
+      "v": "1750",
+      "t": "1750-mm"
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2250",
+      "t": "2250-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "2750",
+      "t": "2750-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "sun_color",
+    "name": "sun_color",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "markise": {
+  "productId": "85c0f928be1771c",
+  "title": "",
+  "selects": [
+   {
+    "id": "rooftype",
+    "name": "rooftype",
+    "label": "",
+    "options": [
+     {
+      "v": "OL",
+      "t": "Orangeline"
+     },
+     {
+      "v": "OL+",
+      "t": "Orangeline+"
+     },
+     {
+      "v": "TR",
+      "t": "Trendline"
+     },
+     {
+      "v": "TR+",
+      "t": "Trendline+"
+     },
+     {
+      "v": "TL",
+      "t": "Topline"
+     },
+     {
+      "v": "TLXL",
+      "t": "Topline XL"
+     },
+     {
+      "v": "DL",
+      "t": "Designline"
+     },
+     {
+      "v": "UL classic",
+      "t": "Ultraline classic"
+     },
+     {
+      "v": "UL style",
+      "t": "Ultraline style"
+     },
+     {
+      "v": "UL compact",
+      "t": "Ultraline compact"
+     },
+     {
+      "v": "SK",
+      "t": "Skyline"
+     },
+     {
+      "v": "SK freistehend",
+      "t": "Skyline vrijstaand"
+     }
+    ]
+   },
+   {
+    "id": "markise",
+    "name": "markise",
+    "label": "",
+    "options": [
+     {
+      "v": "Aufdachmarkise W350",
+      "t": "Aufdachmarkise ZIP"
+     },
+     {
+      "v": "Unterdachmarkise T350",
+      "t": "Unterdachmarkise ZIP"
+     }
+    ]
+   },
+   {
+    "id": "motor",
+    "name": "motor",
+    "label": "",
+    "options": [
+     {
+      "v": "links",
+      "t": "Links"
+     },
+     {
+      "v": "rechts",
+      "t": "Rechts"
+     },
+     {
+      "v": "2xlinks",
+      "t": "2x links"
+     },
+     {
+      "v": "2xrechts",
+      "t": "2x rechts"
+     },
+     {
+      "v": "links+rechtsaussen",
+      "t": "links + rechts außen"
+     },
+     {
+      "v": "innen/innen",
+      "t": "innen + innen"
+     }
+    ]
+   },
+   {
+    "id": "panoramaanlage",
+    "name": "panoramaanlage",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "motortype",
+    "name": "motortype",
+    "label": "",
+    "options": [
+     {
+      "v": "iO",
+      "t": "iO"
+     },
+     {
+      "v": "kabelgebunden",
+      "t": "Kabelgebunden"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "9005",
+      "t": "9005 mat schwarz"
+     },
+     {
+      "v": "db703",
+      "t": "DB703 Metallic"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "remotecontrol",
+    "name": "remotecontrol",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Ja"
+     }
+    ]
+   },
+   {
+    "id": "sensor",
+    "name": "sensor",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Windsensor"
+     },
+     {
+      "v": "1",
+      "t": "Wind- und Regensensor"
+     },
+     {
+      "v": "2",
+      "t": "kein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "roofwidth",
+    "name": "roofwidth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "roofdepth",
+    "name": "roofdepth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "numberoffields",
+    "name": "numberoffields",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "colorcloth",
+    "name": "colorcloth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "offsetleft",
+    "name": "offsetleft",
+    "type": "text",
+    "value": "0",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "offsetright",
+    "name": "offsetright",
+    "type": "text",
+    "value": "0",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "orangeline_plus_poly": {
+  "productId": "46080ea024ed90c",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "3eb084aa3e1cc7c",
+      "t": "Polycarbonaat opaal 5X 16mm (standaard) ecoline"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "7670ec72b137d64",
+      "t": "Polycarbonaat helder 5X 16mm (standaard) ecoline"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_980_quantity",
+    "name": "dakplaten_980_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "orangeline_plus_glas": {
+  "productId": "7f29b6efcd8923b",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "orangeline_poly": {
+  "productId": "635f3b79d4f1ca4",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "780e8916cf62ee5",
+      "t": "Polycarbonat opal 5X 16mm - matt / milch (Standard) (11290)"
+     },
+     {
+      "v": "3eb084aa3e1cc7c",
+      "t": "Polycarbonaat opaal 5X 16mm (standaard) ecoline"
+     },
+     {
+      "v": "3b1613c9a16d80b",
+      "t": "Polycarbonat 5X 16mm - klar (Standard) (11288)"
+     },
+     {
+      "v": "7670ec72b137d64",
+      "t": "Polycarbonaat helder 5X 16mm (standaard) ecoline"
+     },
+     {
+      "v": "5a7bf2454e6a00f",
+      "t": "Polykarb. smokey grey (650) 16mm (11675)"
+     },
+     {
+      "v": "f963d751b5a2ad8",
+      "t": "Polycarb. IR Gold 16mm - matt / milch"
+     },
+     {
+      "v": "2dcbee093a5bbec",
+      "t": "Polycarb. IR Gold 16mm - klar"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_980_quantity",
+    "name": "dakplaten_980_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "orangeline_glas": {
+  "productId": "633d1f3970384c7",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "2000",
+      "t": "2000-mm"
+     },
+     {
+      "v": "2500",
+      "t": "2500-mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "9007",
+      "t": "9007 Graualuminium"
+     },
+     {
+      "v": "9010",
+      "t": "9010LC Reinweiß"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Small"
+     },
+     {
+      "v": "medium",
+      "t": "Medium"
+     },
+     {
+      "v": "large",
+      "t": "Large"
+     },
+     {
+      "v": "extra-large",
+      "t": "Extra Large"
+     },
+     {
+      "v": "extra-large-plus",
+      "t": "Extra Large en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "inzets",
+    "name": "inzets",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "freestanding",
+    "name": "freestanding",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "Nein"
+     },
+     {
+      "v": "1",
+      "t": "Freistehend"
+     },
+     {
+      "v": "2",
+      "t": "mit Stahlfundamenten"
+     }
+    ]
+   },
+   {
+    "id": "verlichting-id-",
+    "name": "verlichting[id]",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "d8fa7e4ed2c6116",
+      "t": "10er led set IP55 erweiterbar bis max. 13 spots"
+     },
+     {
+      "v": "fa1eccf1a06f6a1",
+      "t": "6er led set IP55 bis max. 9 spots (11664)"
+     },
+     {
+      "v": "f1e343da4d75daa",
+      "t": "LED Set Ultra- Designline, 6 Spots inkl. Dimmer, max. 12 (11948)"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ce104087dcff904-",
+    "name": "_fundering[ce104087dcff904]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-5e797f81579fcda-",
+    "name": "_fundering[5e797f81579fcda]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-8e5ff272d3f3d2f-",
+    "name": "_fundering[8e5ff272d3f3d2f]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6cef79e0c0e783a-",
+    "name": "_fundering[6cef79e0c0e783a]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-6d3d31879adb6d0-",
+    "name": "_fundering[6d3d31879adb6d0]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-e6c92547890540e-",
+    "name": "_fundering[e6c92547890540e]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "verlichting-quantity-",
+    "name": "verlichting[quantity]",
+    "type": "text",
+    "value": "1",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "skyline": {
+  "productId": "81ba1579ee8d633",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Ligger SK"
+     },
+     {
+      "v": "standard-plus",
+      "t": "Ligger SK en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger_led",
+    "name": "ligger_led",
+    "type": "text",
+    "value": "0",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ef650f9ec1fd11b-",
+    "name": "_fundering[ef650f9ec1fd11b]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-29dd6b88cb3e854-",
+    "name": "_fundering[29dd6b88cb3e854]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ },
+ "skyline_frei": {
+  "productId": "f06d1e432fc087e",
+  "title": "",
+  "selects": [
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     },
+     {
+      "v": "6000",
+      "t": "6000-mm"
+     },
+     {
+      "v": "7000",
+      "t": "7000-mm"
+     }
+    ]
+   },
+   {
+    "id": "",
+    "name": "",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "3000",
+      "t": "3000-mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500-mm"
+     },
+     {
+      "v": "4000",
+      "t": "4000-mm"
+     },
+     {
+      "v": "4500",
+      "t": "4500-mm"
+     },
+     {
+      "v": "5000",
+      "t": "5000-mm"
+     }
+    ]
+   },
+   {
+    "id": "color",
+    "name": "color",
+    "label": "",
+    "options": [
+     {
+      "v": "",
+      "t": ""
+     },
+     {
+      "v": "7016",
+      "t": "7016LC Anthrazitgrau"
+     },
+     {
+      "v": "raw",
+      "t": "RAL Strukturfarbe wählen"
+     }
+    ]
+   },
+   {
+    "id": "height",
+    "name": "height",
+    "label": "",
+    "options": [
+     {
+      "v": "2400",
+      "t": "2400mm"
+     },
+     {
+      "v": "3000",
+      "t": "3000mm"
+     },
+     {
+      "v": "3500",
+      "t": "3500mm"
+     }
+    ]
+   },
+   {
+    "id": "goot_versteviging",
+    "name": "goot_versteviging",
+    "label": "",
+    "options": [
+     {
+      "v": "0",
+      "t": "exlusive"
+     },
+     {
+      "v": "1",
+      "t": "Inklusiv"
+     },
+     {
+      "v": "2",
+      "t": "inklusive und vormontiert"
+     }
+    ]
+   },
+   {
+    "id": "dakplaten",
+    "name": "dakplaten",
+    "label": "",
+    "options": [
+     {
+      "v": "4715dc6ccf4dff9",
+      "t": "VSG 8mm - klar (Standard) (11128)"
+     },
+     {
+      "v": "a15acd23a51cd8d",
+      "t": "VSG 8mm - matt / milch (11129)"
+     },
+     {
+      "v": "e5a6cf350582c46",
+      "t": "VSG 8mm - grau (Standard) (11905)"
+     },
+     {
+      "v": "d6a5cd2281f3b60",
+      "t": "Glas 10mm VSG Klar (11131)"
+     },
+     {
+      "v": "933082dd3a64a46",
+      "t": "VSG 10mm - matt / milch (11132)"
+     },
+     {
+      "v": "4fbe1497f9bc242",
+      "t": "Sonnenschutzglas klar 55.2 (11391)"
+     },
+     {
+      "v": "",
+      "t": "ohne Dacheindeckung"
+     }
+    ]
+   },
+   {
+    "id": "ligger_type",
+    "name": "ligger_type",
+    "label": "",
+    "options": [
+     {
+      "v": "standard",
+      "t": "Ligger SK"
+     },
+     {
+      "v": "standard-plus",
+      "t": "Ligger SK en versteviging"
+     }
+    ]
+   },
+   {
+    "id": "standard_kit",
+    "name": "standard_kit",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "hole_drill",
+    "name": "hole_drill",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   },
+   {
+    "id": "bocht_90",
+    "name": "bocht_90",
+    "label": "",
+    "options": [
+     {
+      "v": "1",
+      "t": "Ja"
+     },
+     {
+      "v": "0",
+      "t": "Nein"
+     }
+    ]
+   }
+  ],
+  "inputs": [
+   {
+    "id": "width",
+    "name": "width",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "depth",
+    "name": "depth",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "staander",
+    "name": "staander",
+    "type": "text",
+    "value": "2",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "goot_warning",
+    "name": "goot_warning",
+    "type": "checkbox",
+    "value": "1",
+    "placeholder": "",
+    "label": "Das Ändern der Pfosten/Ständeranzahl erfolgt auf eigenes Risiko, bitte"
+   },
+   {
+    "id": "dakplaten_custom_quantity",
+    "name": "dakplaten_custom_quantity",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "dakplaten_custom_size",
+    "name": "dakplaten_custom_size",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger",
+    "name": "ligger",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "ligger_led",
+    "name": "ligger_led",
+    "type": "text",
+    "value": "0",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-ef650f9ec1fd11b-",
+    "name": "_fundering[ef650f9ec1fd11b]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   },
+   {
+    "id": "fundering-29dd6b88cb3e854-",
+    "name": "_fundering[29dd6b88cb3e854]",
+    "type": "text",
+    "value": "",
+    "placeholder": "",
+    "label": ""
+   }
+  ],
+  "texts": []
+ }
+}

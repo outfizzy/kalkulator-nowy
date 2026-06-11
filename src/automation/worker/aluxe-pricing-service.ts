@@ -318,11 +318,11 @@ export class AluxePricingService {
     // Premium
     designstyle:           { minW: 3000, maxW: 6000, minD: 2000, maxD: 4500 },
     designline:            { minW: 3000, maxW: 6000, minD: 2000, maxD: 4500 },
-    ultrastyle:            { minW: 3000, maxW: 7000, minD: 2000, maxD: 5000 },
-    ultrastyle_classic:    { minW: 3000, maxW: 7000, minD: 2000, maxD: 5000 },
-    ultrastyle_style:      { minW: 3000, maxW: 7000, minD: 2000, maxD: 5000 },
-    ultrastyle_compact:    { minW: 3000, maxW: 7000, minD: 2000, maxD: 5000 },
-    ultraline:             { minW: 3000, maxW: 7000, minD: 2000, maxD: 5000 },
+    ultrastyle:            { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultrastyle_classic:    { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultrastyle_style:      { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultrastyle_compact:    { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
+    ultraline:             { minW: 3000, maxW: 7000, minD: 2000, maxD: 6000 }, // snapowane do progow 5000/6000/7000 × 3000-6000
     skystyle:              { minW: 3000, maxW: 6000, minD: 3000, maxD: 5000 },
     skyline:               { minW: 3000, maxW: 6000, minD: 3000, maxD: 5000 },
     skyline_frei:          { minW: 3000, maxW: 6000, minD: 3000, maxD: 5000 },
@@ -732,8 +732,28 @@ export class AluxePricingService {
       await p.selectOption('#ultra_type', variant).catch(() => {});
       cfg.ultra_type = variant;
       await p.waitForTimeout(300); // Wait for form update
+
+      // Ultraline przyjmuje WYLACZNIE wymiary z progow (zmierzone skanem formularza):
+      // szerokosc {5000, 6000, 7000}, glebokosc {3000, 3500, 4000, 4500, 5000, 6000}.
+      // Wpisanie wartosci spoza progow = walidacja odrzuca (stad bylo ~20% skutecznosci).
+      const snapTo = (v: number, steps: number[]) => {
+        const up = steps.find(st => st >= v);
+        return String(up ?? steps[steps.length - 1]);
+      };
+      req = { ...req,
+        width: parseInt(snapTo(req.width, [5000, 6000, 7000])),
+        depth: parseInt(snapTo(req.depth, [3000, 3500, 4000, 4500, 5000, 6000])),
+      };
+      // formularz ma tez pomocnicze selecty progow — ustaw oba zrodla
+      const stepSelects = await p.$$('select:not([id])');
+      if (stepSelects.length >= 2) {
+        await stepSelects[0].selectOption(String(req.width)).catch(() => {});
+        await p.waitForTimeout(200);
+        await stepSelects[1].selectOption(String(req.depth)).catch(() => {});
+        await p.waitForTimeout(200);
+      }
     }
-    
+
     await p.fill('#width', String(req.width));
     cfg.width = String(req.width);
     
@@ -924,22 +944,21 @@ export class AluxePricingService {
     const w = snap(req.width, 1500, 3500);
     const h = snap(req.depth, 1000, 3000);
 
-    const dimSelects = await p.$$('select:not([id])');
-    if (dimSelects.length >= 2) {
-      await dimSelects[0].selectOption(w).catch(() => {});
-      await p.waitForTimeout(300);
-      await dimSelects[1].selectOption(h).catch(() => {});
-      await p.waitForTimeout(300);
-    } else {
-      await p.fill('#width', w).catch(() => {});
-      await p.fill('#depth', h).catch(() => {});
-    }
+    // UWAGA: kazda zmiana selecta moze PRZELADOWAC strone (uchwyty staja sie
+    // nieaktualne — 'Execution context was destroyed'). Dlatego: selektory
+    // tekstowe + waitForLoadState po kazdym kroku, bez trzymania uchwytow.
+    const safeStep = async (fn: () => Promise<unknown>) => {
+      await fn().catch(() => {});
+      await p.waitForLoadState('networkidle').catch(() => {});
+      await p.waitForTimeout(400);
+    };
+    await safeStep(() => p.selectOption('select:not([id]) >> nth=0', w));
+    await safeStep(() => p.selectOption('select:not([id]) >> nth=1', h));
     cfg.width = w;
     cfg.height = h;
 
     // Kolor: jedyna opcja to 'raw' (RAL Strukturfarbe) → pojawia sie select #ral_color
-    await p.selectOption('#color', 'raw').catch(() => {});
-    await p.waitForTimeout(600);
+    await safeStep(() => p.selectOption('#color', 'raw'));
     const ralSel = await p.$('#ral_color');
     if (ralSel) {
       const ralValue = await p.evaluate(`(function(){
