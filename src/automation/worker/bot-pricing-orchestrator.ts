@@ -379,6 +379,17 @@ export class BotPricingOrchestrator {
         const wantsEnclosure = req.wantsWintergarten === true
           || (req.requestedExtras || []).some(e => String(e).startsWith('panorama'));
         if (wantsEnclosure) {
+          // Aluxe ma 5 systemow panoram (zmierzone 5000×2200): AL22 tief 1299€ (szer. ≤6000),
+          // AL24 1299€ (≤7000), AL23 hoch 1397€, AL26 1397€, AL25 1495€. AL23 zawsze jako baza
+          // (wyzej), a przy zabudowie dokladamy tanszy system do konkurencji cenowej.
+          // AL25/AL26 drozsze przy prostszej formie — pomijane w automacie.
+          const budgetAl = (span: number) => span <= 6000
+            ? { line: 'panorama_al22', name: 'AL22' }
+            : { line: 'panorama_al24', name: 'AL24' };
+          const budgetFront = budgetAl(req.width);
+          const budgetSide = budgetAl(req.depth);
+          aluxeProducts.push({ key: 'panorama_budget_front', label: `Panorama ${budgetFront.name} — Front`, category: 'panorama', tier: 'accessory', req: { productLine: budgetFront.line, width: req.width, depth: 2200, color: req.color || '7016' } });
+          aluxeProducts.push({ key: 'panorama_budget_side', label: `Panorama ${budgetSide.name} — Seite`, category: 'panorama', tier: 'accessory', req: { productLine: budgetSide.line, width: req.depth, depth: 2200, color: req.color || '7016' } });
           aluxeProducts.push({ key: 'schiebeturen_front', label: 'Wand mit Schiebetüren — Front', category: 'panorama', tier: 'accessory', req: { productLine: 'schiebeturen', width: req.width, depth: 2200, color: req.color || '7016' } });
           aluxeProducts.push({ key: 'frontwand', label: 'Frontwand (Festverglasung)', category: 'wall', tier: 'accessory', req: { productLine: 'frontwand', width: req.width, depth: 2200, color: req.color || '7016' } });
           aluxeProducts.push({ key: 'feste_seitenelemente', label: 'Feste Seitenelemente', category: 'wall', tier: 'accessory', req: { productLine: 'feste_seitenelemente', width: req.depth, depth: 2200, color: req.color || '7016' } });
@@ -934,10 +945,12 @@ export class BotPricingOrchestrator {
     };
 
     // Helper: cheapest panorama (Schiebewand) per position —
-    // Aluxe AL23 vs MB ESG vs Aluxe Schiebetüren (front) vs Teranda SW450
+    // Aluxe AL23 vs tanszy system AL22/AL24 (przy zabudowie) vs MB ESG
+    // vs Aluxe Schiebetüren (front) vs Teranda SW450
     const cheapestPanorama = (pos: 'front' | 'side') => {
       const candidates = [
         { key: `panorama_al23_${pos}`, supplier: 'aluxe', confidence: 1.0 },
+        { key: `panorama_budget_${pos}`, supplier: 'aluxe', confidence: 1.0 },
         { key: `mb_panorama_${pos}`, supplier: 'mb', confidence: 0.95 },
         { key: `teranda_sw450_${pos}`, supplier: 'teranda', confidence: 1.0 },
         ...(pos === 'front' ? [{ key: 'schiebeturen_front', supplier: 'aluxe', confidence: 1.0 }] : []),
