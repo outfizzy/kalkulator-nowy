@@ -373,6 +373,17 @@ export class BotPricingOrchestrator {
         aluxeProducts.push({ key: 'senkrechtmarkise_front', label: `Senkrechtmarkise — Front${senkFront.units > 1 ? ` (${senkFront.units} Module)` : ''}`, category: 'senkrechtmarkise', tier: 'accessory', priceMultiplier: senkFront.units, req: { productLine: 'senkrechtmarkise', width: senkFront.unitW, depth: senkH, color: req.color || '7016' } });
         aluxeProducts.push({ key: 'senkrechtmarkise_side', label: `Senkrechtmarkise — Seite${senkSide.units > 1 ? ` (${senkSide.units} Module)` : ''}`, category: 'senkrechtmarkise', tier: 'accessory', priceMultiplier: senkSide.units, req: { productLine: 'senkrechtmarkise', width: senkSide.unitW, depth: senkH, color: req.color || '7016' } });
 
+        // Ściany Aluxe — przy zabudowie (Wintergarten / panorama na życzenie):
+        // Schiebetüren konkurują z panoramą AL23 i MB o miejsce w pakiecie,
+        // Frontwand i Feste Seitenelemente trafiają do cross-sellu
+        const wantsEnclosure = req.wantsWintergarten === true
+          || (req.requestedExtras || []).some(e => String(e).startsWith('panorama'));
+        if (wantsEnclosure) {
+          aluxeProducts.push({ key: 'schiebeturen_front', label: 'Wand mit Schiebetüren — Front', category: 'panorama', tier: 'accessory', req: { productLine: 'schiebeturen', width: req.width, depth: 2200, color: req.color || '7016' } });
+          aluxeProducts.push({ key: 'frontwand', label: 'Frontwand (Festverglasung)', category: 'wall', tier: 'accessory', req: { productLine: 'frontwand', width: req.width, depth: 2200, color: req.color || '7016' } });
+          aluxeProducts.push({ key: 'feste_seitenelemente', label: 'Feste Seitenelemente', category: 'wall', tier: 'accessory', req: { productLine: 'feste_seitenelemente', width: req.depth, depth: 2200, color: req.color || '7016' } });
+        }
+
         // Markizy: NAD dachem i POD dachem — konfigurowane pod MODEL KLIENTA
         // (Skyline nie ma opcji markizy w formularzu — pomijamy)
         const markiseRoofCode = roofCodeForModel(primaryModelId);
@@ -509,6 +520,40 @@ export class BotPricingOrchestrator {
         }
       }
       
+      // Ściany Teranda przy zabudowie: SW450 (przesuwna — konkurent panoramy),
+      // FW200 (stała), PL15 (plisa) — każde zapytanie to ~30-60s, więc tylko
+      // gdy klient faktycznie buduje zabudowę
+      const terandaEnclosure = req.wantsWintergarten === true
+        || (req.requestedExtras || []).some(e => String(e).startsWith('panorama'));
+      if (terandaEnclosure) {
+        const wallJobs: { key: string; label: string; category: LiveQuote['category']; product: 'sw450' | 'fw200' | 'pl15'; width: number }[] = [
+          { key: 'teranda_sw450_front', label: 'Schiebewand SW450 — Front', category: 'panorama', product: 'sw450', width: req.width },
+          { key: 'teranda_sw450_side', label: 'Schiebewand SW450 — Seite', category: 'panorama', product: 'sw450', width: req.depth },
+          { key: 'teranda_fw200_side', label: 'Festwand FW200 — Seite', category: 'wall', product: 'fw200', width: req.depth },
+          { key: 'teranda_pl15_front', label: 'Plissee PL15 — Front (Sonnenschutz)', category: 'senkrechtmarkise', product: 'pl15', width: req.width },
+        ];
+        for (const wj of wallJobs) {
+          console.log(`\n    🔄 ${wj.label}...`);
+          const t0 = Date.now();
+          try {
+            const priceResult = await svc.getPrice({
+              product: wj.product, width: wj.width, height: 2200,
+              color: req.color || 'RAL7016st', customerName: req.customerName,
+            });
+            const dur = Date.now() - t0;
+            if (priceResult.success && priceResult.netto && priceResult.netto > 0) {
+              result.prices[wj.key] = priceResult.netto;
+              console.log(`    ✅ ${wj.label}: EK ${priceResult.netto.toFixed(2)}€ [${(dur/1000).toFixed(1)}s]`);
+              result.quotes.push({ supplier: 'teranda', product: wj.key, productLabel: wj.label, category: wj.category, tier: 'accessory', price: priceResult.netto, success: true, durationMs: dur, source: 'live_configurator', confidence: 1.0, dimensions: `${wj.width}×2200mm` });
+            } else {
+              result.quotes.push({ supplier: 'teranda', product: wj.key, productLabel: wj.label, category: wj.category, tier: 'accessory', price: null, success: false, error: priceResult.error, durationMs: dur, source: 'live_configurator', confidence: 0 });
+            }
+          } catch (err) {
+            result.quotes.push({ supplier: 'teranda', product: wj.key, productLabel: wj.label, category: wj.category, tier: 'accessory', price: null, success: false, error: (err as Error).message, durationMs: Date.now() - t0, source: 'live_configurator', confidence: 0 });
+          }
+        }
+      }
+
       result.success = result.quotes.filter(q => q.success).length > 0;
       return result;
     };
@@ -755,6 +800,12 @@ export class BotPricingOrchestrator {
           () => getMbRoofPrice({ model: 'prime', widthMm: req.width, depthMm: req.depth }));
         mbQuote('mb_advanced', 'Pergola-Lamellendach Deluxe (Lamellen verschiebbar)', 'roof', 'mid', undefined,
           () => getMbRoofPrice({ model: 'advanced', widthMm: req.width, depthMm: req.depth }));
+        // Dynamic i Adaptive: tylko jako propozycje upgrade (cross-sell) —
+        // nie wchodzą do puli "najtańsza pergola" (inna klasa produktu)
+        mbQuote('mb_dynamic', 'Pergola-Lamellendach Dynamic', 'roof', 'mid', undefined,
+          () => getMbRoofPrice({ model: 'dynamic', widthMm: req.width, depthMm: req.depth }));
+        mbQuote('mb_adaptive', 'Pergola Adaptive (Textildach)', 'roof', 'mid', undefined,
+          () => getMbRoofPrice({ model: 'adaptive', widthMm: req.width, depthMm: req.depth }));
         mbQuote('mb_zip_front', 'Senkrechtmarkise — Front', 'senkrechtmarkise', 'accessory', undefined,
           () => getMbZipPrice({ widthMm: req.width, heightMm: h }) as any, `${req.width}×${h}mm`);
         mbQuote('mb_zip_side', 'Senkrechtmarkise — Seite', 'senkrechtmarkise', 'accessory', undefined,
@@ -882,11 +933,14 @@ export class BotPricingOrchestrator {
       };
     };
 
-    // Helper: cheapest panorama (Schiebewand) per position — Aluxe AL23 vs MB ESG
+    // Helper: cheapest panorama (Schiebewand) per position —
+    // Aluxe AL23 vs MB ESG vs Aluxe Schiebetüren (front) vs Teranda SW450
     const cheapestPanorama = (pos: 'front' | 'side') => {
       const candidates = [
         { key: `panorama_al23_${pos}`, supplier: 'aluxe', confidence: 1.0 },
         { key: `mb_panorama_${pos}`, supplier: 'mb', confidence: 0.95 },
+        { key: `teranda_sw450_${pos}`, supplier: 'teranda', confidence: 1.0 },
+        ...(pos === 'front' ? [{ key: 'schiebeturen_front', supplier: 'aluxe', confidence: 1.0 }] : []),
       ].filter(c => prices[c.key] && prices[c.key] > 0)
         .map(c => ({ ...c, price: prices[c.key] }))
         .sort((a, b) => a.price - b.price);
@@ -1029,8 +1083,11 @@ export class BotPricingOrchestrator {
       //   Basis = NAJTAŃSZA pergola · Empfohlen = model klienta
       //   (pergola_deluxe → lamele przesuwne = MB ADVANCED).
       // ══════════════════════════════════════════════════════════════
-      const pergolaQuotes = liveQuotes.filter(q => q.category === 'roof' && q.success && q.price !== null && q.price > 0);
-      const cheapestPergola = cheapestRoofOverall(liveQuotes);
+      const pergolaQuotes = liveQuotes.filter(q => q.category === 'roof' && q.success && q.price !== null && q.price > 0
+        && !['mb_dynamic', 'mb_adaptive'].includes(q.product));
+      const cheapestPergola = pergolaQuotes.length > 0
+        ? pergolaQuotes.reduce((a, b) => (a.price! < b.price!) ? a : b)
+        : null;
       const wantsDeluxe = primaryModelId === 'pergola_deluxe';
       const customerPergola = (wantsDeluxe
         ? pergolaQuotes.find(q => q.product === 'mb_advanced')
@@ -1634,6 +1691,25 @@ export class BotPricingOrchestrator {
       });
     }
     
+    // Ściany zabudowy (Frontwand / Feste Seitenelemente / FW200 / Plissee) → cross-sell
+    const wallCrossSell: { key: string; nameDE: string; cat: string; supplier: string; desc: string; icon: string; dims?: string }[] = [
+      { key: 'frontwand', nameDE: 'Frontwand (Festverglasung)', cat: 'fixed_wall', supplier: 'aluxe', desc: 'Feste Glasfront — Windschutz und Wärmedämmung für die Zabudowa', icon: '🪟', dims: `${req.width}×2200mm` },
+      { key: 'feste_seitenelemente', nameDE: 'Feste Seitenelemente', cat: 'fixed_wall', supplier: 'aluxe', desc: 'Feste Seitenverglasung — geschlossene Seiten Ihrer Überdachung', icon: '🪟', dims: `${req.depth}×2200mm` },
+      { key: 'teranda_fw200_side', nameDE: 'Festwand FW200 — Seite', cat: 'fixed_wall', supplier: 'teranda', desc: 'Feste Seitenwand — solide Alternative zur Schiebewand', icon: '🪟', dims: `${req.depth}×2200mm` },
+      { key: 'teranda_pl15_front', nameDE: 'Plissee PL15 (Sonnenschutz)', cat: 'senkrechtmarkise', supplier: 'teranda', desc: 'Plissee-Beschattung für die Glasfront', icon: '⛱️', dims: `${req.width}×2200mm` },
+    ];
+    for (const w of wallCrossSell) {
+      if (!prices[w.key]) continue;
+      const inPkg = packages.some(p2 => p2.items.some(i => i.name.includes(w.nameDE.split(' — ')[0])));
+      if (inPkg) continue;
+      const csCalc = calculateOfferPrice({ lineItems: [{ name: w.nameDE, aluxeNetPrice: prices[w.key], quantity: 1 }], skipMinimumMargin: true, transportAluxe: 0 });
+      crossSell.push({
+        name: w.key, nameDE: w.nameDE, category: w.cat, supplier: w.supplier,
+        purchaseNetto: prices[w.key], customerBrutto: csCalc.customerGrossPrice,
+        dimensions: w.dims, description: w.desc, icon: w.icon, confidence: 1.0, source: 'live_configurator',
+      });
+    }
+
     // Additional roof upgrades (show alternatives not in packages).
     // Carport pomijamy — drabinka pakietów już pokazuje wszystkie warianty,
     // a etykiety pakietów ≠ etykiety quote'ów (dedupe po nazwie nie działa).
