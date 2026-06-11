@@ -47,6 +47,21 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({ leadId, 
     const [purchaseTier, setPurchaseTier] = useState<string>('recommended');
     const [sendingEmail, setSendingEmail] = useState(false);
     const [sendingSMS, setSendingSMS] = useState(false);
+    // Auto-follow-upy: pauza per lead (cron pomija ten lead, dopóki włączona)
+    const [followupsPaused, setFollowupsPaused] = useState<boolean | null>(null);
+    const [pauseSaving, setPauseSaving] = useState(false);
+
+    const toggleFollowupsPause = async () => {
+        if (followupsPaused === null || pauseSaving) return;
+        const next = !followupsPaused;
+        setPauseSaving(true);
+        try {
+            const { error } = await supabase.from('leads').update({ followups_paused: next }).eq('id', leadId);
+            if (error) throw error;
+            setFollowupsPaused(next);
+        } catch (e) { console.error('followups pause error', e); }
+        finally { setPauseSaving(false); }
+    };
 
     const isAgentStatus = ['offer_agent', 'offer_agent_sent', 'needs_info'].includes(leadStatus);
 
@@ -72,10 +87,11 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({ leadId, 
             try {
                 const { data } = await supabase
                     .from('leads')
-                    .select('ai_analysis, ai_draft_email, ai_draft_sms, ai_sentiment, customer_data, pricing_details')
+                    .select('ai_analysis, ai_draft_email, ai_draft_sms, ai_sentiment, customer_data, pricing_details, followups_paused')
                     .eq('id', leadId)
                     .single();
                 if (data) {
+                    setFollowupsPaused((data as any).followups_paused === true);
                     const cd = (data as any).customer_data || {};
                     setLeadAI({
                         ai_analysis: (data as any).ai_analysis,
@@ -154,11 +170,29 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({ leadId, 
                         </p>
                     </div>
                 </div>
-                {pricingSource === 'live_configurator' && (
-                    <span className="px-2 py-0.5 bg-green-400/20 text-green-100 text-[10px] font-bold rounded-full border border-green-300/30">
-                        🔴 LIVE PRICING
-                    </span>
-                )}
+                <div className="flex items-center gap-2">
+                    {pricingSource === 'live_configurator' && (
+                        <span className="px-2 py-0.5 bg-green-400/20 text-green-100 text-[10px] font-bold rounded-full border border-green-300/30">
+                            🔴 LIVE PRICING
+                        </span>
+                    )}
+                    {/* Pauza auto-follow-upów dla TEGO leada */}
+                    {latestOffer && followupsPaused !== null && (
+                        <button
+                            onClick={toggleFollowupsPause}
+                            disabled={pauseSaving}
+                            title={followupsPaused
+                                ? 'Follow-upy wstrzymane dla tego leada — kliknij, aby wznowić'
+                                : 'Auto-follow-upy aktywne (jeśli włączone globalnie) — kliknij, aby wstrzymać dla tego leada'}
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition-colors cursor-pointer
+                                ${followupsPaused
+                                    ? 'bg-amber-400/30 text-amber-100 border-amber-300/40 hover:bg-amber-400/40'
+                                    : 'bg-white/10 text-violet-100 border-white/20 hover:bg-white/20'}`}
+                        >
+                            {pauseSaving ? '…' : followupsPaused ? '⏸ Follow-upy wstrzymane' : '▶ Follow-upy aktywne'}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Processing indicator */}

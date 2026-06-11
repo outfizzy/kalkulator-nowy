@@ -14,6 +14,7 @@ import { MorningCoffeeAI } from './MorningCoffeeAI';
 import { LiveCostWidget } from './LiveCostWidget';
 import { ServiceTicketsWidget } from './ServiceTicketsWidget';
 import { OfferActivityWidget } from './OfferActivityWidget';
+import { OfferFunnelWidget } from './OfferFunnelWidget';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
@@ -644,6 +645,9 @@ export const AdminDashboard: React.FC = () => {
                     <MiniTelephonyWidget />
                 </div>
             </div>
+
+            {/* ═══ LEJEK OFERT + STEROWANIE FOLLOW-UPAMI ═══ */}
+            <OfferFunnelWidget />
 
             {/* ═══ OFFER ACTIVITY WIDGET ═══ */}
             <OfferActivityWidget />
