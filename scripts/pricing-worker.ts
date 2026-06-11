@@ -1082,7 +1082,7 @@ async function main() {
         <!--[if !mso]><!--><a href="${offerUrl}" style="background-color:#1e40af;color:#ffffff;padding:18px 48px;border-radius:8px;text-decoration:none;font-weight:700;font-size:17px;display:inline-block;">Angebot jetzt ansehen &#8594;</a><!--<![endif]-->
       </td></tr>
     </table>
-    <p style="text-align:center;color:#64748b;font-size:12px;margin:0 0 8px;">Vergleichen Sie alle Varianten interaktiv und unverbindlich</p>
+    <p style="text-align:center;color:#64748b;font-size:12px;margin:0 0 8px;">Pakete vergleichen, Extras per Klick hinzuf&#252;gen und Ihren kostenlosen Aufma&#223;termin direkt online anfragen &#8212; unverbindlich</p>
   </td></tr>
 
   <!-- 3 USP Badges -->
@@ -1137,8 +1137,9 @@ async function main() {
     <p style="color:#1e293b;font-size:15px;font-weight:700;margin:0 0 14px;">In Ihrem interaktiven Angebot:</p>
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
       <tr><td style="padding:7px 0;color:#334155;font-size:14px;"><span style="color:#16a34a;font-weight:700;">&#10003;</span> &#160; ${variants.length} Varianten im direkten Vergleich</td></tr>
-      <tr><td style="padding:7px 0;color:#334155;font-size:14px;"><span style="color:#16a34a;font-weight:700;">&#10003;</span> &#160; Zusatzoptionen: Markisen, Schiebet&#252;ren, Beleuchtung</td></tr>
+      <tr><td style="padding:7px 0;color:#334155;font-size:14px;"><span style="color:#16a34a;font-weight:700;">&#10003;</span> &#160; Zusatzoptionen: Markisen, Schiebet&#252;ren, Beleuchtung &#8212; per Klick zur Wunschkonfiguration</td></tr>
       <tr><td style="padding:7px 0;color:#334155;font-size:14px;"><span style="color:#16a34a;font-weight:700;">&#10003;</span> &#160; Alle Preise transparent und verst&#228;ndlich</td></tr>
+      <tr><td style="padding:7px 0;color:#334155;font-size:14px;"><span style="color:#16a34a;font-weight:700;">&#10003;</span> &#160; Kostenlosen Aufma&#223;termin direkt online anfragen</td></tr>
       <tr><td style="padding:7px 0;color:#334155;font-size:14px;"><span style="color:#16a34a;font-weight:700;">&#10003;</span> &#160; Direkte Kontaktaufnahme per Telefon oder E-Mail</td></tr>
     </table>
   </td></tr>

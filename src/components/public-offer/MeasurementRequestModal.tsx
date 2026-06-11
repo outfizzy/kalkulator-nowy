@@ -8,9 +8,13 @@ interface MeasurementRequestModalProps {
     offerToken: string;
     offerId?: string;
     onClose: () => void;
+    /** Zusammenfassung der Wunschkonfiguration des Kunden — wandert mit in die Anfrage. */
+    configSummary?: string;
+    /** Wird nach erfolgreichem Absenden aufgerufen (Seite merkt sich den ✓-Zustand). */
+    onSuccess?: () => void;
 }
 
-export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = ({ offerToken, offerId, onClose }) => {
+export const MeasurementRequestModal: React.FC<MeasurementRequestModalProps> = ({ offerToken, offerId, onClose, configSummary, onSuccess }) => {
     const [selectedDays, setSelectedDays] = useState<string[]>([]);
     const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
     const [note, setNote] = useState('');
@@ -40,7 +44,7 @@ ANFRAGE AUFMASS
 Bevorzugte Tage: ${selectedDays.join(', ')}
 Bevorzugte Zeiten: ${selectedTimes.join(', ')}
 Notiz: ${note}
-
+${configSummary ? `\nGEWÄHLTE KONFIGURATION:\n${configSummary}\n` : ''}
 Bitte um Kontaktaufnahme zur Terminbestätigung.
         `.trim();
 
@@ -52,8 +56,10 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                 OfferService.notifyOfferAction(offerToken, 'measurement_requested', {
                     preferredDays: selectedDays.join(', '),
                     preferredTimes: selectedTimes.join(', '),
-                    note: note
+                    note: note,
+                    ...(configSummary ? { configSummary } : {}),
                 }).catch(() => { });
+                onSuccess?.();
                 onClose();
             } else {
                 toast.error('Fehler beim Senden.');
@@ -82,6 +88,14 @@ Bitte um Kontaktaufnahme zur Terminbestätigung.
                     <p className="text-sm text-slate-600 leading-relaxed">
                         Schlagen Sie für Sie passende Termine vor. Unser Berater wird Sie telefonisch kontaktieren, um das genaue Datum und die Uhrzeit für den Technikerbesuch zu bestätigen.
                     </p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 -mt-2">
+                        {['Dauer ca. 30–45 Min.', '100% kostenlos', 'Unverbindlich'].map(t => (
+                            <span key={t} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                {t}
+                            </span>
+                        ))}
+                    </div>
 
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bevorzugte Tage</label>

@@ -155,7 +155,7 @@ const CATEGORY_ICON_MAP: Record<string, string> = {
 /* ────────────────────────────────────────────────────────────── *
  *  PROPS
  * ────────────────────────────────────────────────────────────── */
-interface CrossSellItem {
+export interface CrossSellItem {
   name: string; nameDE: string; category: string; supplier: string;
   purchaseNetto: number; customerBrutto: number; dimensions?: string;
   description: string; icon: string; confidence: number; source: string;
@@ -181,6 +181,14 @@ interface BotOfferViewProps {
   /** Optional: open the contact form prefilled with interest in a given extra. */
   onRequestExtra?: (extraName: string) => void;
   selectedTier: TierVariant | null;
+  /** Warenkorb: extras the customer added to their configuration. */
+  cartExtras?: CrossSellItem[];
+  /** Toggle an extra in/out of the configuration (enables cart mode on extras). */
+  onToggleExtra?: (item: CrossSellItem) => void;
+  /** True once the customer submitted a measurement request (persists the ✓ state). */
+  measurementRequested?: boolean;
+  /** Date until which the Richtpreise are guaranteed (offer validity). */
+  validUntil?: string;
 }
 
 /* ── Image Gallery Sub-component (top-level: nie remountuje się przy renderze rodzica) ── */
@@ -235,6 +243,7 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
   offerNumber, creatorPhoneHref, creatorPhoneDisplay: creatorPhoneDisplayProp,
   onSelectTier, onRequestMeasurement, onAcceptOffer, onDownloadPDF,
   onRequestExtra, selectedTier,
+  cartExtras = [], onToggleExtra, measurementRequested = false, validUntil,
 }) => {
   const heroPhone = creatorPhoneHref || '+4935615019981';
   const heroPhoneLabel = creatorPhoneDisplayProp || '03561 501 9981';
@@ -356,6 +365,33 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
   // Installation cost actually used by the pricing worker (single source of
   // truth — the hardcoded display value drifted from the calculation before).
   const installationNet = (detailsSource as any)?.installationCostEUR || 1200;
+
+  /* ── WARENKORB (Wunschkonfiguration) ──
+   * Paket = Basis des Warenkorbs, Extras kommen on top. Netto der Extras wird
+   * aus dem Brutto zurückgerechnet (19% MwSt — gleiche Logik wie der Worker). */
+  const cartMode = typeof onToggleExtra === 'function';
+  const isInCart = (cs: CrossSellItem) => cartExtras.some(e => e.nameDE === cs.nameDE);
+  const extrasGross = cartExtras.reduce((s, e) => s + (e.customerBrutto || 0), 0);
+  const extrasNet = extrasGross / 1.19;
+  const cartBase = selectedTier || single;
+  const cartGross = (cartBase?.totalGrossEUR || 0) + extrasGross;
+  const cartNet = (cartBase?.totalNetEUR || 0) + extrasNet;
+  const hasEstimatedExtra = cartExtras.some(e => e.source !== 'live_configurator');
+
+  // Po Paketwahl: sanft zu den Extras scrollen (Schritt 2), sonst Konfiguration.
+  const handleTierSelect = (v: TierVariant) => {
+    const wasSelected = selectedTier?.id === v.id;
+    onSelectTier(v);
+    if (!wasSelected) {
+      setTimeout(() => {
+        const target = document.getElementById((crossSell || []).length > 0 ? 'offer-section-extras' : 'offer-section-config');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 250);
+    }
+  };
+  const scrollToConfig = () => {
+    document.getElementById('offer-section-config')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
 
   /* ══════════════════════════════════════════════════════════════
@@ -488,6 +524,50 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════
+       *  1b. PROZESS-STEPPER — orientiert den Kunden sofort:
+       *  Richtpreise = Schritt 2, das kostenlose Aufmaß ist der nächste
+       *  natürliche Schritt. Nimmt der Preisangabe die Schwere und macht
+       *  den Termin zum Ziel der Seite.
+       * ═══════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-card px-4 py-4 sm:px-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { n: 1, label: 'Anfrage', sub: 'erhalten', state: 'done' },
+            { n: 2, label: 'Ihre Planung', sub: 'mit Richtpreisen', state: 'current' },
+            { n: 3, label: 'Kostenloses Aufmaß', sub: 'bei Ihnen vor Ort', state: measurementRequested ? 'done' : 'next' },
+            { n: 4, label: 'Festpreis & Montage', sub: 'verbindlich nach Aufmaß', state: 'todo' },
+          ].map((st) => (
+            <div key={st.n} className={`flex items-start gap-2.5 rounded-xl px-2.5 py-2 ${
+              st.state === 'current' ? 'bg-[#EAF2FE]' : st.state === 'next' ? 'bg-emerald-50/70 ring-1 ring-emerald-100' : ''
+            }`}>
+              <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black mt-0.5
+                ${st.state === 'done' ? 'bg-emerald-500 text-white'
+                  : st.state === 'current' ? 'bg-[#1E6FD9] text-white'
+                  : st.state === 'next' ? 'bg-white text-emerald-600 ring-2 ring-emerald-300'
+                  : 'bg-slate-100 text-slate-400'}`}>
+                {st.state === 'done' ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : st.n}
+              </span>
+              <div className="min-w-0">
+                <p className={`text-[12px] font-bold leading-tight ${
+                  st.state === 'current' ? 'text-[#1E6FD9]' : st.state === 'next' ? 'text-emerald-700' : 'text-slate-700'
+                }`}>
+                  {st.label}
+                  {st.state === 'current' && <span className="ml-1.5 text-[9px] font-black uppercase tracking-wide bg-[#1E6FD9] text-white rounded px-1 py-px align-middle">Sie sind hier</span>}
+                </p>
+                <p className="text-[10.5px] text-slate-400 leading-tight mt-0.5">{st.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 pt-3 border-t border-slate-100 text-[12px] text-slate-500 leading-relaxed">
+          Alle Preise sind sorgfältig kalkulierte <strong className="text-slate-700">Richtpreise</strong> auf
+          Basis Ihrer Angaben. Den <strong className="text-slate-700">verbindlichen Festpreis</strong> erhalten
+          Sie nach dem <button onClick={onRequestMeasurement} className="font-bold text-[#1E6FD9] hover:underline bg-transparent border-none cursor-pointer p-0">kostenlosen
+          Aufmaß vor Ort</button> — dort klären wir gemeinsam alle Details Ihres Auftrags. Unverbindlich.
+        </p>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -691,7 +771,7 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
               {/* ── CTA ── */}
               <div className="px-5 md:px-7 pb-6 pt-1">
                 <button
-                  onClick={() => onSelectTier(v)}
+                  onClick={() => handleTierSelect(v)}
                   aria-pressed={isSelected}
                   className={`w-full min-h-[48px] py-3.5 rounded-full font-semibold text-[14px] text-white
                     transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer border-none
@@ -702,7 +782,7 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
                 >
                   {isSelected && <Check className="w-4 h-4" />}
                   {isSelected
-                    ? 'Paket gewählt — Schritt 1/3'
+                    ? 'Gewählt — jetzt Extras ansehen'
                     : isSingle
                       ? 'Dieses Angebot wählen'
                       : highlightRec
@@ -1090,23 +1170,34 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
               ))}
             </div>
 
-            <button
-              onClick={onRequestMeasurement}
-              className="w-full sm:w-auto px-10 py-4 min-h-[48px] rounded-full font-semibold text-[15px] text-white
-                bg-[#1E6FD9] hover:bg-[#195FC0]
-                shadow-cta transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
-                border-none cursor-pointer flex items-center justify-center gap-2
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB1FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1628]"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
-              </svg>
-              Aufmaßtermin vereinbaren
-            </button>
-            <p className="text-[11px] text-slate-500 mt-3">
-              Innerhalb 48h · In Ihrer Region · 100% kostenlos
-            </p>
+            {measurementRequested ? (
+              <div className="inline-flex items-center gap-3 rounded-full bg-emerald-500/15 border border-emerald-400/30 px-6 py-3.5">
+                <span className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                  <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                </span>
+                <span className="text-[14px] font-bold text-emerald-200">Aufmaß angefragt — wir melden uns innerhalb 24h</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={onRequestMeasurement}
+                  className="w-full sm:w-auto px-10 py-4 min-h-[48px] rounded-full font-semibold text-[15px] text-white
+                    bg-[#1E6FD9] hover:bg-[#195FC0]
+                    shadow-cta transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                    border-none cursor-pointer flex items-center justify-center gap-2
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB1FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1628]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
+                  </svg>
+                  Kostenloses Aufmaß vereinbaren
+                </button>
+                <p className="text-[11px] text-slate-500 mt-3">
+                  Antwort innerhalb 24h · In Ihrer Region · 100% kostenlos &amp; unverbindlich
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1123,12 +1214,25 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
 
         return (
           <div id="offer-section-extras" className="bg-white rounded-2xl border border-[#E5E7EB] shadow-card overflow-hidden">
-            <div className="px-6 py-5 md:px-8 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2.5">
-                <SvgIcon name="bolt" className="w-5 h-5 text-amber-500" />
-                Optionale Extras
-              </h3>
-              <p className="text-sm text-slate-400 mt-0.5 ml-[30px]">Erweitern Sie Ihr Paket nach Ihren Wünschen</p>
+            <div className="px-6 py-5 md:px-8 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2.5">
+                  <SvgIcon name="bolt" className="w-5 h-5 text-amber-500" />
+                  {cartMode ? 'Stellen Sie Ihre Wunsch-Ausstattung zusammen' : 'Optionale Extras'}
+                </h3>
+                <p className="text-sm text-slate-400 mt-0.5 ml-[30px]">
+                  {cartMode
+                    ? 'Mit einem Klick zum Paket hinzufügen — die Summe aktualisiert sich sofort'
+                    : 'Erweitern Sie Ihr Paket nach Ihren Wünschen'}
+                </p>
+              </div>
+              {cartMode && cartExtras.length > 0 && (
+                <button onClick={scrollToConfig}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold
+                    text-[#1E6FD9] bg-[#EAF2FE] border border-[#BFD9FB] cursor-pointer hover:bg-[#DCEAFD] transition-colors">
+                  <SvgIcon name="pkg" className="w-3.5 h-3.5" /> {cartExtras.length} gewählt
+                </button>
+              )}
             </div>
             <div className="p-4 md:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {visible.map((cs, i) => {
@@ -1169,7 +1273,24 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
                           <span className={`w-1.5 h-1.5 rounded-full ${cs.source === 'live_configurator' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                           {cs.source === 'live_configurator' ? 'Exakter Preis' : 'Richtpreis'}
                         </span>
-                        {(() => {
+                        {cartMode ? (() => {
+                          const inCart = isInCart(cs);
+                          return (
+                            <button
+                              onClick={() => onToggleExtra?.(cs)}
+                              aria-pressed={inCart}
+                              className={`text-[11px] font-bold rounded-lg px-3 py-1.5 cursor-pointer transition-colors border inline-flex items-center gap-1
+                                focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1
+                                ${inCart
+                                  ? 'text-white bg-emerald-500 border-emerald-500 hover:bg-emerald-600'
+                                  : 'text-[#1E6FD9] bg-[#EAF2FE] hover:bg-[#DCEAFD] border-[#BFD9FB]'}`}
+                            >
+                              {inCart
+                                ? (<><Check className="w-3 h-3" strokeWidth={3} /> Hinzugefügt</>)
+                                : (<><Plus className="w-3 h-3" strokeWidth={3} /> Hinzufügen</>)}
+                            </button>
+                          );
+                        })() : (() => {
                           const isRequested = requestedExtras.has(cs.nameDE);
                           return (
                             <button
@@ -1188,6 +1309,14 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
                           );
                         })()}
                       </div>
+                      {cartMode && (
+                        <button
+                          onClick={() => onRequestExtra?.(cs.nameDE)}
+                          className="mt-2 text-[10.5px] font-semibold text-slate-400 hover:text-[#1E6FD9] bg-transparent border-none cursor-pointer p-0 transition-colors"
+                        >
+                          Frage zu diesem Extra stellen →
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1245,23 +1374,36 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-       *  9. SELECTED TIER SUMMARY (Desktop)
+       *  9. IHRE WUNSCHKONFIGURATION — Warenkorb-Karte (alle Geräte).
+       *  Paket + gewählte Extras + Live-Summe. Der Kunde „besitzt" seine
+       *  Konfiguration; der primäre Abschluss ist das kostenlose Aufmaß.
        * ═══════════════════════════════════════════════════════ */}
       {selectedTier && (
-        <div className="hidden md:block bg-brand-gradient rounded-2xl p-8 text-white" id="price-section">
+        <div className="bg-brand-gradient rounded-2xl p-6 md:p-8 text-white" id="offer-section-config">
           {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <SvgIcon name={TIER_STYLES[selectedTier.tier]?.iconName || 'pkg'} className="w-5 h-5" />
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                <SvgIcon name={TIER_STYLES[selectedTier.tier]?.iconName || 'pkg'} className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Ihre Wunschkonfiguration</p>
+                <p className="text-xl font-extrabold truncate">
+                  {clean(selectedTier.label)}
+                  {cartExtras.length > 0 && <span className="text-sm font-bold text-white/60"> + {cartExtras.length} Extra{cartExtras.length > 1 ? 's' : ''}</span>}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Ihr ausgewähltes Paket</p>
-              <p className="text-xl font-extrabold">{clean(selectedTier.label)}</p>
-            </div>
+            {validUntil && (
+              <span className="hidden sm:inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.07] border border-white/10 text-[10.5px] font-semibold text-white/70">
+                <SvgIcon name="shield" className="w-3.5 h-3.5 text-emerald-400" />
+                Preise garantiert bis {validUntil}
+              </span>
+            )}
           </div>
 
-          {/* Positions */}
-          <div className="space-y-0 mb-5">
+          {/* Paket-Positionen */}
+          <div className="space-y-0 mb-2">
             {((selectedTier as any).customerPositions || []).map((pos: any, i: number) => (
               <div key={i} className="flex items-start justify-between py-2.5 border-b border-white/[0.06]">
                 <div className="flex items-start gap-2 min-w-0">
@@ -1280,39 +1422,100 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
             ))}
           </div>
 
-          {/* Price breakdown */}
+          {/* Gewählte Extras — entfernbar */}
+          {cartExtras.length > 0 && (
+            <div className="mb-5">
+              <p className="text-[10px] text-emerald-300/80 font-bold uppercase tracking-widest pt-2 pb-1">Ihre Extras</p>
+              {cartExtras.map((e, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-white/[0.06] gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 w-4 h-4 rounded bg-emerald-400/20 flex items-center justify-center">
+                      <Plus className="w-2.5 h-2.5 text-emerald-300" strokeWidth={3} />
+                    </span>
+                    <p className="text-[13px] text-slate-200 truncate">{e.nameDE}</p>
+                    {e.source !== 'live_configurator' && (
+                      <span className="shrink-0 text-[9px] font-bold uppercase text-amber-300/80">Richtpreis</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="text-[13px] font-semibold tabular-nums text-slate-200">
+                      +{fmt(showGross ? e.customerBrutto : e.customerBrutto / 1.19)} €
+                    </span>
+                    {onToggleExtra && (
+                      <button onClick={() => onToggleExtra(e)} title="Entfernen"
+                        className="w-6 h-6 rounded-full bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 text-slate-400 hover:text-white cursor-pointer flex items-center justify-center transition-colors">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3 h-3"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Preisaufstellung */}
           <div className="pt-4 border-t border-white/10 space-y-1.5">
             <div className="flex justify-between text-[13px]">
               <span className="text-slate-400">Summe netto</span>
-              <span className="font-semibold tabular-nums">{fmt2(selectedTier.totalNetEUR)} €</span>
+              <span className="font-semibold tabular-nums">{fmt2(cartNet)} €</span>
             </div>
             <div className="flex justify-between text-[13px]">
               <span className="text-slate-400">MwSt. 19%</span>
-              <span className="font-semibold tabular-nums">{fmt2(selectedTier.totalGrossEUR - selectedTier.totalNetEUR)} €</span>
+              <span className="font-semibold tabular-nums">{fmt2(cartGross - cartNet)} €</span>
             </div>
             <div className="h-px bg-white/15 my-2" />
             <div className="flex justify-between items-end">
               <span className="text-lg font-bold">Gesamtpreis</span>
-              <span className="text-3xl font-black tabular-nums tracking-tight">{fmt2(selectedTier.totalGrossEUR)} €</span>
+              <span className="text-3xl font-black tabular-nums tracking-tight">{fmt2(cartGross)} €</span>
             </div>
-            <p className="text-[11px] text-slate-500">inkl. MwSt., Lieferung & Montage</p>
+            <p className="text-[11px] text-slate-500">
+              inkl. MwSt., Lieferung &amp; Montage{hasEstimatedExtra ? ' · Extras teils Richtpreis' : ''}
+            </p>
           </div>
 
-          {/* CTA */}
-          <button
-            onClick={onAcceptOffer}
-            className="w-full mt-6 py-4 min-h-[48px] rounded-full font-semibold text-[15px] text-white
-              bg-[#1E6FD9] hover:bg-[#195FC0]
-              shadow-cta transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
-              border-none cursor-pointer flex items-center justify-center gap-2
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB1FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1628]"
-          >
-            <Check className="w-5 h-5" />
-            Angebot annehmen & Aufmaß vereinbaren
-          </button>
-          <p className="text-center text-[11px] text-slate-500 mt-2.5">
-            Unverbindliche Vormerkung · Wir melden uns innerhalb 24h
-          </p>
+          {/* CTAs — Ziel Nr. 1: kostenloses Aufmaß */}
+          {measurementRequested ? (
+            <div className="mt-6 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 px-5 py-4 flex items-start gap-3">
+              <span className="shrink-0 w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center mt-0.5">
+                <Check className="w-4 h-4 text-white" strokeWidth={3} />
+              </span>
+              <div>
+                <p className="text-[14px] font-bold text-emerald-200">Aufmaß angefragt — vielen Dank!</p>
+                <p className="text-[12px] text-emerald-100/70 leading-relaxed mt-0.5">
+                  Wir melden uns innerhalb von 24h zur Terminbestätigung. Ihre Konfiguration
+                  liegt unserem Fachberater bereits vor.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={onRequestMeasurement}
+                className="w-full mt-6 py-4 min-h-[48px] rounded-full font-semibold text-[15px] text-white
+                  bg-[#1E6FD9] hover:bg-[#195FC0]
+                  shadow-cta transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                  border-none cursor-pointer flex items-center justify-center gap-2
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB1FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1628]"
+              >
+                <SvgIcon name="calendar" className="w-5 h-5" />
+                Kostenloses Aufmaß vereinbaren
+              </button>
+              <p className="text-center text-[11px] text-slate-500 mt-2.5">
+                Unverbindlich &amp; kostenlos · Ihre Konfiguration geht direkt an Ihren Berater
+              </p>
+              {onAcceptOffer && (
+                <button
+                  onClick={onAcceptOffer}
+                  className="w-full mt-3 py-3 rounded-full font-semibold text-[13px] text-white
+                    bg-white/[0.08] hover:bg-white/[0.15] border border-white/15
+                    transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Konfiguration verbindlich vormerken
+                </button>
+              )}
+            </>
+          )}
           {onDownloadPDF && (
             <button
               onClick={onDownloadPDF}
@@ -1352,6 +1555,7 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
       {(() => {
         // For N=1 the single package acts as the context even before an explicit tap.
         const effective = selectedTier || single;
+        const stickyGross = (effective?.totalGrossEUR || 0) + (selectedTier ? extrasGross : 0);
         return (
           <div className="fixed bottom-0 inset-x-0 z-50 md:hidden
             bg-[#0A1628]/[0.97] backdrop-blur-xl border-t border-white/10
@@ -1363,25 +1567,39 @@ export const BotOfferView: React.FC<BotOfferViewProps> = ({
                   <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider leading-none flex items-center gap-1 truncate">
                     <SvgIcon name={TIER_STYLES[effective.tier]?.iconName || 'pkg'} className="w-3 h-3 shrink-0" />
                     <span className="truncate">{clean(effective.label)}</span>
+                    {selectedTier && cartExtras.length > 0 && (
+                      <span className="shrink-0 text-[9px] font-black text-emerald-300">+{cartExtras.length} Extra{cartExtras.length > 1 ? 's' : ''}</span>
+                    )}
                   </p>
                   <p className="text-xl font-black text-white tabular-nums tracking-tight mt-0.5">
-                    {fmt(effective.totalGrossEUR)} € <span className="text-[10px] font-medium text-slate-400">inkl. MwSt.</span>
+                    {fmt(stickyGross)} € <span className="text-[10px] font-medium text-slate-400">inkl. MwSt.</span>
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    // Make sure a tier is committed (covers N=1 / not-yet-tapped), then advance.
-                    if (!selectedTier && effective) onSelectTier(effective);
-                    onAcceptOffer?.();
-                  }}
-                  className="px-6 py-3 min-h-[48px] rounded-full font-semibold text-[14px] text-white whitespace-nowrap
-                    bg-[#1E6FD9] hover:bg-[#195FC0]
-                    shadow-cta border-none cursor-pointer
-                    active:scale-[0.97] transition-all duration-300
-                    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB1FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1628]"
-                >
-                  Weiter →
-                </button>
+                {measurementRequested ? (
+                  <button
+                    onClick={scrollToConfig}
+                    className="px-5 py-3 min-h-[48px] rounded-full font-semibold text-[13px] text-emerald-300 whitespace-nowrap
+                      bg-emerald-500/15 border border-emerald-400/30 cursor-pointer
+                      active:scale-[0.97] transition-all duration-300 flex items-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" strokeWidth={3} /> Aufmaß angefragt
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      // Make sure a tier is committed (covers N=1 / not-yet-tapped), then book.
+                      if (!selectedTier && effective) onSelectTier(effective);
+                      onRequestMeasurement ? onRequestMeasurement() : onAcceptOffer?.();
+                    }}
+                    className="px-5 py-3 min-h-[48px] rounded-full font-semibold text-[13.5px] text-white whitespace-nowrap
+                      bg-[#1E6FD9] hover:bg-[#195FC0]
+                      shadow-cta border-none cursor-pointer
+                      active:scale-[0.97] transition-all duration-300 flex items-center gap-1.5
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6DB1FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1628]"
+                  >
+                    <SvgIcon name="calendar" className="w-4 h-4" /> Aufmaß vereinbaren
+                  </button>
+                )}
               </>
             ) : (
               <>

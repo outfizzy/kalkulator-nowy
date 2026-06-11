@@ -6,7 +6,7 @@ import { DatabaseService } from '../../services/database';
 import { LeadForm } from './LeadForm';
 import type { Lead, Communication, Offer, MailboxConfig } from '../../types';
 import { supabase } from '../../lib/supabase';
-import { TelephonyService, getRecordingProxyUrl, type CallLog, type SMSLog } from '../../services/database/telephony.service';
+import { TelephonyService, type CallLog, type SMSLog } from '../../services/database/telephony.service';
 import { CommunicationTimeline } from '../crm/CommunicationTimeline';
 import { UnifiedTimeline, calculateEngagementScore } from '../crm/UnifiedTimeline';
 import { OffersList } from '../OffersList';
@@ -110,9 +110,10 @@ export const LeadDetailsPage: React.FC = () => {
     const [configurations, setConfigurations] = useState<LeadConfiguration[]>([]);
     const [generatingLink, setGeneratingLink] = useState(false);
     const [callLogs, setCallLogs] = useState<CallLog[]>([]);
-    const [callsLoading, setCallsLoading] = useState(false);
-    const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
-    const [showTranscription, setShowTranscription] = useState<string | null>(null);
+    const [, setCallsLoading] = useState(false);
+    // Mapa referencji montowana dopiero po kliknięciu — jej geokodowanie (Nominatim,
+    // do 40 zapytań po 250 ms) potrafiło blokować przegląd leada na kilkanaście sekund
+    const [showNearbyRefs, setShowNearbyRefs] = useState(false);
     const [isSMSModalOpen, setIsSMSModalOpen] = useState(false);
     const [smsLogs, setSmsLogs] = useState<SMSLog[]>([]);
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
@@ -697,52 +698,74 @@ export const LeadDetailsPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ═══ MEASUREMENT SUGGESTIONS + REFERENCE MAP ═══ */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                            {/* Measurement proximity suggestions */}
-                            {lead.status !== 'won' && lead.status !== 'lost' && (
-                                <MeasurementSuggestionWidget
-                                    leadAddress={lead.customerData.address || (lead.customerData as any).street || ''}
-                                    leadCity={lead.customerData.city}
-                                    leadPostalCode={lead.customerData.postalCode}
-                                    assignedRepId={lead.assignedTo}
-                                    onSchedule={(date) => {
-                                        setIsMeasurementModalOpen(true);
-                                    }}
-                                />
-                            )}
-
-                            {/* Reference Map — nearby won contracts */}
-                            <NearbyReferencesWidget
-                                leadAddress={lead.customerData.address || (lead.customerData as any).street || ''}
-                                leadCity={lead.customerData.city}
-                                leadPostalCode={lead.customerData.postalCode}
-                                leadId={lead.id}
-                            />
-                        </div>
-
                         {/* ═══ 4. MAIN 2-COLUMN LAYOUT ═══ */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-                            {/* ── LEFT COLUMN: Email + Attachments + Notes + Calls ── */}
+                            {/* ── LEFT COLUMN: Ostatnia komunikacja + Attachments + Notes ── */}
                             <div className="space-y-4">
-                                {/* Email History */}
-                                {lead.customerData.email && (
-                                    <EmailHistoryWidget customerEmail={lead.customerData.email} maxItems={10} allTeamMailboxes={allTeamMailboxes} />
-                                )}
-
-                                {/* Email Origin */}
-                                {lead.emailMessageId && (
-                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-start gap-3">
-                                        <span className="text-blue-600">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                                        </span>
-                                        <div>
-                                            <h4 className="text-blue-900 font-semibold text-xs">Lead aus E-Mail</h4>
-                                            <p className="text-blue-700 text-[10px] mt-0.5">ID: {lead.emailMessageId}</p>
-                                        </div>
+                                {/* Ostatnia komunikacja — kompaktowo z już załadowanych danych.
+                                    Pełna historia (maile IMAP, timeline, SMS) żyje w zakładce
+                                    Kommunikation — wcześniej Übersicht dublował ją dwoma ciężkimi
+                                    widgetami (IMAP fetch + pełna lista połączeń) */}
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                            Ostatnia komunikacja
+                                        </h3>
+                                        <button onClick={() => setActiveTab('communications')} className="text-xs font-semibold text-accent hover:text-accent-dark bg-accent/10 hover:bg-accent/20 px-2.5 py-1 rounded-lg transition-colors">Pełna historia →</button>
                                     </div>
-                                )}
+                                    {(() => {
+                                        const items = [
+                                            ...communications.map(c => ({
+                                                kind: c.type === 'call' ? 'call' : c.type === 'sms' ? 'sms' : 'email',
+                                                direction: c.direction,
+                                                label: c.subject || (c.content || '').substring(0, 90),
+                                                date: new Date(c.date || c.createdAt),
+                                            })),
+                                            ...callLogs.map(c => ({
+                                                kind: 'call',
+                                                direction: c.direction,
+                                                label: c.summary || `Połączenie ${c.status}${c.duration_seconds > 0 ? ` • ${Math.floor(c.duration_seconds / 60)}m ${c.duration_seconds % 60}s` : ''}`,
+                                                date: new Date(c.started_at),
+                                            })),
+                                            ...smsLogs.map(m => ({
+                                                kind: (m.channel === 'whatsapp' ? 'whatsapp' : 'sms'),
+                                                direction: m.direction,
+                                                label: (m.body || '').substring(0, 90),
+                                                date: new Date(m.created_at),
+                                            })),
+                                        ]
+                                            .filter(i => !isNaN(i.date.getTime()))
+                                            .sort((a, b) => b.date.getTime() - a.date.getTime())
+                                            .slice(0, 5);
+
+                                        if (items.length === 0) {
+                                            return <p className="text-slate-400 text-sm">Brak komunikacji — zadzwoń lub napisz pierwszy. 📞</p>;
+                                        }
+
+                                        const kindIcon: Record<string, React.ReactNode> = {
+                                            email: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+                                            call: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>,
+                                            sms: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>,
+                                            whatsapp: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+                                        };
+
+                                        return (
+                                            <div className="space-y-1.5">
+                                                {items.map((item, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.direction === 'inbound' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`} title={item.direction === 'inbound' ? 'Przychodząca' : 'Wychodząca'}>
+                                                            {kindIcon[item.kind] || kindIcon.email}
+                                                        </span>
+                                                        <span className="flex-1 min-w-0 text-xs text-slate-700 truncate">{item.label || '(bez treści)'}</span>
+                                                        <span className="text-[10px] text-slate-400 font-mono shrink-0">{item.date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
 
                                 {/* Attachments */}
                                 {lead.attachments && lead.attachments.length > 0 && (
@@ -948,88 +971,6 @@ export const LeadDetailsPage: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Call History */}
-                                <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
-                                    <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                        Anrufe {callLogs.length > 0 && <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold">{callLogs.length}</span>}
-                                    </h3>
-                                    {callsLoading ? (
-                                        <p className="text-slate-400 text-sm">Laden...</p>
-                                    ) : callLogs.length === 0 ? (
-                                        <p className="text-slate-400 text-sm">Keine Anrufe.</p>
-                                    ) : (
-                                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                                            {callLogs.map(call => {
-                                                const isExpanded = expandedCallId === call.id;
-                                                const dirIcon = call.direction === 'inbound'
-                                                    ? <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                                    : <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3h5m0 0v5m0-5l-6 6M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.516l2.257-1.13a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.28 3H5z" /></svg>;
-                                                const statusColors: Record<string, string> = {
-                                                    completed: 'bg-green-100 text-green-700', 'no-answer': 'bg-red-100 text-red-700',
-                                                    missed: 'bg-red-100 text-red-700', initiated: 'bg-yellow-100 text-yellow-700',
-                                                    ringing: 'bg-blue-100 text-blue-700', 'in-progress': 'bg-blue-100 text-blue-700',
-                                                    busy: 'bg-orange-100 text-orange-700', failed: 'bg-red-100 text-red-700',
-                                                };
-                                                const sentimentIcons: Record<string, React.ReactNode> = {
-                                                    positive: <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px]">+</span>,
-                                                    neutral: <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px]">=</span>,
-                                                    negative: <span className="w-4 h-4 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-[10px]">−</span>
-                                                };
-                                                return (
-                                                    <div key={call.id} className="border border-slate-200 rounded-lg overflow-hidden">
-                                                        <button onClick={() => setExpandedCallId(isExpanded ? null : call.id)} className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 transition-colors text-left">
-                                                            <span className="shrink-0">{dirIcon}</span>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="font-medium text-xs text-slate-800">{call.direction === 'inbound' ? call.from_number : call.to_number}</span>
-                                                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${statusColors[call.status] || 'bg-slate-100 text-slate-600'}`}>{call.status}</span>
-                                                                    {call.sentiment && sentimentIcons[call.sentiment] && <span className="inline-flex">{sentimentIcons[call.sentiment]}</span>}
-                                                                </div>
-                                                                <div className="text-[10px] text-slate-400 mt-0.5">
-                                                                    {new Date(call.started_at).toLocaleString()}
-                                                                    {call.duration_seconds > 0 && ` • ${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`}
-                                                                </div>
-                                                            </div>
-                                                            <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                                        </button>
-                                                        {isExpanded && (
-                                                            <div className="border-t border-slate-100 p-3 space-y-2 bg-slate-50">
-                                                                {call.recording_url && (
-                                                                    <div className="bg-white rounded-lg border border-slate-200 p-2">
-                                                                        <p className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> Aufnahme</p>
-                                                                        <audio controls src={getRecordingProxyUrl(call.recording_url)} className="w-full h-8" />
-                                                                    </div>
-                                                                )}
-                                                                {call.summary && (
-                                                                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100 p-2">
-                                                                        <span className="text-[10px] font-bold text-indigo-800 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> AI</span>
-                                                                        <p className="text-xs text-slate-700 mt-0.5">{call.summary}</p>
-                                                                    </div>
-                                                                )}
-                                                                {call.transcription && (
-                                                                    <div className="bg-white rounded-lg border border-slate-200 p-2">
-                                                                        <button onClick={() => setShowTranscription(showTranscription === call.id ? null : call.id)} className="text-[10px] font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1">
-                                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                                                            Transkription {showTranscription === call.id ? '▲' : '▼'}
-                                                                        </button>
-                                                                        {showTranscription === call.id && <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap max-h-32 overflow-auto">{call.transcription}</p>}
-                                                                    </div>
-                                                                )}
-                                                                {call.notes && (
-                                                                    <div className="bg-amber-50 rounded-lg border border-amber-100 p-2">
-                                                                        <p className="text-[10px] font-bold text-amber-700 mb-0.5 flex items-center gap-1"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> Notizen</p>
-                                                                        <p className="text-xs text-amber-900">{call.notes}</p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
 
                             </div>
 
@@ -1112,6 +1053,38 @@ export const LeadDetailsPage: React.FC = () => {
                                     <CustomerActivityTimeline leadId={lead.id} />
                                 </div>
                             </div>
+                        </div>
+
+                        {/* ═══ POMIARY W OKOLICY + MAPA REFERENCJI — pomocnicze, na dole;
+                            mapa montowana na żądanie (ciężkie geokodowanie) ═══ */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            {lead.status !== 'won' && lead.status !== 'lost' && (
+                                <MeasurementSuggestionWidget
+                                    leadAddress={lead.customerData.address || (lead.customerData as any).street || ''}
+                                    leadCity={lead.customerData.city}
+                                    leadPostalCode={lead.customerData.postalCode}
+                                    assignedRepId={lead.assignedTo}
+                                    onSchedule={(date) => {
+                                        setIsMeasurementModalOpen(true);
+                                    }}
+                                />
+                            )}
+                            {showNearbyRefs ? (
+                                <NearbyReferencesWidget
+                                    leadAddress={lead.customerData.address || (lead.customerData as any).street || ''}
+                                    leadCity={lead.customerData.city}
+                                    leadPostalCode={lead.customerData.postalCode}
+                                    leadId={lead.id}
+                                />
+                            ) : (
+                                <button
+                                    onClick={() => setShowNearbyRefs(true)}
+                                    className="bg-white rounded-lg border border-dashed border-slate-300 hover:border-accent/50 hover:bg-accent/5 transition-all p-4 flex items-center justify-center gap-3 text-slate-500 hover:text-accent min-h-[88px]"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span className="text-sm font-semibold">Pokaż realizacje w okolicy (mapa)</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* ═══ 5. FAIR DATA — compact indicator, full details in Fair tab ═══ */}
@@ -1533,6 +1506,22 @@ export const LeadDetailsPage: React.FC = () => {
 
                     {activeTab === 'communications' && (
                         <div className="space-y-6">
+                            {/* Historia maili (IMAP) — przeniesiona z Übersicht: ciężki fetch
+                                uruchamia się teraz dopiero po wejściu w tę zakładkę */}
+                            {lead.customerData.email && (
+                                <EmailHistoryWidget customerEmail={lead.customerData.email} maxItems={10} allTeamMailboxes={allTeamMailboxes} />
+                            )}
+                            {lead.emailMessageId && (
+                                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-start gap-3">
+                                    <span className="text-blue-600">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    </span>
+                                    <div>
+                                        <h4 className="text-blue-900 font-semibold text-xs">Lead aus E-Mail</h4>
+                                        <p className="text-blue-700 text-[10px] mt-0.5">ID: {lead.emailMessageId}</p>
+                                    </div>
+                                </div>
+                            )}
                             <UnifiedTimeline
                                 communications={communications}
                                 callLogs={callLogs}

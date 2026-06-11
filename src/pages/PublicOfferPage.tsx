@@ -19,7 +19,7 @@ import { ModelAdvantagesSection } from '../components/public-offer/ModelAdvantag
 import { UpsellSection } from '../components/public-offer/UpsellSection';
 import { AttachmentLightbox } from '../components/public-offer/AttachmentLightbox';
 import { TierComparisonSection, type TierVariant } from '../components/public-offer/TierComparisonSection';
-import { BotOfferView } from '../components/public-offer/BotOfferView';
+import { BotOfferView, type CrossSellItem } from '../components/public-offer/BotOfferView';
 import { getModelDisplayName } from '../config/modelImages';
 import { toCustomerLabel } from '../utils/productLabel';
 
@@ -69,6 +69,44 @@ export const PublicOfferPage: React.FC = () => {
     const [activeVariantIdx, setActiveVariantIdx] = useState(0);
     const [viewingAttachment, setViewingAttachment] = useState<any>(null);
     const [selectedTier, setSelectedTier] = useState<TierVariant | null>(null);
+    // ── Warenkorb: extras the customer added to their Wunschkonfiguration ──
+    const [cartExtras, setCartExtras] = useState<CrossSellItem[]>([]);
+    // ✓-Zustand „Aufmaß angefragt" — überlebt einen Reload (pro Angebot).
+    const [measurementRequested, setMeasurementRequested] = useState<boolean>(() => {
+        try { return localStorage.getItem(`aufmass_requested:${token}`) === '1'; } catch { return false; }
+    });
+    const markMeasurementRequested = () => {
+        setMeasurementRequested(true);
+        try { localStorage.setItem(`aufmass_requested:${token}`, '1'); } catch { /* ignore */ }
+    };
+
+    // Zusammenfassung der Wunschkonfiguration (geht an den Berater mit jeder Aktion).
+    const buildConfigSummary = (): string => {
+        if (!selectedTier) return '';
+        const extrasGross = cartExtras.reduce((s, e) => s + (e.customerBrutto || 0), 0);
+        const lines = [
+            `Paket: ${selectedTier.label} — ${Math.round(selectedTier.totalGrossEUR).toLocaleString('de-DE')} € brutto`,
+            ...cartExtras.map(e =>
+                `Extra: ${e.nameDE} — +${Math.round(e.customerBrutto).toLocaleString('de-DE')} €${e.source !== 'live_configurator' ? ' (Richtpreis)' : ''}`),
+        ];
+        if (cartExtras.length > 0) {
+            lines.push(`Gesamt: ${Math.round(selectedTier.totalGrossEUR + extrasGross).toLocaleString('de-DE')} € brutto`);
+        }
+        return lines.join('\n');
+    };
+
+    // Extra in den Warenkorb legen / entfernen + Tracking für den Vertrieb.
+    const handleToggleExtra = (item: CrossSellItem) => {
+        setCartExtras(prev => {
+            const inCart = prev.some(e => e.nameDE === item.nameDE);
+            if (offer?.id) {
+                OfferService.trackInteraction(offer.id, inCart ? 'cart_extra_removed' : 'cart_extra_added', {
+                    extra: item.nameDE, priceGross: item.customerBrutto,
+                }).catch(() => { });
+            }
+            return inCart ? prev.filter(e => e.nameDE !== item.nameDE) : [...prev, item];
+        });
+    };
     // Ref to the "Fragen zum Angebot?" textarea — focused when an extra is requested.
     const messageRef = useRef<HTMLTextAreaElement>(null);
     // Wątek wiadomości (klient ↔ Berater) — przez RPC get_offer_messages (po tokenie)
@@ -200,9 +238,11 @@ export const PublicOfferPage: React.FC = () => {
         setAccepting(true);
         try {
             // This RPC updates offer status, lead status, creates notification for sales rep
+            const configSummary = buildConfigSummary();
             const success = await OfferService.notifyOfferAction(token, 'offer_accepted', {
                 offerNumber: offer?.offerNumber,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                ...(configSummary ? { configSummary } : {}),
             });
             // Also track in offer_interactions directly
             if (offer?.id) {
@@ -616,6 +656,13 @@ export const PublicOfferPage: React.FC = () => {
                         onAcceptOffer={handleAcceptOffer}
                         onRequestExtra={handleRequestExtra}
                         onDownloadPDF={handleDownloadPDF}
+                        cartExtras={cartExtras}
+                        onToggleExtra={handleToggleExtra}
+                        measurementRequested={measurementRequested}
+                        validUntil={offer?.createdAt
+                            ? new Date(new Date(offer.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000)
+                                .toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                            : undefined}
                     />
                 )}
 
@@ -1166,6 +1213,8 @@ export const PublicOfferPage: React.FC = () => {
                 <MeasurementRequestModal
                     offerToken={token}
                     offerId={offer?.id}
+                    configSummary={buildConfigSummary() || undefined}
+                    onSuccess={markMeasurementRequested}
                     onClose={() => setIsMeasurementModalOpen(false)}
                 />
             )}
