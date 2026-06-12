@@ -93,7 +93,17 @@ export function getMbRoofPrice(req: MbRoofRequest): MbQuoteResult {
   const matrix = MB_PRICE_MATRICES[covering.matrixKey];
   if (!matrix) return { success: false, error: `Fehlende Matrix: ${covering.matrixKey}` };
 
-  const hit = matrixLookup(matrix, widthCm, depthCm);
+  // Pergole lamelowe/tekstylne: oś lamel ma twardy limit z cennika (prime/dynamic
+  // 400cm, advanced 500cm), ale konstrukcję montuje się w OBU orientacjach —
+  // np. taras 600×400 = lamele 400 + jazda 600. Liczymy obie orientacje
+  // i bierzemy tańszą dostępną (tak konfiguruje się to u MB).
+  const PERGOLA_SWAP_MODELS = new Set(['prime', 'dynamic', 'advanced', 'adaptive']);
+  let hit = matrixLookup(matrix, widthCm, depthCm);
+  let axesSwapped = false;
+  if (PERGOLA_SWAP_MODELS.has(model.id)) {
+    const alt = matrixLookup(matrix, depthCm, widthCm);
+    if (alt && (!hit || alt.price < hit.price)) { hit = alt; axesSwapped = true; }
+  }
   if (!hit) {
     return { success: false, error: `${widthCm}×${depthCm}cm außerhalb der Preisliste für ${model.mbName} (${covering.label})` };
   }
@@ -103,7 +113,7 @@ export function getMbRoofPrice(req: MbRoofRequest): MbQuoteResult {
   const billedAreaM2 = (billedWidthCm * billedDepthCm) / 10000;
 
   const breakdown: MbQuoteLine[] = [
-    { label: `${model.mbName} ${covering.label} — ${billedWidthCm}×${billedDepthCm}cm (Abrechnungsmaß)`, netEur: hit.price },
+    { label: `${model.mbName} ${covering.label} — ${billedWidthCm}×${billedDepthCm}cm (Abrechnungsmaß)${axesSwapped ? ' — Lamellenachse quer' : ''}`, netEur: hit.price },
   ];
   let total = hit.price;
 

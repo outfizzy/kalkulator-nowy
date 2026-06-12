@@ -271,6 +271,19 @@ const PRODUCT_CATALOG: Record<string, ProductModel> = {
         description: 'Design-Ikone mit klaren Linien. Für architektonisch anspruchsvolle Projekte.',
         highlights: ['Puristisches Design', 'Verdeckte Befestigung', 'Klare Linienführung', 'Award-Winning Design'],
     },
+    // Brak tego klucza powodował, że override Claude'a `primaryModel: 'ultrastyle'`
+    // był ignorowany (PRODUCT_CATALOG[cc.primaryModel] === undefined) i zostawał
+    // model z regexów — np. carport złapany z taglinu stopki maila.
+    ultrastyle: {
+        id: 'ultrastyle', displayName: 'Ultrastyle', supplierName: 'Ultraline',
+        supplier: 'aluxe', category: 'roof',
+        heroImage: '/images/models/ultraline.jpg',
+        galleryImages: ['/images/models/ultraline.jpg', '/images/models/ultraline-2.jpg', '/images/models/ultraline-3.jpg', '/images/models/ultraline-4.webp'],
+        basePricePerSqM: 420, minPrice: 4500,
+        description: 'Premium-Flachdach mit Echtglas und integrierter Entwässerung. Die Architektur-Klasse.',
+        highlights: ['Echtglas-Eindeckung', 'Flachdach-Architektur', 'Integrierte Entwässerung', 'Premium-Profilsystem'],
+        competitorCompare: 'Premium-Klasse — vergleichbar mit Solarlux',
+    },
     // ── PERGOLA ──
     pergola: {
         id: 'pergola', displayName: 'Pergola', supplierName: 'Pergola',
@@ -391,9 +404,25 @@ interface ParsedLeadData {
 
 const VALID_EXTRAS = ['led', 'zip_sides', 'zip_front', 'markise', 'heater', 'panorama_front', 'panorama_sides', 'keilfenster'];
 
+// Notatki leadów z maili zawierają NAGŁÓWKI przekazanej wiadomości — m.in.
+// linię `Od: "Polendach24 – Terrassenüberdachung, Carport, Wintergärten" <...>`.
+// Słowa "Carport"/"Wintergärten" z taglinu firmowego matchowały regexy detekcji
+// produktu (klient prosił o Ultrastyle → wyceniło carport!) i flagę Wintergarten.
+// Do WSZYSTKICH regexów detekcji używamy tekstu z odciętymi metadanymi maila.
+function stripMailMetadata(raw: string): string {
+    return (raw || '')
+        .split('\n')
+        .filter(line => !/^\s*(Od|From|Temat|Subject|Data|Date|An|To|Cc|Wiadomość wysłana ze strony)\s*:/i.test(line.trim()))
+        .join('\n')
+        // tagline może też siedzieć w treści (podpisy/cytowania) — wycinamy frazę firmową
+        .replace(/Polendach24\s*[–-]\s*Terrassenüberdachung[^\n<"]*/gi, ' ')
+        .replace(/---\s*Pełna treść wiadomości\s*---/gi, ' ');
+}
+
 function extractLeadData(customerData: any, notes: string, fairProducts?: any[]): ParsedLeadData {
     const cd = customerData || {};
-    const text = `${notes || ''} ${JSON.stringify(cd)}`.toLowerCase();
+    const cleanNotes = stripMailMetadata(notes);
+    const text = `${cleanNotes} ${JSON.stringify(cd)}`.toLowerCase();
     
     const result: ParsedLeadData = {
         customerName: `${cd.firstName || ''} ${cd.lastName || ''}`.trim(),
@@ -471,7 +500,7 @@ function extractLeadData(customerData: any, notes: string, fairProducts?: any[])
     // PRIORITY 2: Notes / email text (regex extraction as fallback)
     // Only parse if configurator didn't provide dimensions
     // ══════════════════════════════════════════════════════════════════
-    const allText = notes || '';
+    const allText = cleanNotes;
     
     // ── DIMENSIONS from notes (only if not already set from configurator) ──
     if (result.width <= 0 || result.depth <= 0) {
@@ -574,7 +603,7 @@ function extractLeadData(customerData: any, notes: string, fairProducts?: any[])
     // w standaloneProducts robiły false positive dla zwykłej Schiebewand.
     // NOTE: 80% of "Wintergarten" requests actually want Terrassenüberdachung + Panorama AL23
     const wintergartenKeywords = /wintergarten|kaltwintergarten|warmwintergarten|geschlossen|rundherum.*glas|rundum.*vergl|schiebew[aä]nd|schiebetür|glasschieb|3\s*seiten.*glas|seiten.*geschloss/i;
-    const customerText = `${notes || ''} ${cd.configuredNotes || ''} ${cd.message || ''} ${cd.wishes || ''}`.toLowerCase();
+    const customerText = `${cleanNotes} ${stripMailMetadata(cd.configuredNotes || '')} ${stripMailMetadata(cd.message || '')} ${cd.wishes || ''}`.toLowerCase();
     const isWintergarten = wintergartenKeywords.test(customerText);
 
     // ── PRODUCT DETECTION (only if not set from configurator) ──
@@ -603,7 +632,7 @@ function extractLeadData(customerData: any, notes: string, fairProducts?: any[])
             [/orangestyle|orangeline|orangeri/i, 'orangestyle', 'roof'],
             [/topstyle|topline/i, 'topstyle', 'roof'],
             [/designline/i, 'designline', 'roof'],
-            [/ultrastyle|ultraline/i, 'trendstyle', 'roof'],
+            [/ultrastyle|ultraline/i, 'ultrastyle', 'roof'],
             [/trendstyle|trendline/i, 'trendstyle', 'roof'],
             [/pavillon/i, 'trendstyle', 'roof'],  // Pavillon = freistehende Überdachung
             [/terassen|terrasse|überdachung|zadasz|dach/i, 'trendstyle', 'roof'],
