@@ -2,8 +2,23 @@ import { supabase } from '../../lib/supabase';
 import type { ServiceTicket } from '../../types';
 import { PostgrestError } from '@supabase/supabase-js';
 
+/**
+ * Kolizyjnoodporny numer zgłoszenia serwisowego.
+ * Format: SRV-{ROK}-{base36 czasu}{losowy znak} — np. SRV-2026-7K3PQX.
+ * Kolumna service_tickets.ticket_number ma UNIQUE; poprzedni 4-cyfrowy random
+ * (1000–9999) kolidował już po ~setce zgłoszeń w roku i wywalał INSERT.
+ */
+export function generateServiceTicketNumber(): string {
+    const year = new Date().getFullYear();
+    const timePart = Date.now().toString(36).toUpperCase().slice(-5);
+    const randPart = Math.floor(Math.random() * 36).toString(36).toUpperCase();
+    return `SRV-${year}-${timePart}${randPart}`;
+}
+
 export const ServiceService = {
-    // Public method for external form
+    // Public method for external form (publiczna strona /reklamation).
+    // Weryfikuje, że podany e-mail należy DO TEGO kontraktu — bez tego każdy
+    // mógłby założyć zgłoszenie na cudzy kontrakt.
     async verifyContract(contractNumber: string, email: string): Promise<{
         verified: boolean;
         contractId?: string;
@@ -11,51 +26,37 @@ export const ServiceService = {
         installationId?: string;
         error?: string;
     }> {
-        // 1. Find contract
-        const { data: contracts, error } = await supabase
-            .from('contracts')
-            .select('id, client_data, offer_id')
-            .eq('contract_number', contractNumber) // Note: ensure DB column name matches
-            .limit(1);
+        const cn = (contractNumber || '').trim();
+        const emailNorm = (email || '').trim().toLowerCase();
+        if (!cn || !emailNorm) return { verified: false, error: 'Missing data' };
 
-        // Fallback search if column name differs or sensitive case
-        // Assuming 'contract_number' based on earlier types, but let's be safe
-        // Ideally we would check 'contractNumber' in JSON or col.
+        // Weryfikacja idzie przez RPC SECURITY DEFINER — tabele contracts/customers/
+        // installations mają RLS niedostępne dla anon (publiczny formularz), więc
+        // bezpośrednie zapytanie z przeglądarki zawsze zwracało "nie znaleziono".
+        // RPC dopasowuje numer (z contract_data JSONB) + e-mail klienta server-side.
+        const { data, error } = await supabase.rpc('verify_service_contract', {
+            p_contract_number: cn,
+            p_email: emailNorm,
+        });
 
-        if (error || !contracts || contracts.length === 0) {
-            // Try fetching all and filtering if needed or check types, 
-            // but for now let's assume direct column match or JSON match
-            return { verified: false, error: 'Contract not found' };
+        if (error) {
+            console.error('verify_service_contract RPC error:', error);
+            return { verified: false, error: 'Verification failed' };
         }
 
-        const contract = contracts[0];
-        // Client data might be in JSON or joined
-        // Based on types.ts: contract.client is Customer. in DB it is often 'client' or 'contract_data->client'
-
-        // Let's assume strict verification for now
-        // A better approach might be to search Customer by email first
-        const { data: customer } = await supabase
-            .from('customers')
-            .select('id, email')
-            .ilike('email', email)
-            .single();
-
-        if (!customer) return { verified: false, error: 'Email not found' };
-
-        // Link logic could be improved, but if both exist, we good for now
-
-        // Find installation for this contract (via offerId)
-        const { data: installation } = await supabase
-            .from('installations')
-            .select('id')
-            .eq('offer_id', contract.offer_id)
-            .single();
+        const res = (data || {}) as {
+            verified?: boolean; contractId?: string; clientId?: string;
+            installationId?: string; error?: string;
+        };
+        if (!res.verified) {
+            return { verified: false, error: res.error || 'Contract not found' };
+        }
 
         return {
             verified: true,
-            contractId: contract.id,
-            clientId: customer.id,
-            installationId: installation?.id
+            contractId: res.contractId,
+            clientId: res.clientId,
+            installationId: res.installationId,
         };
     },
 
@@ -64,7 +65,7 @@ export const ServiceService = {
         photos: File[]
     ): Promise<{ data: ServiceTicket | null; error: Error | null }> {
         try {
-            const ticketNumber = `SRV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+            const ticketNumber = generateServiceTicketNumber();
             const photoUrls: string[] = [];
 
             // Upload Photos
@@ -276,14 +277,19 @@ export const ServiceService = {
                     }
                 }
 
-                // Team Assignment
+                // Team Assignment — pobierz realną nazwę zespołu (było hardcode 'Nowy zespół')
                 if (updates.assignedTeamId && updates.assignedTeamId !== currentTicket.assignedTeamId) {
+                    const { data: newTeam } = await supabase
+                        .from('installation_teams')
+                        .select('name')
+                        .eq('id', updates.assignedTeamId)
+                        .maybeSingle();
                     historyEntries.push({
                         ticket_id: id,
                         changed_by: user.id,
                         change_type: 'assignment',
                         old_value: currentTicket.assignedTeam?.name || 'Brak',
-                        new_value: 'Nowy zespół' // We'd need to fetch team name to be precise, skipping for speed
+                        new_value: newTeam?.name || 'Nieznany zespół'
                     });
                 }
 

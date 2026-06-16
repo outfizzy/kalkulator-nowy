@@ -133,7 +133,7 @@ export const ServiceDashboard = () => {
     const { isAdmin } = useAuth();
     const [tickets, setTickets] = useState<ServiceTicket[]>([]);
     const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState<ServiceTicketStatus | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<ServiceTicketStatus | 'all' | 'urgent'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -177,7 +177,11 @@ export const ServiceDashboard = () => {
 
     // ── Filtered + Searched tickets ──
     const filteredTickets = tickets.filter(t => {
-        if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+        if (statusFilter === 'urgent') {
+            if (t.priority !== 'critical' && t.priority !== 'high') return false;
+        } else if (statusFilter !== 'all' && t.status !== statusFilter) {
+            return false;
+        }
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             const clientName = extractClientName(t).toLowerCase();
@@ -197,7 +201,7 @@ export const ServiceDashboard = () => {
         scheduled: tickets.filter(t => t.status === 'scheduled').length,
         in_progress: tickets.filter(t => t.status === 'in_progress').length,
         resolved: tickets.filter(t => t.status === 'resolved').length,
-        critical: tickets.filter(t => t.priority === 'critical' || t.priority === 'high').length,
+        urgent: tickets.filter(t => (t.priority === 'critical' || t.priority === 'high') && t.status !== 'resolved' && t.status !== 'closed' && t.status !== 'rejected').length,
     };
 
     return (
@@ -247,11 +251,11 @@ export const ServiceDashboard = () => {
                     { key: 'scheduled', label: 'Zaplanowane', count: counts.scheduled, icon: <CalendarCheck className="w-4 h-4" />, gradient: 'from-purple-500 to-purple-600' },
                     { key: 'in_progress', label: 'W realizacji', count: counts.in_progress, icon: <Play className="w-4 h-4" />, gradient: 'from-indigo-500 to-indigo-600' },
                     { key: 'resolved', label: 'Rozwiązane', count: counts.resolved, icon: <CheckCircle2 className="w-4 h-4" />, gradient: 'from-emerald-500 to-emerald-600' },
-                    { key: 'critical', label: 'Pilne', count: counts.critical, icon: <AlertTriangle className="w-4 h-4" />, gradient: counts.critical > 0 ? 'from-red-500 to-red-600' : 'from-slate-400 to-slate-500' },
+                    { key: 'urgent', label: 'Pilne', count: counts.urgent, icon: <AlertTriangle className="w-4 h-4" />, gradient: counts.urgent > 0 ? 'from-red-500 to-red-600' : 'from-slate-400 to-slate-500' },
                 ].map(kpi => (
                     <button
                         key={kpi.key}
-                        onClick={() => setStatusFilter(kpi.key === 'critical' ? 'all' : kpi.key as ServiceTicketStatus)}
+                        onClick={() => setStatusFilter(prev => prev === kpi.key ? 'all' : kpi.key as ServiceTicketStatus | 'urgent')}
                         className={`bg-gradient-to-br ${kpi.gradient} rounded-2xl p-3 sm:p-4 text-white shadow-sm relative overflow-hidden text-left transition-all hover:shadow-md ${statusFilter === kpi.key ? 'ring-2 ring-offset-2 ring-indigo-400' : ''}`}
                     >
                         <div className="absolute top-2 right-2 bg-white/10 rounded-lg p-1.5">{kpi.icon}</div>

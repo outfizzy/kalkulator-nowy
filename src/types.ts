@@ -1183,7 +1183,7 @@ export interface ServiceTicketHistory {
 export interface ServiceTicket {
     id: string;
     ticketNumber: string;
-    clientId: string;
+    clientId?: string; // nullable w DB — zgłoszenia z maila/publiczne mogą nie mieć klienta CRM
     contractId?: string;
     contractNumber?: string; // Manual contract number for legacy orders
     installationId?: string;

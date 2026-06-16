@@ -530,7 +530,8 @@ Deno.serve(async (req) => {
                     }
                 } else if (analysis.type === 'service') {
                     const { error } = await supabaseAdmin.from('service_tickets').insert({
-                        ticket_number: `SRV-${Date.now().toString().slice(-6)}`,
+                        // Spójny, kolizjoodporny format z resztą aplikacji (SRV-{rok}-{base36})
+                        ticket_number: `SRV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-5)}${Math.floor(Math.random() * 36).toString(36).toUpperCase()}`,
                         type: 'other',
                         status: 'new',
                         priority: analysis.serviceData?.priority || 'medium',
