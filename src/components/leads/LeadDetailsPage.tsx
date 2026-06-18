@@ -21,6 +21,8 @@ import { EmailHistoryWidget } from '../common/EmailHistoryWidget';
 import { ScheduleMeasurementModal } from './ScheduleMeasurementModal';
 import { MeasurementSuggestionWidget } from './MeasurementSuggestionWidget';
 import { NearbyReferencesWidget } from './NearbyReferencesWidget';
+import { ChatConversationWidget } from './ChatConversationWidget';
+import { HerkunftWidget } from './HerkunftWidget';
 import { SnowZoneEmailModal } from './SnowZoneEmailModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -472,6 +474,9 @@ export const LeadDetailsPage: React.FC = () => {
                         </div>
                     )}
                     {activeTab === 'overview' && (<div className="space-y-4">
+
+                        {/* ═══ HERKUNFT & TRACKING (Attribution aus der Website) ═══ */}
+                        <HerkunftWidget cd={lead.customerData as never} />
 
                         {/* ═══ AGENT ACTIVITY PANEL ═══ */}
                         {lead && <AgentActivityPanel leadId={lead.id} leadStatus={lead.status} />}
@@ -950,6 +955,61 @@ export const LeadDetailsPage: React.FC = () => {
                                                     </div>
                                                 </div>
                                             );
+                                        }
+
+                                        // polendach24.de — Konfigurator / Formular (deutsch): same nice card as zadaszto
+                                        const isWebsiteDe = lead.source === 'calculator_v2' ||
+                                            (/(^|[\n·])\s*(Modell|Maße|Breite|Tiefe|Dacheindeckung|Geschätzter Richtpreis):/i.test(raw) || raw.includes('Projektdetails'));
+                                        if (isWebsiteDe) {
+                                            const get = (key: string) => {
+                                                const m = raw.match(new RegExp(`(?:^|[\\n·])\\s*${key}:\\s*([^\\n·]+)`, 'i'));
+                                                return m ? m[1].trim() : null;
+                                            };
+                                            const breite = get('Breite');
+                                            const tiefe = get('Tiefe');
+                                            const masse = get('Maße') || (breite && tiefe ? `${breite} × ${tiefe}` : null);
+                                            const fields = [
+                                                { label: 'Modell', value: get('Modell'), icon: '🏠', wide: true },
+                                                { label: 'Bauart', value: get('Bauart'), icon: '🏗️', wide: false },
+                                                { label: 'Maße', value: masse, icon: '📐', wide: false },
+                                                { label: 'Farbe', value: get('Farbe'), icon: '🎨', wide: false },
+                                                { label: 'Dach', value: get('Dach') || get('Dacheindeckung'), icon: '🪟', wide: false },
+                                                { label: 'Beschattung', value: get('Dachbeschattung') || get('Beschattung'), icon: '🌤️', wide: false },
+                                                { label: 'Seiten / Verglasung', value: get('Seiten') || get('Seiten/Verglasung') || get('Verglasung'), icon: '🧱', wide: true },
+                                                { label: 'Extras', value: get('Extras'), icon: '➕', wide: true },
+                                                { label: 'Richtpreis', value: get('Geschätzter Richtpreis') || get('Richtpreis'), icon: '💶', wide: true },
+                                            ].filter(f => f.value && f.value !== '—' && !/^kein/i.test(f.value!));
+                                            if (fields.length >= 2) {
+                                                const message = raw.split('\n')
+                                                    .map(l => l.trim())
+                                                    .filter(l => l && !l.includes('Projektdetails') && !/^[A-Za-zäöüÄÖÜß /]+:\s/.test(l))
+                                                    .join('\n').trim();
+                                                return (
+                                                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4 mb-3 shadow-sm">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <span className="text-lg">{lead.source === 'calculator_v2' ? '🧮' : '📋'}</span>
+                                                            <div>
+                                                                <h4 className="text-sm font-bold text-emerald-900">{lead.source === 'calculator_v2' ? 'Anfrage aus dem Online-Konfigurator' : 'Anfrage über das Website-Formular'}</h4>
+                                                                <p className="text-[10px] text-emerald-600">Konfiguration zur Angebotserstellung</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                            {fields.map((f, i) => (
+                                                                <div key={i} className={`bg-white/80 rounded-lg border border-emerald-100 px-3 py-2 ${f.wide ? 'sm:col-span-2' : ''}`}>
+                                                                    <span className="text-[10px] text-emerald-600 uppercase font-semibold block">{f.icon} {f.label}</span>
+                                                                    <span className="text-sm text-slate-800 font-medium whitespace-pre-wrap">{f.value}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        {message && (
+                                                            <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                                <span className="text-[10px] text-amber-600 uppercase font-semibold block">💬 Nachricht des Kunden</span>
+                                                                <p className="text-sm text-slate-700 whitespace-pre-wrap">{message}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
                                         }
 
                                         // Default: generic markdown rendering
@@ -1506,6 +1566,8 @@ export const LeadDetailsPage: React.FC = () => {
 
                     {activeTab === 'communications' && (
                         <div className="space-y-6">
+                            {/* Chat-Verlauf mit Max (KI-Berater) — voller Kontext für den Vertrieb */}
+                            <ChatConversationWidget leadId={lead.id} sessionId={(lead.customerData as { chatSessionId?: string }).chatSessionId} />
                             {/* Historia maili (IMAP) — przeniesiona z Übersicht: ciężki fetch
                                 uruchamia się teraz dopiero po wejściu w tę zakładkę */}
                             {lead.customerData.email && (
