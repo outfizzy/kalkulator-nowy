@@ -82,6 +82,8 @@ export const AGB_SECTIONS_PL: Array<{ title: string; items: string[] }> = [
             'Wykonawca udziela od dnia odbioru następujących okresów gwarancji (o ile w umowie nie ustalono inaczej):\n  - 5 lat na stabilność konstrukcji i prawidłowy montaż,\n  - 10 lat na powłokę proszkową elementów aluminiowych,\n  - 2 lata na napędy mechaniczne, sterowniki, oświetlenie LED i akcesoria,\n  - 1 rok na promienniki grzewcze,\n  - do 10 lat na płyty poliwęglanowe (malejąco: 100% przez pierwsze 5 lat, następnie degresywnie zgodnie z danymi producenta), z wyłączeniem naturalnej kondensacji, uszkodzeń gradowych i wody w kanałach.',
             'Reklamacje należy zgłaszać w formie dokumentowej (z dokumentacją zdjęciową) niezwłocznie po stwierdzeniu wady.',
             'Gwarancja nie obejmuje szkód powstałych wskutek niewłaściwego użytkowania, nieprzestrzegania zaleceń pielęgnacyjnych, wyjątkowych warunków atmosferycznych, samowolnych ingerencji lub normalnego zużycia.',
+            'Zamawiający zobowiązany jest do bieżącego odśnieżania konstrukcji — po przekroczeniu dopuszczalnej grubości pokrywy śnieżnej (wynikającej ze strefy obciążenia śniegiem wskazanej w umowie) nadmiar śniegu należy niezwłocznie i ostrożnie usunąć, bez użycia narzędzi mogących uszkodzić pokrycie, a także usuwać zalegający lód i utrzymywać drożność rynien oraz odpływów. Elementy ruchome (markizy, rolety ZIP, systemy przesuwne) należy złożyć na czas opadów śniegu, oblodzenia i silnego wiatru.',
+            'Szkody powstałe wskutek przekroczenia dopuszczalnego obciążenia śniegiem, zaniechania odśnieżania lub okresowej konserwacji nie są objęte gwarancją, a Wykonawca nie ponosi za nie odpowiedzialności.',
             'Wykonawca ma prawo do naprawy lub wymiany. W razie dwukrotnej nieudanej naprawy Zamawiający może żądać odpowiedniego obniżenia ceny lub odstąpić od umowy.',
             'Za wady nie uznaje się: niewielkich odchyleń koloru, odchyleń optycznych mieszczących się w normach, tolerancji produkcyjnych (np. profili aluminiowych do 1,5 mm/m), dopuszczalnych zjawisk optycznych szkła i poliwęglanu oraz naturalnych reakcji materiału (np. odkształceń przy zmianach temperatury), jeżeli nie są widoczne z typowej odległości.',
             'Wszelkie świadczenia z tytułu rękojmi i gwarancji realizowane są wyłącznie przez Wykonawcę lub autoryzowanych partnerów.',
@@ -137,6 +139,8 @@ export const RODO_SECTION_PL = {
         'Dane mogą być przekazywane podmiotom trzecim wyłącznie w zakresie niezbędnym do realizacji umowy (np. firmy transportowe, biuro rachunkowe, dostawcy usług IT) lub gdy wymagają tego przepisy prawa.',
         'Każdej osobie, której dane dotyczą, przysługuje prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, wniesienia sprzeciwu, przenoszenia danych oraz cofnięcia zgody w dowolnym momencie (jeżeli przetwarzanie odbywa się na podstawie zgody), a także prawo wniesienia skargi do Prezesa UODO.',
         'Dane przechowywane są przez okres niezbędny do realizacji umowy, rozliczeń i wypełnienia obowiązków prawnych, a następnie usuwane lub anonimizowane.',
+        'Podanie danych jest dobrowolne, lecz niezbędne do zawarcia i wykonania umowy — ich niepodanie uniemożliwia realizację zamówienia.',
+        'Dane nie podlegają zautomatyzowanemu podejmowaniu decyzji ani profilowaniu.',
         'Szczegółowe informacje o przetwarzaniu danych, prawach osób oraz danych kontaktowych administratora znajdują się w polityce prywatności na stronie zadaszto.pl.',
     ],
 };

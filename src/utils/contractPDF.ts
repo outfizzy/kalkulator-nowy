@@ -62,12 +62,14 @@ const LABELS = {
         payCash: 'Zahlungsart: Barzahlung. Die Restzahlung erfolgt in bar bei Abnahme der Montage.',
         payTransfer: (iban: string, bank: string) =>
             `Zahlungsart: Überweisung auf das Konto IBAN: ${iban} (${bank}). Die Restzahlung ist nach Abnahme der Montage ohne Abzug fällig.`,
-        s3: '§3 Bauseitige Voraussetzungen',
+        s3: '§3 Bauseitige Voraussetzungen und Pflichten des Auftraggebers',
         reqFoundation: (b: boolean) => `• Fundamente: ${b ? 'werden bauseitig durch den Auftraggeber erstellt' : 'im Leistungsumfang des Auftragnehmers enthalten bzw. nicht erforderlich'}`,
         reqPower: (b: boolean) => `• Stromzuführung: ${b ? 'wird bauseitig durch den Auftraggeber bereitgestellt' : 'nicht erforderlich bzw. gesondert vereinbart'}`,
         reqConstr: (b: boolean) => `• Bauantrag/Baugenehmigung: ${b ? 'liegt in der Verantwortung des Auftraggebers' : 'nicht Gegenstand dieses Vertrages'}`,
         reqOther: (s: string) => `• Sonstiges: ${s}`,
         reqAccess: 'Der Auftraggeber stellt einen freien Zugang zur Montagestelle sicher.',
+        reqSnow: '• Nutzung und Schneeräumung: Die Konstruktion ist für die in §1 angegebene Schneelastzone ausgelegt. Der Auftraggeber ist verpflichtet, das Dach bei Überschreiten der zulässigen Schneehöhe schonend zu räumen (ohne beschädigende Werkzeuge), Eis zu entfernen und Rinnen/Abläufe freizuhalten. Bewegliche Elemente (Markisen, ZIP-Screens, Schiebesysteme) sind bei Schneefall, Vereisung und starkem Wind einzufahren.',
+        reqMaintenance: '• Der Auftraggeber führt regelmäßige Wartung und Reinigung gemäß den Pflegehinweisen durch. Schäden durch Überschreiten der Schneelast, unterlassene Räumung/Wartung oder unsachgemäße Nutzung sind von der Gewährleistung ausgeschlossen.',
         s4: '§4 Liefer- und Montagezeit',
         s4Body: (weeks?: number, days?: number) =>
             `Die Montage erfolgt nach Terminabsprache${weeks ? `, voraussichtlich innerhalb von ca. ${weeks} Wochen nach Vertragsabschluss` : ''}.` +
@@ -115,12 +117,14 @@ const LABELS = {
         payCash: 'Forma płatności: gotówka. Pozostała kwota płatna gotówką przy odbiorze montażu.',
         payTransfer: (iban: string, bank: string) =>
             `Forma płatności: przelew na konto IBAN: ${iban} (${bank}). Pozostała kwota płatna po odbiorze montażu, bez potrąceń.`,
-        s3: '§3 Warunki po stronie Zamawiającego',
+        s3: '§3 Warunki i obowiązki Zamawiającego',
         reqFoundation: (b: boolean) => `• Fundamenty: ${b ? 'wykonuje Zamawiający we własnym zakresie' : 'w zakresie Wykonawcy lub niewymagane'}`,
         reqPower: (b: boolean) => `• Doprowadzenie prądu: ${b ? 'zapewnia Zamawiający we własnym zakresie' : 'niewymagane lub uzgodnione odrębnie'}`,
         reqConstr: (b: boolean) => `• Pozwolenie / zgłoszenie budowlane: ${b ? 'po stronie Zamawiającego' : 'nie jest przedmiotem niniejszej umowy'}`,
         reqOther: (s: string) => `• Inne: ${s}`,
         reqAccess: 'Zamawiający zapewnia swobodny dostęp do miejsca montażu.',
+        reqSnow: '• Eksploatacja i odśnieżanie: konstrukcja jest przewidziana na obciążenie śniegiem zgodne ze strefą wskazaną w §1. Zamawiający zobowiązany jest do bieżącego, ostrożnego odśnieżania dachu po przekroczeniu dopuszczalnej grubości pokrywy (bez narzędzi mogących uszkodzić pokrycie), usuwania lodu oraz utrzymywania drożności rynien i odpływów. Elementy ruchome (markizy, rolety ZIP, systemy przesuwne) należy złożyć na czas opadów śniegu, oblodzenia i silnego wiatru.',
+        reqMaintenance: '• Konserwacja: Zamawiający wykonuje okresowe czyszczenie i konserwację zgodnie z zaleceniami. Szkody z tytułu przekroczenia obciążenia śniegiem, zaniechania odśnieżania/konserwacji lub niewłaściwego użytkowania nie są objęte gwarancją.',
         s4: '§4 Termin dostawy i montażu',
         s4Body: (weeks?: number, days?: number) =>
             `Montaż następuje po uzgodnieniu terminu${weeks ? `, przewidywany w ciągu ok. ${weeks} tygodni od zawarcia umowy` : ''}.` +
@@ -419,6 +423,8 @@ async function createContractDocument(contract: Contract): Promise<jsPDF> {
     bodyText(L.reqConstr(!!req.constructionProject));
     if (req.other) bodyText(L.reqOther(req.other));
     bodyText(L.reqAccess);
+    bodyText(L.reqSnow);
+    bodyText(L.reqMaintenance);
     y += 3;
 
     // ═══ §4 TERMIN MONTAŻU ═══
