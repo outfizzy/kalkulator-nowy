@@ -349,6 +349,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                 <div className="p-6 overflow-y-auto flex-1">
                     {step === 'customer' ? (
                         <CustomerSelector
+                            locale={brand}
                             onSelect={(c) => {
                                 setSelectedCustomer(c);
                                 setStep('details');

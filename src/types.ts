@@ -84,7 +84,7 @@ export interface DimensionOptions {
 
 export interface Customer {
     id?: string; // Optional for backward compatibility with offers that embed customer data without ID
-    salutation: 'Herr' | 'Frau' | 'Firma';
+    salutation: 'Herr' | 'Frau' | 'Firma' | 'Pan' | 'Pani';
     companyName?: string; // Added for PDF generation
     firstName: string;
     lastName: string;
