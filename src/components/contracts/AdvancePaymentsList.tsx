@@ -19,7 +19,7 @@ export const AdvancePaymentsList: React.FC = () => {
     }, []);
 
     const loadContracts = async () => {
-        setLoading(false);
+        setLoading(true);
         try {
             const all = await DatabaseService.getContracts();
             // Only contracts with advance > 0

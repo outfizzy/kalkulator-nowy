@@ -60,6 +60,7 @@ export const LegacyImportModal: React.FC<LegacyImportModalProps> = ({ isOpen, on
             await ContractService.createContract({
                 offerId: offer.id,
                 contractNumber: contractNumber, // Manual Override
+                createdAt: new Date(date), // Data archiwalna, nie bieżąca
                 client: customer,
                 product: offer.product,
                 pricing: offer.pricing,
@@ -90,9 +91,10 @@ export const LegacyImportModal: React.FC<LegacyImportModalProps> = ({ isOpen, on
             setPostalCode('');
             setCity('');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Import Fail:', error);
-            toast.error('Błąd importu umowy');
+            // Pokaż konkretny błąd (np. 'Numer umowy już istnieje: X')
+            toast.error(error?.message || 'Błąd importu umowy');
         } finally {
             setLoading(false);
         }

@@ -4,7 +4,7 @@ import type { Offer } from '../types';
 import { getSalesProfile, getCurrentUser } from './storage';
 import { translate, formatCurrency } from './translations';
 import { LOGO_BASE64 } from './assets';
-// import { ROBOTO_REGULAR_BASE64, ROBOTO_BOLD_BASE64 } from './pdfFonts'; // DISABLED: corrupted data
+import { ensureUnicodeFont } from './pdfFontLoader';
 
 // --- ULTRA PREMIUM DESIGN SYSTEM ---
 const THEME = {
@@ -32,7 +32,7 @@ function safeStr(val: any): string {
 
 // sanitizeText removed — Roboto fonts support UTF-8 natively
 
-function translateForPDF(key: string, category: string): string {
+export function translateForPDF(key: string, category: string): string {
     const v2Map: Record<string, string> = {
         // Models
         'trendline': 'Trendstyle', 'trendstyle': 'Trendstyle',
@@ -249,10 +249,13 @@ export async function generateOfferPDFData(offer: Offer): Promise<string> {
 async function createDocument(offer: Offer): Promise<jsPDF> {
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // NOTE: Custom Roboto fonts disabled — pdfFonts.ts contains corrupted data.
-    // jsPDF PubSub swallows parse errors without throwing, registering a broken font
-    // that crashes on text(). Using built-in helvetica which handles German chars fine.
-    doc.setFont('helvetica', 'normal');
+    // Roboto ładowane w locie z /public/fonts (pdfFontLoader) — wbudowana helvetica
+    // (WinAnsi) psuła polskie znaki i U+2212: jsPDF koduje całą linię jako UTF-16BE
+    // i wychodzą krzaki. Loader ma smoke-check i fallback na helveticę.
+    const unicodeFont = await ensureUnicodeFont(doc);
+    FONTS.normal = unicodeFont;
+    FONTS.bold = unicodeFont;
+    doc.setFont(unicodeFont, 'normal');
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -764,13 +767,14 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     let ty = y;
 
     doc.setFontSize(9);
-    const productNet = offer.pricing?.sellingPriceNet || 0;
-    const totalsInstallNet = offer.pricing?.installationCosts?.totalInstallation || 0;
-    const totalsInstallGross = totalsInstallNet * 1.19;
-    const productGross = offer.pricing?.sellingPriceGross || (productNet * 1.19);
-    const totalNet = productNet + totalsInstallNet;
+    // sellingPriceNet ZAWIERA już montaż i dojazd (pricing.service.ts:965) —
+    // wcześniejsze dosumowanie liczyło montaż PODWÓJNIE i zawyżało sumę PDF
+    // względem oferty interaktywnej (wzorzec: PublicOfferPage.tsx:435-438)
+    const totalNet = offer.pricing?.sellingPriceNet || 0;
+    const totalsInstallNet = Math.min(installNet, totalNet);
+    const productNet = totalNet - totalsInstallNet;
     const totalVat = totalNet * 0.19;
-    const totalGross = productGross + totalsInstallGross;
+    const totalGross = offer.pricing?.sellingPriceGross || (totalNet * 1.19);
     const discount = offer.pricing?.discountValue || 0;
     const discountGross = discount > 0 ? discount * 1.19 : 0;
 
@@ -782,9 +786,9 @@ async function createDocument(offer: Offer): Promise<jsPDF> {
     ty += 6;
 
     // Installation netto (if applicable)
-    if (installNet > 0) {
+    if (totalsInstallNet > 0) {
         doc.text('Fachgerechte Montage & Lieferung:', totalBoxX, ty + 5);
-        doc.text(formatCurrency(installNet), pageWidth - MARGIN, ty + 5, { align: 'right' });
+        doc.text(formatCurrency(totalsInstallNet), pageWidth - MARGIN, ty + 5, { align: 'right' });
         ty += 6;
     }
 

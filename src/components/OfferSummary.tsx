@@ -197,6 +197,14 @@ export const OfferSummary: React.FC<OfferSummaryProps> = ({ offer, onReset, onOf
     const handleCreateContract = async () => {
         setIsCreatingContract(true);
         try {
+            // Guard: nie twórz duplikatu — jeśli umowa dla tej oferty już istnieje, przejdź do niej
+            const existingContract = await DatabaseService.findContractByOfferId(offer.id);
+            if (existingContract) {
+                toast.error(`Umowa już istnieje (${existingContract.contractNumber})`);
+                navigate(`/contracts/${existingContract.id}`);
+                return;
+            }
+
             const contractPayload = {
                 offerId: offer.id,
                 status: 'draft' as const,

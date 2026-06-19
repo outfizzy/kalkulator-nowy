@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, MapPin, Camera, Loader2, Trash2 } from 'lucide-react';
+import { X, Upload, MapPin, Camera, Loader2, Trash2, Sparkles } from 'lucide-react';
 import { DatabaseService } from '../../services/database';
 import { geocodeAddress } from '../../utils/geocoding';
 import { GeocodingService } from '../../services/geocoding.service';
@@ -34,10 +34,15 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
         description: '',
         client_name: '',
         completion_date: '',
+        seo_title: '',
+        meta_description: '',
     });
 
     const [photoFiles, setPhotoFiles] = useState<File[]>([]);
     const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+    const [aiCaptions, setAiCaptions] = useState<string[]>([]);
+    const [aiTips, setAiTips] = useState<string[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGeocoding, setIsGeocoding] = useState(false);
     const [geocodeResult, setGeocodeResult] = useState<{ lat: number; lng: number } | null>(null);
@@ -114,6 +119,43 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
         }
     };
 
+    const parseDimensions = (title: string): string | undefined => {
+        const m = title.match(/(\d{3,4})\s*[x×]\s*(\d{3,4})/i);
+        if (!m) return undefined;
+        const toM = (v: string) => (parseInt(v, 10) / 1000).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+        return `${toM(m[1])} × ${toM(m[2])} m`;
+    };
+
+    const handleGenerateAI = async () => {
+        setIsGenerating(true);
+        try {
+            const copy = await DatabaseService.generateCopy({
+                productType: form.product_type,
+                city: form.city,
+                postalCode: form.postal_code,
+                dimensions: parseDimensions(form.title || ''),
+                title: form.title,
+                draftDescription: form.description,
+                photoCount: photoFiles.length,
+            });
+            setForm(prev => ({
+                ...prev,
+                title: copy.title || prev.title,
+                description: copy.description || prev.description,
+                seo_title: copy.seoTitle || prev.seo_title,
+                meta_description: copy.metaDescription || prev.meta_description,
+            }));
+            setAiCaptions(copy.photoCaptions || []);
+            setAiTips(copy.tips || []);
+            toast.success('KI-Texte erstellt — bitte prüfen und ggf. anpassen.');
+        } catch (e) {
+            console.error('AI copy error:', e);
+            toast.error(e instanceof Error ? e.message : 'KI-Generierung fehlgeschlagen.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!form.title.trim()) {
             toast.error('Titel ist erforderlich');
@@ -134,7 +176,8 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
                     longitude: geocodeResult?.lng,
                     source: 'manual',
                 },
-                photoFiles
+                photoFiles,
+                aiCaptions
             );
 
             toast.success('Referenz hinzugefügt!');
@@ -151,9 +194,13 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
                 description: '',
                 client_name: '',
                 completion_date: '',
+                seo_title: '',
+                meta_description: '',
             });
             setPhotoFiles([]);
             setPhotoPreviews([]);
+            setAiCaptions([]);
+            setAiTips([]);
             setGeocodeResult(null);
         } catch (error) {
             console.error('Error creating realization:', error);
@@ -209,6 +256,35 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
                         </div>
                     </div>
 
+                    {/* KI-Assistent (Claude): Beschreibung, SEO & Bildtexte */}
+                    <div className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-blue-50 p-4 space-y-2">
+                        <button
+                            type="button"
+                            onClick={handleGenerateAI}
+                            disabled={isGenerating}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-lg font-semibold text-sm hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                        >
+                            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                            {isGenerating ? 'KI schreibt…' : 'KI: Beschreibung, SEO & Bildtexte erstellen'}
+                        </button>
+                        <p className="text-[11px] text-violet-700/80 leading-snug">
+                            Schreibt eine SEO-optimierte Projektbeschreibung, SEO-Titel, Meta-Beschreibung und Bildunterschriften.
+                            Tipp: zuerst <strong>Produkttyp, Ort/PLZ</strong> und die <strong>Fotos</strong> wählen. Alle Texte bleiben editierbar.
+                        </p>
+                    </div>
+
+                    {/* KI-Tipps: was/wie diese Referenz besser machen */}
+                    {aiTips.length > 0 && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                            <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> KI-Tipps — so wird die Referenz noch besser</p>
+                            <ul className="space-y-1.5">
+                                {aiTips.map((t, i) => (
+                                    <li key={i} className="text-xs text-amber-900/90 flex gap-2"><span className="text-amber-500 mt-0.5">●</span><span>{t}</span></li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {/* Description */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Beschreibung</label>
@@ -216,10 +292,42 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
                             name="description"
                             value={form.description || ''}
                             onChange={handleChange}
-                            placeholder="Optionale Beschreibung der Referenz..."
-                            rows={2}
+                            placeholder="Optionale Beschreibung der Referenz… oder von der KI erstellen lassen."
+                            rows={4}
                             className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                         />
+                    </div>
+
+                    {/* SEO-Felder */}
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-sm font-semibold text-slate-700">SEO-Titel</label>
+                                <span className={`text-[11px] ${(form.seo_title || '').length > 60 ? 'text-red-500' : 'text-slate-400'}`}>{(form.seo_title || '').length}/60</span>
+                            </div>
+                            <input
+                                type="text"
+                                name="seo_title"
+                                value={form.seo_title || ''}
+                                onChange={handleChange}
+                                placeholder="z. B. Terrassenüberdachung Dresden – Polendach24 Referenz"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-sm font-semibold text-slate-700">Meta-Beschreibung</label>
+                                <span className={`text-[11px] ${(form.meta_description || '').length > 155 ? 'text-red-500' : 'text-slate-400'}`}>{(form.meta_description || '').length}/155</span>
+                            </div>
+                            <textarea
+                                name="meta_description"
+                                value={form.meta_description || ''}
+                                onChange={handleChange}
+                                placeholder="Kurztext für Google-Suchergebnisse (mit Handlungsaufforderung)."
+                                rows={2}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                            />
+                        </div>
                     </div>
 
                     {/* Address */}
@@ -359,6 +467,18 @@ export const AddRealizationModal: React.FC<AddRealizationModalProps> = ({ isOpen
                                         </button>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {aiCaptions.length > 0 && (
+                            <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3">
+                                <p className="text-[11px] font-bold text-violet-700 uppercase tracking-wider mb-1.5">KI-Bildunterschriften (Alt-Texte)</p>
+                                <ul className="space-y-1">
+                                    {aiCaptions.map((c, i) => (
+                                        <li key={i} className="text-xs text-slate-600 flex gap-1.5"><span className="text-violet-400 font-mono">{i + 1}.</span><span>{c}</span></li>
+                                    ))}
+                                </ul>
+                                <p className="text-[10px] text-slate-400 mt-1.5">Werden den Fotos der Reihe nach zugeordnet (1 = Cover).</p>
                             </div>
                         )}
                     </div>

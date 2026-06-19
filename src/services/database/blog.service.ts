@@ -22,6 +22,22 @@ export interface BlogPost {
     silo?: string | null;
     /** Display priority (1 = highest) */
     priority?: number;
+    /** SEO alt text for the cover image. */
+    image_alt?: string | null;
+}
+
+/** Result of the AI article generator (Claude) — a publish-ready post with all SEO fields. */
+export interface GeneratedArticle {
+    title: string;
+    slug: string;
+    excerpt: string;
+    metaTitle: string;
+    metaDescription: string;
+    tags: string[];
+    suggestedSilo: string;
+    content: string;
+    coverImageAlt: string;
+    imageBriefs: { placement: string; description: string; alt: string }[];
 }
 
 export const BlogService = {
@@ -82,6 +98,7 @@ export const BlogService = {
             meta_title: post.meta_title || post.title || '',
             meta_description: post.meta_description || post.excerpt || '',
             tags: post.tags || [],
+            image_alt: post.image_alt || null,
             site,
         };
 
@@ -124,6 +141,24 @@ export const BlogService = {
 
         if (error) throw error;
         return data;
+    },
+
+    /**
+     * AI article generator (Claude Opus 4.8) — returns a publish-ready German SEO post
+     * with all fields (title, slug, meta, tags, silo, content, cover alt, image briefs).
+     * Calls the `generate-blog-article` Edge Function.
+     */
+    async generateArticle(input: { topic: string; keywords?: string; silo?: string | null }): Promise<GeneratedArticle> {
+        const { data, error } = await supabase.functions.invoke('generate-blog-article', { body: input });
+        if (error) {
+            let detail = '';
+            try { detail = (await (error as { context?: Response }).context?.json())?.error || ''; } catch { /* ignore */ }
+            throw new Error(detail || 'KI-Generierung fehlgeschlagen.');
+        }
+        if (!data || (data as { error?: string }).error) {
+            throw new Error((data as { error?: string })?.error || 'KI-Generierung fehlgeschlagen.');
+        }
+        return data as GeneratedArticle;
     },
 
     async publishPost(id: string): Promise<void> {
@@ -197,13 +232,15 @@ export const BlogService = {
         const folder = site === 'de' ? 'blog-de' : 'blog-pl';
         const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substr(2, 8)}.${ext}`;
 
+        // Bucket 'media': existing public bucket (auth upload, public read, image mime types).
+        // The previously referenced 'public' bucket does not exist → uploads failed.
         const { error } = await supabase.storage
-            .from('public')
+            .from('media')
             .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
         if (error) throw error;
 
-        const { data } = supabase.storage.from('public').getPublicUrl(fileName);
+        const { data } = supabase.storage.from('media').getPublicUrl(fileName);
         return data.publicUrl;
     }
 };

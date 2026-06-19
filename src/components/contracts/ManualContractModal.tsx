@@ -10,23 +10,36 @@ interface ManualContractModalProps {
     onClose: () => void;
     onSuccess: () => void;
     preselectedCustomer?: Customer;
+    /** Marka, w ramach której tworzymy umowę: 'de' = Polendach24, 'pl' = zadaszto.pl */
+    brand?: 'de' | 'pl';
 }
 
-export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen, onClose, onSuccess, preselectedCustomer }) => {
+export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen, onClose, onSuccess, preselectedCustomer, brand = 'de' }) => {
     const [step, setStep] = useState<'customer' | 'details'>(preselectedCustomer ? 'details' : 'customer');
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(preselectedCustomer);
+
+    // ── Branding / waluta / VAT zależne od marki ──
+    const isPL = brand === 'pl';
+    const currency = isPL ? 'PLN' : 'EUR';
+    const curSym = isPL ? 'zł' : '€';
+    // Stawka VAT jako ułamek. DE: stałe 19%. PL: wybór 23%/8%.
+    const [vatRate, setVatRate] = useState(isPL ? 0.23 : 0.19);
+    const vatMult = 1 + vatRate;
+    const vatPct = Math.round(vatRate * 100);
+    const vatLabel = isPL ? 'VAT' : 'MwSt';
 
     // Form State
     const [contractNumber, setContractNumber] = useState('');
 
-    // Auto-fetch next contract number
+    // Auto-fetch next contract number (per marka) + reset VAT przy otwarciu/zmianie marki
     React.useEffect(() => {
         if (isOpen) {
-            DatabaseService.getNextContractNumber()
+            setVatRate(brand === 'pl' ? 0.23 : 0.19);
+            DatabaseService.getNextContractNumber(brand)
                 .then(num => setContractNumber(num))
                 .catch(err => console.error('Failed to fetch next contract number:', err));
         }
-    }, [isOpen]);
+    }, [isOpen, brand]);
 
     // Items State (descriptive, no per-item price)
     const [items, setItems] = useState<Array<{
@@ -69,25 +82,22 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     const [newAddon, setNewAddon] = useState('');
     const [newAddonPlacement, setNewAddonPlacement] = useState('alle');
 
-    // Addons that need placement specification
-    const placementAddons = [
-        'Schiebewand Glas AL23', 'Schiebewand Glas AL24',
-        'Senkrechtmarkise (ZIP Screen)',
-        'Seitenwand Glas', 'Seitenwand Alu', 'Frontwand Alu',
-        'Seitenwand Polycarbonat',
-        'Markise Aufdach (Dachowa)', 'Markise Unterdach (Poddachowa)',
-        'Keilfenster (Okno klinowe)',
-        'Windschutz'
-    ];
-    const placementOptions = [
+    // Słowa kluczowe dopasowań (DE + PL), niezależne od języka etykiet
+    const matchAny = (name: string, keys: string[]) => keys.some(k => name.toLowerCase().includes(k.toLowerCase()));
+    const placementOptions = isPL ? [
+        { id: 'links', label: 'Lewa' },
+        { id: 'rechts', label: 'Prawa' },
+        { id: 'vorne', label: 'Przód' },
+        { id: 'alle', label: 'Wszystkie strony' }
+    ] : [
         { id: 'links', label: 'Links (Lewa)' },
         { id: 'rechts', label: 'Rechts (Prawa)' },
         { id: 'vorne', label: 'Vorne (Przód)' },
         { id: 'alle', label: 'Alle Seiten (Wszystkie)' }
     ];
-    const needsPlacement = (addonName: string) => placementAddons.some(p => addonName.includes(p.split(' ')[0]));
-    const needsDimensions = (addonName: string) => ['Senkrechtmarkise', 'Seitenwand', 'Frontwand', 'Keilfenster', 'Windschutz', 'Schiebewand'].some(k => addonName.includes(k));
-    const needsQuantity = (addonName: string) => ['LED', 'Heizstrahler', 'Lautsprecher', 'Spots'].some(k => addonName.includes(k));
+    const needsPlacement = (addonName: string) => matchAny(addonName, ['Schiebewand', 'Senkrechtmarkise', 'Seitenwand', 'Frontwand', 'Keilfenster', 'Windschutz', 'Ściana', 'Roleta', 'Markiz', 'Okno klinowe', 'Osłona', 'przesuwn']);
+    const needsDimensions = (addonName: string) => matchAny(addonName, ['Senkrechtmarkise', 'Seitenwand', 'Frontwand', 'Keilfenster', 'Windschutz', 'Schiebewand', 'ZIP', 'Roleta', 'Ściana', 'Okno klinowe', 'przesuwn', 'Osłona']);
+    const needsQuantity = (addonName: string) => matchAny(addonName, ['LED', 'Heizstrahler', 'Lautsprecher', 'Spots', 'Spoty', 'Promiennik', 'Głośnik', 'Listwa']);
 
     // Measurement / Ordering Data State
     const [unterkRinne, setUnterkRinne] = useState('');     // H3 - Unterkante Rinne
@@ -110,8 +120,19 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     const [deliverySameAsClient, setDeliverySameAsClient] = useState(true);
     const [plannedInstallDate, setPlannedInstallDate] = useState(''); // Planowana data montażu
 
-    // Addons from catalog.json and pricing engine — grouped by category
-    const commonAddons = [
+    // Dodatki — etykiety zależne od marki (PL po polsku, DE po niemiecku)
+    const commonAddons = isPL ? [
+        'LED Spoty', 'LED Listwa', 'LED Trafo',
+        'Ściana przesuwna szklana AL23', 'Ściana przesuwna szklana AL24',
+        'Markiza naddachowa', 'Markiza poddachowa',
+        'Roleta ZIP (pionowa)',
+        'Ściana boczna szklana', 'Ściana boczna alu', 'Ściana frontowa alu',
+        'Ściana boczna poliwęglan',
+        'Okno klinowe',
+        'Promiennik grzewczy', 'Głośnik',
+        'Podłoga WPC', 'Fundament',
+        'Rynna', 'Fotowoltaika', 'Osłona wiatrowa'
+    ] : [
         // Oświetlenie / Beleuchtung
         'LED Spots', 'LED Listwa (Stripe)', 'LED Trafo',
         // Szyby przesuwne / Schiebewände
@@ -131,7 +152,11 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
         'Regenrinne (Rynna)', 'Photovoltaik', 'Windschutz'
     ];
 
-    const commonColors = [
+    const commonColors = isPL ? [
+        'RAL 7016 (antracyt)', 'RAL 9016 (biały)', 'RAL 9005 (czarny)',
+        'RAL 7035 (jasnoszary)', 'RAL 8014 (brąz sepia)', 'RAL 9006 (srebrny)',
+        'DB 703', 'Kolor specjalny (RAL)'
+    ] : [
         'RAL 7016 (Anthrazit)', 'RAL 9016 (Weiß)', 'RAL 9005 (Schwarz)',
         'RAL 7035 (Lichtgrau)', 'RAL 8014 (Sepiabraun)', 'RAL 9006 (Silber)',
         'DB 703', 'Sonderfarbe (RAL)'
@@ -154,7 +179,6 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     if (!isOpen) return null;
 
     const totalPrice = parseFloat(totalContractPrice.replace(',', '.')) || 0;
-    const totalPriceBrutto = parseFloat(totalContractPriceBrutto.replace(',', '.')) || 0;
     const installPriceNum = parseFloat(installationPrice.replace(',', '.')) || 0;
     const installDaysNum = parseInt(installationDays) || 1;
 
@@ -162,20 +186,26 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     const handleNettoChange = (val: string) => {
         setTotalContractPrice(val);
         const n = parseFloat(val.replace(',', '.')) || 0;
-        setTotalContractPriceBrutto(n > 0 ? (n * 1.19).toFixed(2) : '');
+        setTotalContractPriceBrutto(n > 0 ? (n * vatMult).toFixed(2) : '');
         setPriceInputMode('netto');
     };
     const handleBruttoChange = (val: string) => {
         setTotalContractPriceBrutto(val);
         const b = parseFloat(val.replace(',', '.')) || 0;
-        setTotalContractPrice(b > 0 ? (b / 1.19).toFixed(2) : '');
+        setTotalContractPrice(b > 0 ? (b / vatMult).toFixed(2) : '');
         setPriceInputMode('brutto');
+    };
+    // Zmiana stawki VAT (PL) — przelicz brutto z aktualnego netto
+    const handleVatChange = (rate: number) => {
+        setVatRate(rate);
+        const n = parseFloat(totalContractPrice.replace(',', '.')) || 0;
+        if (n > 0) setTotalContractPriceBrutto((n * (1 + rate)).toFixed(2));
     };
 
     // Advance helpers
     const advanceNum = parseFloat(advance.replace(',', '.')) || 0;
     const setAdvancePercent = (pct: number) => {
-        const base = advanceType === 'brutto' ? totalPrice * 1.19 : totalPrice;
+        const base = advanceType === 'brutto' ? totalPrice * vatMult : totalPrice;
         setAdvance((base * pct / 100).toFixed(2));
     };
 
@@ -248,10 +278,12 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
         setIsSubmitting(true);
         try {
             const advanceRaw = parseFloat(advance.replace(',', '.'));
-            const advanceNetto = advanceType === 'brutto' ? advanceRaw / 1.19 : advanceRaw;
+            const advanceNetto = advanceType === 'brutto' ? advanceRaw / vatMult : advanceRaw;
 
             await DatabaseService.createManualContract({
                 customer: selectedCustomer,
+                brand,
+                vatRate,
                 items: allItems,
                 totalPrice: totalPrice,
                 contractDetails: {
@@ -352,18 +384,42 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 )}
                             </div>
 
-                            {/* Contract Number */}
+                            {/* Brand badge */}
+                            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold ${isPL ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
+                                <span className="text-base">{isPL ? '🇵🇱' : '🇩🇪'}</span>
+                                <span>Umowa dla marki: {isPL ? 'zadaszto.pl' : 'Polendach24'}</span>
+                                <span className="ml-auto text-xs font-medium opacity-80">{currency} · VAT {vatPct}%</span>
+                            </div>
+
+                            {/* Contract Number — auto-podpowiedź, można wpisać ręcznie */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Numer Umowy (Opcjonalne)
+                                    Numer umowy
                                 </label>
-                                <input
-                                    type="text"
-                                    value={contractNumber}
-                                    onChange={e => setContractNumber(e.target.value)}
-                                    placeholder="np. PL/001/13/01/2026"
-                                    className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={contractNumber}
+                                        onChange={e => setContractNumber(e.target.value)}
+                                        placeholder={isPL ? 'np. ZAD/2026/001' : 'np. UM/2026/001'}
+                                        className="flex-1 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => DatabaseService.getNextContractNumber(brand)
+                                            .then(num => setContractNumber(num))
+                                            .catch(err => console.error('Failed to fetch next contract number:', err))}
+                                        title="Wygeneruj kolejny numer"
+                                        className="px-3 py-2 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium whitespace-nowrap"
+                                    >
+                                        ↻ kolejny
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    {isPL
+                                        ? 'Podpowiadamy kolejny numer zadaszto.pl — możesz wpisać własny ręcznie.'
+                                        : 'Auto-Vorschlag der nächsten Nummer — manuell überschreibbar.'}
+                                </p>
                             </div>
 
                             {/* ── Product Configuration ── */}
@@ -446,7 +502,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                                 onChange={e => setPostsCount(e.target.value)}
                                                 className="w-full p-2.5 border border-blue-200 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-blue-400 outline-none"
                                             />
-                                            <p className="text-[9px] text-blue-400 text-center mt-0.5">Pfosten / Stützen</p>
+                                            <p className="text-[9px] text-blue-400 text-center mt-0.5">{isPL ? 'słupy' : 'Pfosten / Stützen'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -578,14 +634,14 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                             {/* ── Measurement / Ordering Data ── */}
                             <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
                                 <h3 className="font-bold text-emerald-800 mb-3 flex items-center gap-2 text-sm">
-                                    <span>📐</span> Dane z Pomiaru (Bestelldaten)
+                                    <span>📐</span> {isPL ? 'Dane z pomiaru' : 'Dane z Pomiaru (Bestelldaten)'}
                                 </h3>
                                 <p className="text-[10px] text-emerald-500 mb-3">Dane techniczne potrzebne do złożenia zamówienia u producenta.</p>
 
                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                     {/* Unterkante Rinne (H3) */}
                                     <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Unterkante Rinne / H3 (mm)</label>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Dolna krawędź rynny / H3 (mm)' : 'Unterkante Rinne / H3 (mm)'}</label>
                                         <input
                                             type="number"
                                             value={unterkRinne}
@@ -593,12 +649,12 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                             placeholder="np. 2500"
                                             className="w-full p-2.5 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                                         />
-                                        <p className="text-[9px] text-emerald-400 mt-0.5">Höhe Unterkante Rinne vom Boden</p>
+                                        <p className="text-[9px] text-emerald-400 mt-0.5">{isPL ? 'Wysokość dolnej krawędzi rynny od podłoża' : 'Höhe Unterkante Rinne vom Boden'}</p>
                                     </div>
 
                                     {/* Unterkante Wand (H1) */}
                                     <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Unterkante Wand / H1 (mm)</label>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Dolna krawędź profilu ściennego / H1 (mm)' : 'Unterkante Wand / H1 (mm)'}</label>
                                         <input
                                             type="number"
                                             value={unterkWand}
@@ -606,7 +662,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                             placeholder="np. 2800"
                                             className="w-full p-2.5 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                                         />
-                                        <p className="text-[9px] text-emerald-400 mt-0.5">Höhe Unterkante Wandprofil</p>
+                                        <p className="text-[9px] text-emerald-400 mt-0.5">{isPL ? 'Wysokość dolnej krawędzi profilu ściennego' : 'Höhe Unterkante Wandprofil'}</p>
                                     </div>
                                 </div>
 
@@ -665,30 +721,30 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 {/* Wall & Mounting Type */}
                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                     <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ściana / Wandbeschaffenheit</label>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Ściana' : 'Ściana / Wandbeschaffenheit'}</label>
                                         <select
                                             value={wallType}
                                             onChange={e => setWallType(e.target.value)}
                                             className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                                         >
-                                            <option value="massiv">Mur masywny (Massivwand)</option>
-                                            <option value="daemmung">Ocieplenie / WDVS (Dämmung)</option>
-                                            <option value="holz">Drewno (Holzwand)</option>
-                                            <option value="blech">Blacha (Blechfassade)</option>
-                                            <option value="fertighaus">Dom prefabrykowany (Fertighaus)</option>
-                                            <option value="other">Inne (Sonstiges)</option>
+                                            <option value="massiv">{isPL ? 'Mur masywny' : 'Mur masywny (Massivwand)'}</option>
+                                            <option value="daemmung">{isPL ? 'Ocieplenie / WDVS' : 'Ocieplenie / WDVS (Dämmung)'}</option>
+                                            <option value="holz">{isPL ? 'Drewno' : 'Drewno (Holzwand)'}</option>
+                                            <option value="blech">{isPL ? 'Blacha' : 'Blacha (Blechfassade)'}</option>
+                                            <option value="fertighaus">{isPL ? 'Dom prefabrykowany' : 'Dom prefabrykowany (Fertighaus)'}</option>
+                                            <option value="other">{isPL ? 'Inne' : 'Inne (Sonstiges)'}</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Montaż / Montageart</label>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Montaż' : 'Montaż / Montageart'}</label>
                                         <select
                                             value={mountType}
                                             onChange={e => setMountType(e.target.value)}
                                             className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                                         >
-                                            <option value="wall">Montaż ścienny (Wandmontage)</option>
-                                            <option value="ceiling">Montaż sufitowy (Deckenmontage)</option>
-                                            <option value="freestanding">Wolnostojący (Freistand)</option>
+                                            <option value="wall">{isPL ? 'Montaż ścienny' : 'Montaż ścienny (Wandmontage)'}</option>
+                                            <option value="ceiling">{isPL ? 'Montaż sufitowy' : 'Montaż sufitowy (Deckenmontage)'}</option>
+                                            <option value="freestanding">{isPL ? 'Wolnostojący' : 'Wolnostojący (Freistand)'}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -702,7 +758,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                             onChange={e => setHasElectrical(e.target.checked)}
                                             className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-400"
                                         />
-                                        <span className="text-xs text-emerald-800 font-medium">⚡ Prąd na miejscu (Strom vorhanden)</span>
+                                        <span className="text-xs text-emerald-800 font-medium">⚡ {isPL ? 'Prąd na miejscu' : 'Prąd na miejscu (Strom vorhanden)'}</span>
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
@@ -711,15 +767,15 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                             onChange={e => setHasDrainage(e.target.checked)}
                                             className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-400"
                                         />
-                                        <span className="text-xs text-emerald-800 font-medium">🌧️ Odpływ wody (Entwässerung vorhanden)</span>
+                                        <span className="text-xs text-emerald-800 font-medium">🌧️ {isPL ? 'Odpływ wody' : 'Odpływ wody (Entwässerung vorhanden)'}</span>
                                     </label>
                                     {hasDrainage && (
                                         <div className="flex items-center gap-2 ml-6">
                                             <span className="text-[10px] text-emerald-600 font-bold">Kierunek:</span>
                                             {[
-                                                { id: 'links', label: '← Links' },
-                                                { id: 'rechts', label: 'Rechts →' },
-                                                { id: 'beidseitig', label: '← Obie / Beidseitig →' }
+                                                { id: 'links', label: isPL ? '← Lewo' : '← Links' },
+                                                { id: 'rechts', label: isPL ? 'Prawo →' : 'Rechts →' },
+                                                { id: 'beidseitig', label: isPL ? '← Obustronnie →' : '← Obie / Beidseitig →' }
                                             ].map(d => (
                                                 <button
                                                     key={d.id}
@@ -740,7 +796,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
 
                                 {/* Technical Notes */}
                                 <div>
-                                    <label className="block text-xs font-bold text-emerald-700 mb-1">Uwagi techniczne / Technische Hinweise</label>
+                                    <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Uwagi techniczne' : 'Uwagi techniczne / Technische Hinweise'}</label>
                                     <textarea
                                         value={technicalNotes}
                                         onChange={e => setTechnicalNotes(e.target.value)}
@@ -925,14 +981,39 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
 
                             {/* Financial Summary */}
                             <div className="space-y-4">
-                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                    <span>💰</span> Podsumowanie Finansowe
-                                </h3>
+                                <div className="flex items-center justify-between gap-2">
+                                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                        <span>💰</span> Podsumowanie Finansowe
+                                    </h3>
+                                    {/* Stawka VAT — wybór dla PL, stała dla DE */}
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{vatLabel}</span>
+                                        {isPL ? (
+                                            <div className="flex gap-1">
+                                                {[0.23, 0.08].map(r => (
+                                                    <button
+                                                        key={r}
+                                                        type="button"
+                                                        onClick={() => handleVatChange(r)}
+                                                        className={`px-2 py-0.5 text-[11px] font-bold rounded-md border transition-colors ${vatRate === r ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                                    >
+                                                        {Math.round(r * 100)}%
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-600">19%</span>
+                                        )}
+                                    </div>
+                                </div>
+                                {isPL && (
+                                    <p className="text-[10px] text-slate-400 -mt-2">8% — usługa budowlano-montażowa (budownictwo mieszkaniowe); 23% — stawka podstawowa.</p>
+                                )}
 
                                 {/* Total Contract Price — Netto / Brutto bidirectional */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Netto (EUR)</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Netto ({currency})</label>
                                         <input
                                             type="text"
                                             value={totalContractPrice}
@@ -942,7 +1023,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Brutto (EUR)</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Brutto ({currency})</label>
                                         <input
                                             type="text"
                                             value={totalContractPriceBrutto}
@@ -950,14 +1031,14 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                             placeholder="np. 5950"
                                             className={`w-full p-2.5 border-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-right font-bold text-lg ${priceInputMode === 'brutto' ? 'border-indigo-400 bg-white' : 'border-slate-200 bg-slate-50'}`}
                                         />
-                                        <p className="text-[10px] text-slate-400 text-right mt-0.5">19% MwSt</p>
+                                        <p className="text-[10px] text-slate-400 text-right mt-0.5">{vatPct}% {vatLabel}</p>
                                     </div>
                                 </div>
 
                                 {/* Installation Price + Days */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cena Montażu Netto (EUR)</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cena Montażu Netto ({currency})</label>
                                         <input
                                             type="text"
                                             value={installationPrice}
@@ -969,8 +1050,8 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cena Montażu Brutto</label>
                                         <div className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-600 text-right">
-                                            {(installPriceNum * 1.19).toFixed(2)} €
-                                            <span className="text-[10px] text-slate-400 ml-1">(19%)</span>
+                                            {(installPriceNum * vatMult).toFixed(2)} {curSym}
+                                            <span className="text-[10px] text-slate-400 ml-1">({vatPct}%)</span>
                                         </div>
                                     </div>
                                     <div>
@@ -990,13 +1071,13 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     <div className="flex justify-between items-center">
                                         <span className="text-sm font-bold text-indigo-800">RAZEM Netto (Zlecenie + Montaż)</span>
                                         <span className="text-lg font-bold text-indigo-900">
-                                            {(totalPrice + installPriceNum).toFixed(2)} €
+                                            {(totalPrice + installPriceNum).toFixed(2)} {curSym}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1">
-                                        <span className="text-xs text-indigo-600">RAZEM Brutto (19% MwSt)</span>
+                                        <span className="text-xs text-indigo-600">RAZEM Brutto ({vatPct}% {vatLabel})</span>
                                         <span className="text-sm font-bold text-indigo-700">
-                                            {((totalPrice + installPriceNum) * 1.19).toFixed(2)} €
+                                            {((totalPrice + installPriceNum) * vatMult).toFixed(2)} {curSym}
                                         </span>
                                     </div>
                                 </div>
@@ -1005,7 +1086,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Zaliczka (EUR)</label>
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Zaliczka ({currency})</label>
                                             <div className="flex items-center gap-1">
                                                 <button type="button" onClick={() => setAdvanceType('netto')} className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${advanceType === 'netto' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Netto</button>
                                                 <button type="button" onClick={() => setAdvanceType('brutto')} className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${advanceType === 'brutto' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Brutto</button>
@@ -1035,7 +1116,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                         {totalPrice > 0 && advanceNum > 0 && (
                                             <p className="text-[10px] text-slate-400 mt-1 text-right">
                                                 = {advanceType === 'brutto'
-                                                    ? `${((advanceNum / (totalPrice * 1.19)) * 100).toFixed(0)}% brutto`
+                                                    ? `${((advanceNum / (totalPrice * vatMult)) * 100).toFixed(0)}% brutto`
                                                     : `${((advanceNum / totalPrice) * 100).toFixed(0)}% netto`
                                                 }
                                             </p>

@@ -23,10 +23,27 @@ export const ContractsList: React.FC = () => {
 
     // Role checks
     const userRole = currentUser?.role;
-    const isSalesRep = userRole === 'sales_rep';
+    // Handlowiec DE i PL widzą wyłącznie swoje umowy (jak dotychczas dla 'sales_rep')
+    const isSalesRep = userRole === 'sales_rep' || userRole === 'sales_rep_pl';
     const isManagerRole = userRole === 'manager';
     const canSeeCommission = isAdmin() || isSalesRep; // admin & sales_rep see commission
     const canSeeStats = isAdmin() || isManagerRole; // admin & manager see stats
+
+    // ── Przełącznik marki: pl = zadaszto.pl, de = Polendach24 (jak w leadach) ──
+    const isPLOnly = userRole === 'sales_rep_pl';
+    const isDEOnly = userRole === 'sales_rep';
+    const canSwitchMarket = isAdmin() || isManagerRole;
+    const [marketFilter, setMarketFilter] = useState<'de' | 'pl'>(() => {
+        if (isPLOnly) return 'pl';
+        if (isDEOnly) return 'de';
+        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('contracts_market') : null;
+        return saved === 'pl' ? 'pl' : 'de';
+    });
+    const changeMarket = (m: 'de' | 'pl') => {
+        setMarketFilter(m);
+        setCurrentPage(1);
+        try { localStorage.setItem('contracts_market', m); } catch { /* ignore */ }
+    };
 
     const loadContracts = useCallback(async () => {
         try {
@@ -76,10 +93,12 @@ export const ContractsList: React.FC = () => {
         }
     };
 
+    // Filtruj po aktywnej marce (brak brand = 'de' dla zgodności wstecz)
+    const byMarket = contracts.filter(c => ((c.brand || 'de') === marketFilter));
     // Sales rep only sees their own contracts
     const visibleContracts = isSalesRep
-        ? contracts.filter(c => c.salesRepId === currentUser?.id)
-        : contracts;
+        ? byMarket.filter(c => c.salesRepId === currentUser?.id)
+        : byMarket;
 
     const filteredContracts = visibleContracts.filter(c => {
         const term = searchTerm.toLowerCase();
@@ -123,9 +142,37 @@ export const ContractsList: React.FC = () => {
         <div className="h-full flex flex-col bg-slate-50">
             <div className="p-4 sm:p-6">
                 <div className="flex flex-wrap justify-between items-center gap-3 mb-4 sm:mb-6">
-                    <div>
-                        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Lista Umów</h1>
-                        <p className="text-slate-500 text-sm hidden sm:block">Zarządzaj umowami i dokumentacją</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="min-w-0">
+                            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Lista Umów</h1>
+                            <p className="text-slate-500 text-sm hidden sm:block">Zarządzaj umowami i dokumentacją</p>
+                        </div>
+
+                        {/* Przełącznik marki (DE / PL) */}
+                        {(canSwitchMarket || isPLOnly || isDEOnly) && (
+                            <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                                {(canSwitchMarket || isDEOnly) && (
+                                    <button
+                                        onClick={() => changeMarket('de')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${marketFilter === 'de'
+                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80'
+                                            : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        <span className="text-sm">🇩🇪</span> DE
+                                    </button>
+                                )}
+                                {(canSwitchMarket || isPLOnly) && (
+                                    <button
+                                        onClick={() => changeMarket('pl')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${marketFilter === 'pl'
+                                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80'
+                                            : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        <span className="text-sm">🇵🇱</span> PL
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         {canSeeStats && (
@@ -497,6 +544,7 @@ export const ContractsList: React.FC = () => {
             {/* Manual Contract Modal */}
             <ManualContractModal
                 isOpen={isManualModalOpen}
+                brand={marketFilter}
                 onClose={() => setIsManualModalOpen(false)}
                 onSuccess={() => {
                     loadContracts();
