@@ -1620,11 +1620,11 @@ export const ContractService = {
                 const detectCategory = (desc: string, model: string): string => {
                     const d = desc.toLowerCase();
                     const m = model.toLowerCase();
-                    if (d.includes('senkrechtmarkise') || d.includes('zip')) return 'ZIP Screen';
-                    if (d.includes('schiebewand') || d.includes('szyb') || d.includes('sliding')) return 'Sliding Glass';
-                    if (d.includes('seitenwand') || d.includes('ściana') || d.includes('festwand')) return 'Side Wall';
+                    if (d.includes('senkrechtmarkise') || d.includes('zip') || d.includes('roleta')) return 'ZIP Screen';
+                    if (d.includes('schiebewand') || d.includes('szyb') || d.includes('sliding') || d.includes('przesuwn')) return 'Sliding Glass';
+                    if (d.includes('seitenwand') || d.includes('ściana') || d.includes('festwand') || d.includes('windschutz') || d.includes('osłona')) return 'Side Wall';
                     if (d.includes('markise') || d.includes('markiza')) return 'Awning';
-                    if (d.includes('led') || d.includes('heizstrahler') || d.includes('lautsprecher') || d.includes('rinne')) return 'Accessories';
+                    if (d.includes('led') || d.includes('heizstrahler') || d.includes('lautsprecher') || d.includes('rinne') || d.includes('promiennik') || d.includes('głośnik') || d.includes('rynna') || d.includes('fotowoltaik') || d.includes('photovoltaik')) return 'Accessories';
                     if (d.includes('wpc') || d.includes('boden') || d.includes('podłog')) return 'Flooring';
                     if (d.includes('profil') || d.includes('ausgleich') || d.includes('wandanschluss')) return 'Profiles';
                     if (m === 'addon') return 'Accessories';

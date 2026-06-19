@@ -382,10 +382,21 @@ async function createContractDocument(contract: Contract): Promise<jsPDF> {
 
     const addons = Array.isArray(product.addons) ? product.addons : [];
     const customItems = Array.isArray(product.customItems) ? product.customItems : [];
-    if (addons.length || customItems.length) {
+    // Dedup po etykiecie — w umowach manualnych dodatki trafiają i do addons,
+    // i do customItems; bez tego wyświetlałyby się dwukrotnie. Dla ofert (rozłączne
+    // listy) pokażemy wszystkie pozycje.
+    const extras: string[] = [];
+    const seenExtras = new Set<string>();
+    const pushExtra = (label: string) => {
+        const t = (label || '').trim();
+        const k = t.toLowerCase();
+        if (t && !seenExtras.has(k)) { seenExtras.add(k); extras.push(t); }
+    };
+    for (const a of addons) pushExtra(addonLabel(a, lang));
+    for (const ci of customItems) pushExtra(ci?.name || ci?.description || L.sonderpos);
+    if (extras.length) {
         bodyText(L.addonsTitle, { bold: true });
-        for (const a of addons) bodyText(`• ${addonLabel(a, lang)}`);
-        for (const ci of customItems) bodyText(`• ${ci?.name || ci?.description || L.sonderpos}`);
+        for (const e of extras) bodyText(`• ${e}`);
         y += 2;
     }
 
