@@ -166,7 +166,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
     // Kanoniczna linia produktów (polendach24.de / zadaszto.pl) + opcja "Inny"
     const availableModels = [
         ...PRODUCT_MODELS.map(m => ({ id: m.id, name: m.label })),
-        { id: 'other', name: 'Inny / Sonstiges' }
+        { id: 'other', name: isPL ? 'Inny' : 'Inny / Sonstiges' }
     ];
 
     if (!isOpen) return null;

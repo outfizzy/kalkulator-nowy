@@ -261,7 +261,7 @@ export const BestellscheinPage: React.FC = () => {
         montagePolendach: data.montagePolendach,
         montageKunde: data.montageKunde,
       });
-      toast.success('Bestellschein PDF wygenerowany!');
+      toast.success(L('Bestellschein PDF wygenerowany!', 'Karta zamówienia (PDF) wygenerowana!'));
     } catch (err) {
       console.error(err);
       toast.error('Błąd generowania PDF');

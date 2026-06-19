@@ -1908,7 +1908,7 @@ const ContractPDFButton: React.FC<{ contract: Contract }> = ({ contract }) => {
                 onClick={() => run('download')}
                 disabled={generating}
                 className="px-4 py-2 bg-slate-800 text-white rounded-l-lg font-bold hover:bg-slate-900 transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
-                title="Pobierz gotową umowę do druku (Werkvertrag + AGB)"
+                title={(contract.brand || 'de') === 'pl' ? 'Pobierz gotową umowę do druku (Umowa + OWU)' : 'Pobierz gotową umowę do druku (Werkvertrag + AGB)'}
             >
                 {generating ? '⏳' : '📄'} Umowa PDF
             </button>
@@ -2043,7 +2043,7 @@ const BestellscheinButton: React.FC<{ contract: Contract }> = ({ contract }) => 
             onClick={() => navigate(`/contracts/${contract.id}/bestellschein`)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 shadow-sm"
         >
-            📄 Bestellschein
+            📄 {(contract.brand || 'de') === 'pl' ? 'Karta zamówienia' : 'Bestellschein'}
         </button>
     );
 };
