@@ -5,6 +5,7 @@ import { generateBestellscheinPDF } from '../../utils/bestellscheinPDF';
 import { toast } from 'react-hot-toast';
 import type { Contract } from '../../types';
 import { getBrand, normalizeVat } from '../../config/brandConfig';
+import { PRODUCT_MODELS } from '../../config/productModels';
 
 // Polskie etykiety wyświetlane dla wartości kanonicznych (wartości zapisywane bez zmian,
 // dzięki czemu dopasowanie checkboxów w PDF nadal działa).
@@ -62,16 +63,7 @@ interface BestellscheinData {
   beschreibung: string;
 }
 
-const KONSTRUKTION_TYPES = [
-  { id: 'trendstyle', label: 'Trendstyle' },
-  { id: 'topstyle', label: 'Topstyle' },
-  { id: 'topstyle_xl', label: 'Topstyle XL' },
-  { id: 'carport', label: 'Carport' },
-  { id: 'ultrastyle', label: 'Ultrastyle' },
-  { id: 'skystyle', label: 'Skystyle' },
-  { id: 'pergola', label: 'Pergola' },
-  { id: 'pergola_deluxe', label: 'Pergola deluxe' },
-];
+const KONSTRUKTION_TYPES = PRODUCT_MODELS;
 
 const FARBEN = [
   { id: '7016', label: 'RAL 7016' },

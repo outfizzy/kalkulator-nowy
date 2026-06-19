@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { CustomerSelector } from '../customers/CustomerSelector';
 import { DatabaseService } from '../../services/database';
 import type { Customer } from '../../types';
+import { PRODUCT_MODELS } from '../../config/productModels';
 import { toast } from 'react-hot-toast';
 
 interface ManualContractModalProps {
@@ -162,17 +163,9 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
         'DB 703', 'Sonderfarbe (RAL)'
     ];
 
-    // Catalog Models matching catalog.json + additional models from pricing engine
+    // Kanoniczna linia produktów (polendach24.de / zadaszto.pl) + opcja "Inny"
     const availableModels = [
-        { id: 'orangestyle', name: 'Orangestyle' },
-        { id: 'trendstyle', name: 'Trendstyle' },
-        { id: 'trendstyle_plus', name: 'Trendstyle+' },
-        { id: 'topstyle', name: 'Topstyle' },
-        { id: 'topstyle_xl', name: 'Topstyle XL' },
-        { id: 'ultrastyle_style', name: 'Ultrastyle Style' },
-        { id: 'designline', name: 'Designline (Schiebedach)' },
-        { id: 'pergola_deluxe', name: 'Pergola Deluxe' },
-        { id: 'carport', name: 'Carport' },
+        ...PRODUCT_MODELS.map(m => ({ id: m.id, name: m.label })),
         { id: 'other', name: 'Inny / Sonstiges' }
     ];
 

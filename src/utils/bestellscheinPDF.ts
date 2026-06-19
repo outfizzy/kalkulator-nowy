@@ -5,6 +5,7 @@ import { AGB_SECTIONS_PL, RODO_SECTION_PL } from './contractAGB.pl';
 import { loadBrandLogo, drawBrandLogo } from './pdfBrandLogo';
 import { ensureUnicodeFont } from './pdfFontLoader';
 import { getBrand, normalizeVat, formatMoney, type BrandConfig } from '../config/brandConfig';
+import { PRODUCT_MODELS } from '../config/productModels';
 
 // ── Karta zamówienia (Bestellschein) — brand-aware (Polendach24 / zadaszto.pl) ──
 // DE: "Bestellschein", EUR, niemieckie nagłówki + AGB.
@@ -41,16 +42,7 @@ const CH: Record<string, string> = {
   '—':'-','–':'-','×':'x'
 };
 
-// Construction types on the form
-const KONSTRUKTION_TYPES = [
-  'trendstyle','topstyle','topstyle_xl','carport',
-  'ultrastyle','skystyle','pergola','pergola_deluxe'
-];
-const KONSTRUKTION_LABELS: Record<string,string> = {
-  trendstyle:'Trendstyle', topstyle:'Topstyle', topstyle_xl:'Topstyle XL',
-  carport:'Carport', ultrastyle:'Ultrastyle', skystyle:'Skystyle',
-  pergola:'Pergola', pergola_deluxe:'Pergola deluxe'
-};
+// Typy konstrukcji = kanoniczna linia produktów (src/config/productModels.ts)
 const COLOR_MAP: Record<string,string> = {
   '7016':'RAL 7016','9005':'RAL 9005','9016':'RAL 9016','9007':'RAL 9007',
   'ral7016':'RAL 7016','ral9005':'RAL 9005','ral9016':'RAL 9016','ral9007':'RAL 9007',
@@ -242,14 +234,21 @@ export async function generateBestellscheinPDF(contract: Contract, formData?: Be
   // Konstruktionstyp
   sectionHead(L.konstruktionstyp);
   doc.setFontSize(8); doc.setFont(F,'normal');
-  const ktRows = [KONSTRUKTION_TYPES.slice(0,4), KONSTRUKTION_TYPES.slice(4)];
+  // Najlepiej dopasowany model = dokładne id lub najdłuższe id zawarte w modelId
+  // (np. 'topstyle_xl' → Topstyle XL, a nie również Topstyle)
+  let bestModelId = '';
+  for (const m of PRODUCT_MODELS) {
+    if (modelId === m.id) { bestModelId = m.id; break; }
+    if (modelId.includes(m.id) && m.id.length > bestModelId.length) bestModelId = m.id;
+  }
+  const ktRows: typeof PRODUCT_MODELS[] = [];
+  for (let i = 0; i < PRODUCT_MODELS.length; i += 4) ktRows.push(PRODUCT_MODELS.slice(i, i + 4));
   ktRows.forEach(row => {
     let rx = M;
-    row.forEach(kt => {
-      const checked = modelId.includes(kt) || modelId === kt;
-      checkbox(rx, y, checked);
-      txt(KONSTRUKTION_LABELS[kt], rx+6, y+3);
-      rx += 42;
+    row.forEach(m => {
+      checkbox(rx, y, m.id === bestModelId);
+      txt(m.label, rx + 6, y + 3);
+      rx += 44;
     });
     y += 8;
   });
