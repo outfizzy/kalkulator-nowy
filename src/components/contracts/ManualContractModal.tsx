@@ -422,7 +422,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     <span>📦</span> Konfiguracja Produktu
                                 </h3>
 
-                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                                     {/* Model */}
                                     <div className="col-span-2">
                                         <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Model zadaszenia</label>
@@ -465,7 +465,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                     </div>
 
                                     {/* Width x Depth x Posts */}
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         <div>
                                             <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Szerokość (mm)</label>
                                             <input
@@ -632,7 +632,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 </h3>
                                 <p className="text-[10px] text-emerald-500 mb-3">Dane techniczne potrzebne do złożenia zamówienia u producenta.</p>
 
-                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                                     {/* Unterkante Rinne (H3) */}
                                     <div>
                                         <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Dolna krawędź rynny / H3 (mm)' : 'Unterkante Rinne / H3 (mm)'}</label>
@@ -676,7 +676,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                         </div>
                                         <p className="text-[10px] text-amber-600 mb-2">Wymagane gdy teren pod szyby przesuwne jest nierówny — podaj różnicę wysokości (mm) na każdej stronie</p>
                                         {needsLevelingProfiles && (
-                                            <div className="grid grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                 <div>
                                                     <input
                                                         type="number"
@@ -713,7 +713,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 )}
 
                                 {/* Wall & Mounting Type */}
-                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                                     <div>
                                         <label className="block text-xs font-bold text-emerald-700 mb-1">{isPL ? 'Ściana' : 'Ściana / Wandbeschaffenheit'}</label>
                                         <select
@@ -831,7 +831,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                         <span className="text-xs text-violet-800 font-medium">Adres dostawy = adres klienta</span>
                                     </label>
                                     {!deliverySameAsClient && (
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             <div>
                                                 <input
                                                     type="text"
@@ -1005,7 +1005,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 )}
 
                                 {/* Total Contract Price — Netto / Brutto bidirectional */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kwota za zlecenie Netto ({currency})</label>
                                         <input
@@ -1030,7 +1030,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 </div>
 
                                 {/* Installation Price + Days */}
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cena Montażu Netto ({currency})</label>
                                         <input
@@ -1077,7 +1077,7 @@ export const ManualContractModal: React.FC<ManualContractModalProps> = ({ isOpen
                                 </div>
 
                                 {/* Advance + Payment */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
                                             <label className="text-xs font-bold text-slate-500 uppercase">Zaliczka ({currency})</label>

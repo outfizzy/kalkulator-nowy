@@ -1163,7 +1163,7 @@ export const ContractDetails: React.FC = () => {
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kwota Brutto ({isPLContract ? `PLN • ${vatLabel}` : `EUR • ${vatLabel}`})</label>
                                         <input type="number" step="0.01" value={grossPrice.toFixed(2)} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) setContract({ ...contract, pricing: { ...contract.pricing, finalPriceNet: v / vatRate } }); }} className="w-full p-2 border rounded-lg font-bold text-sm" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Zaliczka %</label>
                                             <div className="relative">
@@ -1587,7 +1587,7 @@ export const ContractDetails: React.FC = () => {
                         </h3>
 
                         {realization && realization.photos.length > 0 ? (
-                            <div className="grid grid-cols-3 gap-2 mb-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                                 {realization.photos.map((photo, idx) => (
                                     <div key={idx} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group">
                                         <img src={photo.url} alt={photo.caption || 'Zdjęcie realizacji'} className="w-full h-full object-cover" />
@@ -1783,7 +1783,7 @@ export const ContractDetails: React.FC = () => {
                                             {report.photos && report.photos.length > 0 && (
                                                 <div className="mb-3">
                                                     <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1.5">📸 Zdjęcia ({report.photos.length})</span>
-                                                    <div className="grid grid-cols-4 gap-1.5">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                                                         {report.photos.map((url: string, i: number) => (
                                                             <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 hover:opacity-80 transition-opacity">
                                                                 <img src={url} alt={`Zdjęcie ${i + 1}`} className="w-full h-full object-cover" />

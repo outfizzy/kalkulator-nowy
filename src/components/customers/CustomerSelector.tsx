@@ -331,7 +331,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                     </div>
 
                     {/* Name */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('Imię / Vorname', 'Imię')}</label>
                             <input
@@ -377,7 +377,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                     )}
 
                     {/* Address */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="col-span-2">
                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('Ulica / Straße', 'Ulica')}</label>
                             <input
@@ -402,7 +402,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('PLZ', 'Kod pocztowy')}</label>
                             <input
@@ -429,7 +429,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                     </div>
 
                     {/* Contact */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Telefon</label>
                             <input

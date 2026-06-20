@@ -321,7 +321,7 @@ export const BestellscheinPage: React.FC = () => {
           </h2>
 
           {/* Client vs Company */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
             <div className="space-y-3">
               <p className="text-xs font-bold text-slate-500 uppercase">{L('Zwischen (Kunde)', 'Zamawiający')}</p>
               <Field label={L('Name, Vorname', 'Imię i nazwisko')} value={data.clientName} onChange={v => upd('clientName', v)} />
@@ -342,7 +342,7 @@ export const BestellscheinPage: React.FC = () => {
 
           {/* Prices */}
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={L('Gesamtpreis exkl. MwSt. — NETTO (EUR)', `Cena netto (${brandCfg.currency})`)} value={String(data.priceNet)} onChange={v => { upd('priceNet', Number(v) || 0); upd('priceGross', Math.round((Number(v) || 0) * vatMult * 100) / 100); }} type="number" />
               <Field label={L('Gesamtpreis inkl. MwSt. (19%) — BRUTTO (EUR)', `Cena brutto (VAT ${vatPct}%) (${brandCfg.currency})`)} value={String(data.priceGross)} onChange={v => upd('priceGross', Number(v) || 0)} type="number" />
             </div>
@@ -350,7 +350,7 @@ export const BestellscheinPage: React.FC = () => {
 
           {/* Konstruktionstyp */}
           <Section title={L('Konstruktionstyp', 'Typ konstrukcji')}>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {KONSTRUKTION_TYPES.map(kt => (
                 <Check key={kt.id} checked={data.konstruktionstyp === kt.id} onChange={() => upd('konstruktionstyp', kt.id)} label={kt.label} />
               ))}
@@ -367,7 +367,7 @@ export const BestellscheinPage: React.FC = () => {
 
           {/* Maße */}
           <Section title={L('Maße der Konstruktion', 'Wymiary konstrukcji')}>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label={L('Breite (mm)', 'Szerokość (mm)')} value={data.breite} onChange={v => upd('breite', v)} placeholder="np. 5000" />
               <Field label={L('Tiefe (mm)', 'Głębokość (mm)')} value={data.tiefe} onChange={v => upd('tiefe', v)} placeholder="np. 3500" />
               <Field label={L('Max. Höhe (mm)', 'Maks. wysokość (mm)')} value={data.maxHoehe} onChange={v => upd('maxHoehe', v)} placeholder="np. 2800" />
@@ -423,7 +423,7 @@ export const BestellscheinPage: React.FC = () => {
 
           {/* Seitliche Optionen — with diagram */}
           <Section title={L('Seitliche Optionen', 'Opcje boczne')}>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Left */}
               <div className="border border-slate-200 rounded-lg p-3">
                 <p className="text-xs font-bold text-slate-600 mb-2 text-center">{L('← Linke Seite', '← Lewa strona')}</p>
