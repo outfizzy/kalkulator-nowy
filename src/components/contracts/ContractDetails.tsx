@@ -22,10 +22,12 @@ import { Camera, Upload, Trash2 } from 'lucide-react';
 export const ContractDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { isAdmin } = useAuth();
+    const { isAdmin, currentUser } = useAuth();
     const [contract, setContract] = useState<Contract | null>(null);
     const [newComment, setNewComment] = useState('');
     const [isEditing, setIsEditing] = useState(false);
+    // Status of the contract at the moment editing started — used to detect the draft→signed TRANSITION
+    const statusBeforeEditRef = useRef<Contract['status'] | null>(null);
     const [costBreakdown, setCostBreakdown] = useState<any>(null);
     const [costLoading, setCostLoading] = useState(false);
 
@@ -101,7 +103,9 @@ export const ContractDetails: React.FC = () => {
     const handleSave = async () => {
         if (!contract) return;
 
-        if (contract.status === 'signed') {
+        // Confirm only on the TRANSITION to 'signed', not on every save of an already-signed contract
+        const becameSigned = statusBeforeEditRef.current !== 'signed' && contract.status === 'signed';
+        if (becameSigned) {
             if (!window.confirm('Czy na pewno oznaczyć jako PODPISANĄ? Umowa stanie się dostępna do montażu.')) {
                 return;
             }
@@ -112,7 +116,7 @@ export const ContractDetails: React.FC = () => {
             toast.success('Zapisano zmiany');
             setIsEditing(false);
 
-            if (contract.status === 'signed') {
+            if (becameSigned) {
                 toast.success('Umowa podpisana! Przejdź do "Planowanie Montaży" aby utworzyć montaż.', { duration: 5000 });
             }
         } catch (error) {
@@ -127,7 +131,7 @@ export const ContractDetails: React.FC = () => {
         const comment: ContractComment = {
             id: crypto.randomUUID(),
             text: newComment,
-            author: 'Aktualny Użytkownik',
+            author: currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'Nieznany użytkownik',
             createdAt: new Date()
         };
 
@@ -152,44 +156,20 @@ export const ContractDetails: React.FC = () => {
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
-    const uploadAttachment = async (file: File, type: 'document' | 'image') => {
-        if (!contract) return;
-
-        try {
-            const path = `contracts/${contract.id}`;
-            const publicUrl = await StorageService.uploadFile(file, 'attachments', path);
-
-            const attachment: ContractAttachment = {
-                id: crypto.randomUUID(),
-                name: file.name,
-                url: publicUrl,
-                type: type,
-                createdAt: new Date()
-            };
-
-            const updatedContract: Contract = {
-                ...contract,
-                attachments: [...contract.attachments, attachment],
-                ...(file.name.toLowerCase().includes('podpisan') && type === 'document' ? { status: 'signed', signedAt: new Date() } : {})
-            };
-
-            setContract(updatedContract);
-            await DatabaseService.updateContract(updatedContract.id, updatedContract);
-            return true;
-        } catch (error) {
-            console.error('Upload error:', error);
-            return false;
-        }
-    };
-
-    /** Batch upload: handles multiple files with progress counter */
+    /**
+     * Batch upload: uploads ALL files to Storage first, then persists them with a SINGLE updateContract.
+     * (Previously each file did its own updateContract built from a stale closure — with N files only
+     * the last attachment survived, overwriting the previous ones.)
+     */
     const uploadMultipleFiles = async (files: File[], type: 'document' | 'image' | 'auto') => {
         if (!contract || files.length === 0) return;
         setIsUploading(true);
         setUploadProgress({ current: 0, total: files.length });
         const toastId = toast.loading(`Wgrywanie 0/${files.length}...`);
 
-        let successCount = 0;
+        const newAttachments: ContractAttachment[] = [];
+        let markSigned = false;
+
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileType = type === 'auto'
@@ -199,8 +179,45 @@ export const ContractDetails: React.FC = () => {
             setUploadProgress({ current: i + 1, total: files.length });
             toast.loading(`Wgrywanie ${i + 1}/${files.length}...`, { id: toastId });
 
-            const ok = await uploadAttachment(file, fileType);
-            if (ok) successCount++;
+            try {
+                const path = `contracts/${contract.id}`;
+                const publicUrl = await StorageService.uploadFile(file, 'attachments', path);
+                newAttachments.push({
+                    id: crypto.randomUUID(),
+                    name: file.name,
+                    url: publicUrl,
+                    type: fileType,
+                    createdAt: new Date()
+                });
+                if (fileType === 'document' && file.name.toLowerCase().includes('podpisan')) {
+                    markSigned = true;
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+            }
+        }
+
+        let successCount = newAttachments.length;
+
+        if (newAttachments.length > 0) {
+            const signedAt = new Date();
+            const updatedContract: Contract = {
+                ...contract,
+                attachments: [...contract.attachments, ...newAttachments],
+                ...(markSigned ? { status: 'signed' as const, signedAt } : {})
+            };
+            try {
+                await DatabaseService.updateContract(updatedContract.id, updatedContract);
+                // Functional update — don't clobber any state changes made while uploading
+                setContract(prev => prev ? {
+                    ...prev,
+                    attachments: [...prev.attachments, ...newAttachments],
+                    ...(markSigned ? { status: 'signed' as const, signedAt } : {})
+                } : prev);
+            } catch (error) {
+                console.error('Error saving attachments:', error);
+                successCount = 0;
+            }
         }
 
         setUploadProgress({ current: 0, total: 0 });
@@ -278,6 +295,9 @@ export const ContractDetails: React.FC = () => {
         try {
             await DatabaseService.createInstallation({
                 offerId: contract.offerId,
+                // Link installation to the contract — OrderedItemsModule.syncPartsStatus looks installations up by source_type/source_id
+                sourceType: 'contract',
+                sourceId: contract.id,
                 status: 'pending',
                 client: {
                     firstName: contract.client.firstName,
@@ -321,7 +341,11 @@ export const ContractDetails: React.FC = () => {
     const vatLabel = isPLContract ? `${Math.round((vatRate - 1) * 100)}% VAT` : '19% MwSt';
     const grossPrice = netPrice * vatRate;
     const commissionRate = netPrice > 0 ? ((contract.commission || 0) / netPrice) * 100 : 0;
-    const advancePercent = contract.pricing?.advancePayment ? Math.round((contract.pricing.advancePayment / grossPrice) * 100) : 0;
+    // Zaliczka jest przechowywana NETTO (tak zapisuje ManualContractModal:251 i tak
+    // liczy protokół PDF) — % i "do zapłaty" liczymy spójnie od kwot netto/brutto
+    const advanceNet = contract.pricing?.advancePayment || contract.advanceAmount || 0;
+    const advanceGross = advanceNet * vatRate;
+    const advancePercent = advanceNet && netPrice > 0 ? Math.round((advanceNet / netPrice) * 100) : 0;
     const allImages = (contract.attachments || []).filter(a => a.type === 'image');
     const allDocuments = (contract.attachments || []).filter(a => a.type === 'document');
 
@@ -401,6 +425,8 @@ export const ContractDetails: React.FC = () => {
                     )}
                 </div>
                 <div className="flex gap-2 flex-wrap flex-shrink-0">
+                    {/* Gotowa umowa do druku (Werkvertrag DE + AGB) */}
+                    <ContractPDFButton contract={contract} />
                     {/* Bestellschein PDF */}
                     <BestellscheinButton contract={contract} />
                     {/* Protocol PDF dropdown */}
@@ -415,7 +441,7 @@ export const ContractDetails: React.FC = () => {
                             </button>
                         </>
                     ) : (
-                        <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 transition-colors text-sm">
+                        <button onClick={() => { statusBeforeEditRef.current = contract.status; setIsEditing(true); }} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 transition-colors text-sm">
                             ✏️ Edytuj
                         </button>
                     )}
@@ -430,13 +456,17 @@ export const ContractDetails: React.FC = () => {
                             <span className="text-lg">{contract.advancePaid ? '✅' : '💰'}</span>
                         </div>
                         <div>
-                            <div className="text-xs font-bold text-slate-500 uppercase">Zaliczka</div>
+                            <div className="text-xs font-bold text-slate-500 uppercase">Zaliczka (netto)</div>
                             {isEditing ? (
                                 <div className="flex items-center gap-2 mt-1">
                                     <input
                                         type="number" step="0.01" min="0"
                                         value={contract.advanceAmount || ''}
-                                        onChange={e => setContract({ ...contract, advanceAmount: parseFloat(e.target.value) || 0 })}
+                                        onChange={e => {
+                                            const v = parseFloat(e.target.value) || 0;
+                                            // Keep both sources of truth in sync: advance_amount column AND pricing.advancePayment (JSON)
+                                            setContract({ ...contract, advanceAmount: v, pricing: { ...contract.pricing, advancePayment: v } });
+                                        }}
                                         className="w-32 px-2 py-1 border rounded text-sm font-bold"
                                         placeholder="Kwota zaliczki"
                                     />
@@ -1133,17 +1163,17 @@ export const ContractDetails: React.FC = () => {
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kwota Brutto ({isPLContract ? `PLN • ${vatLabel}` : `EUR • ${vatLabel}`})</label>
                                         <input type="number" step="0.01" value={grossPrice.toFixed(2)} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) setContract({ ...contract, pricing: { ...contract.pricing, finalPriceNet: v / vatRate } }); }} className="w-full p-2 border rounded-lg font-bold text-sm" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Zaliczka %</label>
                                             <div className="relative">
-                                                <input type="number" min="0" max="100" value={advancePercent || ''} onChange={(e) => { const p = parseFloat(e.target.value); if (!isNaN(p)) setContract({ ...contract, pricing: { ...contract.pricing, advancePayment: (grossPrice * p) / 100 } }); }} className="w-full p-2 border rounded-lg text-sm pr-6" />
+                                                <input type="number" min="0" max="100" value={advancePercent || ''} onChange={(e) => { const p = parseFloat(e.target.value); if (!isNaN(p)) { const amount = (netPrice * p) / 100; /* netto! sync JSON + column */ setContract({ ...contract, advanceAmount: amount, pricing: { ...contract.pricing, advancePayment: amount } }); } }} className="w-full p-2 border rounded-lg text-sm pr-6" />
                                                 <span className="absolute right-2 top-2 text-slate-400 font-bold text-sm">%</span>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kwota Zaliczki</label>
-                                            <div className="p-2 bg-white border rounded-lg text-sm text-slate-600 font-medium">{contract.pricing.advancePayment ? contract.pricing.advancePayment.toFixed(2) : '0.00'} €</div>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kwota Zaliczki (netto)</label>
+                                            <div className="p-2 bg-white border rounded-lg text-sm text-slate-600 font-medium">{contract.pricing.advancePayment ? contract.pricing.advancePayment.toFixed(2) : '0.00'} € <span className="text-[10px] text-slate-400">({((contract.pricing.advancePayment || 0) * vatRate).toFixed(2)} € brutto)</span></div>
                                         </div>
                                     </div>
                                     <div>
@@ -1161,8 +1191,8 @@ export const ContractDetails: React.FC = () => {
                                         <span className="font-bold text-slate-800">{grossPrice.toFixed(2)} €</span>
                                     </div>
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
-                                        <span className="text-slate-600">Zaliczka ({advancePercent}%)</span>
-                                        <span className="font-bold text-green-600">{contract.pricing.advancePayment?.toFixed(2) || '0.00'} €</span>
+                                        <span className="text-slate-600">Zaliczka ({advancePercent}% netto)</span>
+                                        <span className="font-bold text-green-600">{advanceNet.toFixed(2)} € <span className="text-[10px] font-medium text-slate-400">({advanceGross.toFixed(2)} € brutto)</span></span>
                                     </div>
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
                                         <span className="text-slate-600">Metoda Płatności</span>
@@ -1205,8 +1235,8 @@ export const ContractDetails: React.FC = () => {
                             {/* Remaining Payment */}
                             {contract.pricing.advancePayment && contract.pricing.advancePayment > 0 && (
                                 <div className="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
-                                    <span className="text-slate-600">Do zapłaty (po montażu)</span>
-                                    <span className="font-bold text-slate-800">{(grossPrice - (contract.pricing.advancePayment || 0)).toFixed(2)} €</span>
+                                    <span className="text-slate-600">Do zapłaty (po montażu, brutto)</span>
+                                    <span className="font-bold text-slate-800">{Math.max(0, grossPrice - advanceGross).toFixed(2)} €</span>
                                 </div>
                             )}
 
@@ -1557,7 +1587,7 @@ export const ContractDetails: React.FC = () => {
                         </h3>
 
                         {realization && realization.photos.length > 0 ? (
-                            <div className="grid grid-cols-3 gap-2 mb-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                                 {realization.photos.map((photo, idx) => (
                                     <div key={idx} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group">
                                         <img src={photo.url} alt={photo.caption || 'Zdjęcie realizacji'} className="w-full h-full object-cover" />
@@ -1753,7 +1783,7 @@ export const ContractDetails: React.FC = () => {
                                             {report.photos && report.photos.length > 0 && (
                                                 <div className="mb-3">
                                                     <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1.5">📸 Zdjęcia ({report.photos.length})</span>
-                                                    <div className="grid grid-cols-4 gap-1.5">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                                                         {report.photos.map((url: string, i: number) => (
                                                             <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 hover:opacity-80 transition-opacity">
                                                                 <img src={url} alt={`Zdjęcie ${i + 1}`} className="w-full h-full object-cover" />
@@ -1849,6 +1879,51 @@ export const ContractDetails: React.FC = () => {
 };
 
 // ── Protocol PDF Button with dropdown ──
+// ── Gotowa umowa do druku (Werkvertrag DE + AGB) ──
+const ContractPDFButton: React.FC<{ contract: Contract }> = ({ contract }) => {
+    const [generating, setGenerating] = useState(false);
+
+    const run = async (mode: 'download' | 'preview') => {
+        setGenerating(true);
+        try {
+            const { generateContractPDF, generateContractPDFBlobUrl } = await import('../../utils/contractPDF');
+            if (mode === 'download') {
+                await generateContractPDF(contract);
+                toast.success('Umowa PDF wygenerowana!');
+            } else {
+                const url = await generateContractPDFBlobUrl(contract);
+                window.open(url, '_blank', 'noopener');
+            }
+        } catch (err) {
+            console.error('Contract PDF error:', err);
+            toast.error('Błąd generowania umowy PDF');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    return (
+        <div className="flex">
+            <button
+                onClick={() => run('download')}
+                disabled={generating}
+                className="px-4 py-2 bg-slate-800 text-white rounded-l-lg font-bold hover:bg-slate-900 transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
+                title={(contract.brand || 'de') === 'pl' ? 'Pobierz gotową umowę do druku (Umowa + OWU)' : 'Pobierz gotową umowę do druku (Werkvertrag + AGB)'}
+            >
+                {generating ? '⏳' : '📄'} Umowa PDF
+            </button>
+            <button
+                onClick={() => run('preview')}
+                disabled={generating}
+                className="px-2.5 py-2 bg-slate-700 text-white rounded-r-lg hover:bg-slate-900 transition-colors text-sm border-l border-slate-600 disabled:opacity-50"
+                title="Podgląd w nowej karcie"
+            >
+                👁
+            </button>
+        </div>
+    );
+};
+
 const ProtocolPDFButton: React.FC<{ contract: Contract }> = ({ contract }) => {
     const [open, setOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -1968,7 +2043,7 @@ const BestellscheinButton: React.FC<{ contract: Contract }> = ({ contract }) => 
             onClick={() => navigate(`/contracts/${contract.id}/bestellschein`)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 shadow-sm"
         >
-            📄 Bestellschein
+            📄 {(contract.brand || 'de') === 'pl' ? 'Karta zamówienia' : 'Bestellschein'}
         </button>
     );
 };

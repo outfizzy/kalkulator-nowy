@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import type { Installation, User, InstallationTeam, TeamUnavailability, OrderItem, OrderItemStatus, ProductConfig, SelectedAddon, InstallationWorkLog, Contract, ServiceTicket } from '../../types';
 import { UserService } from './user.service';
 import { InstallationTeamService } from './installation-team.service';
+import { generateServiceTicketNumber } from './service.service';
 import { GoogleCalendarService } from '../google-calendar.service';
 
 interface InstallationData {
@@ -1153,17 +1154,19 @@ export const InstallationService = {
             .eq('id', installationId);
 
         // 3. Resolve client ID from contract
+        // NOTE: contracts table has NO client_id/customer_id columns (only id, offer_id, user_id,
+        // contract_data, status, signed_*, sales_rep_id, advance_*) — client data lives in contract_data JSON.
         let clientId: string | null = null;
         let contractId: string | null = null;
         if (installation.offerId) {
             const { data: contract } = await supabase
                 .from('contracts')
-                .select('id, client_id, customer_id')
+                .select('id, contract_data')
                 .eq('offer_id', installation.offerId)
                 .single();
             if (contract) {
                 contractId = contract.id;
-                clientId = contract.client_id || contract.customer_id || null;
+                clientId = (contract.contract_data as any)?.client?.id || null;
             }
         }
         // Fallback: try installation's customerId
@@ -1172,20 +1175,24 @@ export const InstallationService = {
         }
 
         // 4. Create a service ticket
-        const ticketNumber = `SRV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-        await supabase
+        // UWAGA: 'repair' NIE jest wartością enuma service_ticket_type
+        // (dozwolone: leak/electrical/visual/mechanical/other) — insert się wywalał
+        // po cichu i zgłoszenie nigdy nie powstawało. Poprawiono na 'other'.
+        const ticketNumber = generateServiceTicketNumber();
+        const { error: ticketError } = await supabase
             .from('service_tickets')
             .insert({
                 ticket_number: ticketNumber,
                 client_id: clientId,
                 contract_id: contractId,
                 installation_id: installationId,
-                type: 'repair',
+                type: 'other',
                 status: 'new',
                 priority: 'medium',
                 description: description || 'Serwis po montażu',
                 photos: []
             });
+        if (ticketError) console.error('completeAndCreateServiceTicket — błąd tworzenia zgłoszenia:', ticketError);
     },
 
     /**

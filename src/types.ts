@@ -84,7 +84,7 @@ export interface DimensionOptions {
 
 export interface Customer {
     id?: string; // Optional for backward compatibility with offers that embed customer data without ID
-    salutation: 'Herr' | 'Frau' | 'Firma';
+    salutation: 'Herr' | 'Frau' | 'Firma' | 'Pan' | 'Pani';
     companyName?: string; // Added for PDF generation
     firstName: string;
     lastName: string;
@@ -418,6 +418,10 @@ export interface PricingResult {
     advancePayment?: number;
     advancePaymentDate?: Date;
     finalPriceNet?: number; // For signed contracts override
+    // Stawka VAT (ułamek 0.19/0.08/0.23 lub mnożnik 1.19 — normalizować) i waluta umowy.
+    // Trzymane w JSONB; opcjonalne dla zgodności wstecz (starsze umowy nie mają).
+    vatRate?: number;
+    currency?: 'EUR' | 'PLN';
     // Cost Tracking
     orderCosts?: number; // Manual input for additional costs
     measurementCost?: number; // Calculated/Cached measurement cost
@@ -768,9 +772,13 @@ export interface InstallationSettings {
 
 export interface Contract {
     id: string;
-    contractNumber: string; // Format: PL/001/11/2025
+    contractNumber: string; // Format: UM/2026/001 (DE) lub ZAD/2026/001 (PL)
     offerId: string;
     status: ContractStatus;
+
+    // Marka, w ramach której wystawiono umowę: 'de' = Polendach24, 'pl' = zadaszto.pl.
+    // Brak wartości traktujemy jako 'de' (zgodność wstecz). Przechowywane w contract_data JSONB.
+    brand?: 'de' | 'pl';
 
     // Snapshot of data at contract creation (editable)
     client: Customer;
@@ -1183,7 +1191,7 @@ export interface ServiceTicketHistory {
 export interface ServiceTicket {
     id: string;
     ticketNumber: string;
-    clientId: string;
+    clientId?: string; // nullable w DB — zgłoszenia z maila/publiczne mogą nie mieć klienta CRM
     contractId?: string;
     contractNumber?: string; // Manual contract number for legacy orders
     installationId?: string;

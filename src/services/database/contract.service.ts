@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import type { Contract } from '../../types';
+import type { Contract, Customer } from '../../types';
 import { getEurPlnRate } from '../exchange-rate.service';
 import { FuelPriceService } from '../fuel-price.service';
 import { calculateDistanceFromGubin } from '../../utils/distanceCalculator';
@@ -43,6 +43,7 @@ export const ContractService = {
                 id: row.id,
                 offerId: row.offer_id,
                 contractNumber: row.contract_data.contractNumber,
+                brand: (row.contract_data.brand || 'de') as 'de' | 'pl',
                 status: row.status as Contract['status'],
                 client: row.contract_data.client,
                 product: row.contract_data.product,
@@ -60,6 +61,8 @@ export const ContractService = {
                 installationNotes: row.contract_data.installationNotes || '',
                 plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
                 dachrechnerData: row.contract_data.dachrechnerData || undefined,
+                // Prefer dedicated column, fallback to JSONB copy
+                installation_days_estimate: row.installation_days_estimate ?? row.contract_data.installation_days_estimate ?? undefined,
                 createdAt: new Date(row.created_at),
                 signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
                 signedBy: row.signed_by,
@@ -122,6 +125,7 @@ export const ContractService = {
             id: row.id,
             offerId: row.offer_id,
             contractNumber: row.contract_data.contractNumber,
+            brand: (row.contract_data.brand || 'de') as 'de' | 'pl',
             status: row.status as Contract['status'],
             client: row.contract_data.client,
             product: row.contract_data.product,
@@ -139,6 +143,8 @@ export const ContractService = {
             installationNotes: row.contract_data.installationNotes || '',
             plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
             dachrechnerData: row.contract_data.dachrechnerData || undefined,
+            // Prefer dedicated column, fallback to JSONB copy
+            installation_days_estimate: row.installation_days_estimate ?? row.contract_data.installation_days_estimate ?? undefined,
             createdAt: new Date(row.created_at),
             signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
             signedBy: row.signed_by,
@@ -167,32 +173,82 @@ export const ContractService = {
         };
     },
 
-    async getNextContractNumber(): Promise<string> {
-        const { data, error } = await supabase.rpc('get_next_contract_number');
-        if (error) throw error;
-        return data as string;
+    async getNextContractNumber(brand: 'de' | 'pl' = 'de'): Promise<string> {
+        const prefix = brand === 'pl' ? 'ZAD' : 'UM';
+
+        // 1. Preferowana ścieżka: RPC z prefiksem (atomowa, SECURITY DEFINER).
+        const { data, error } = await supabase.rpc('get_next_contract_number', { p_prefix: prefix });
+        if (!error && data) return data as string;
+
+        // 2. Fallback (gdy RPC nie zostało jeszcze zmigrowane do wariantu z p_prefix):
+        //    liczymy kolejny numer po stronie klienta wg tej samej logiki co RPC.
+        const year = new Date().getFullYear().toString();
+        const { data: rows, error: qErr } = await supabase
+            .from('contracts')
+            .select('contract_data')
+            .like('contract_data->>contractNumber', `%/${year}/%`);
+        if (qErr) throw qErr;
+
+        let max = 0;
+        (rows || []).forEach((r: { contract_data?: { contractNumber?: string } }) => {
+            const cn = r.contract_data?.contractNumber || '';
+            const isPLNumber = cn.startsWith('ZAD/');
+            // DE liczy wszystko z roku poza linią ZAD; PL liczy wyłącznie ZAD/rok.
+            if (brand === 'pl' ? !cn.startsWith(`ZAD/${year}/`) : isPLNumber) return;
+            const m = cn.match(/\/(\d+)$/);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return `${prefix}/${year}/${String(max + 1).padStart(3, '0')}`;
     },
 
-    async createContract(contract: Omit<Contract, 'id' | 'createdAt' | 'contractNumber'>): Promise<Contract> {
+    async createContract(contract: Omit<Contract, 'id' | 'createdAt' | 'contractNumber' | 'commission'> & { contractNumber?: string; createdAt?: Date; commission?: number }): Promise<Contract> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        // Generate or use provided contract number
+        // Marka: jawnie podana albo wykryta z prefiksu numeru (ZAD/ → pl), domyślnie de.
+        const brand: 'de' | 'pl' = contract.brand
+            || ((contract.contractNumber || '').startsWith('ZAD/') ? 'pl' : 'de');
+
+        // Generate or use provided contract number (brand-aware: UM/ vs ZAD/)
         let newContractNumber = contract.contractNumber;
-
         if (!newContractNumber) {
-            const { data: contractNumberData, error: rpcError } = await supabase
-                .rpc('get_next_contract_number');
-
-            if (rpcError) throw rpcError;
-            newContractNumber = contractNumberData as string;
+            newContractNumber = await this.getNextContractNumber(brand);
         }
 
-        // [AUTOMATION] Auto-calculate commission from sales rep's rate
-        let calculatedCommission = (contract.commission && contract.commission > 0) ? contract.commission : 0;
+        // Walidacja unikalności numeru umowy — chroni przed race condition,
+        // gdy numer został pobrany z RPC przy otwarciu modala (potwierdzone duplikaty)
+        const isNumberTaken = async (num: string): Promise<boolean> => {
+            const { data: existingRows, error: checkError } = await supabase
+                .from('contracts')
+                .select('id')
+                .eq('contract_data->>contractNumber', num)
+                .limit(1);
+            if (checkError) throw checkError;
+            return !!existingRows && existingRows.length > 0;
+        };
+
+        if (await isNumberTaken(newContractNumber)) {
+            // Numer z RPC (wygenerowany teraz lub prefetch z prefiksem KS/) → pobierz świeży.
+            // Numer wpisany ręcznie → błąd, użytkownik musi podać inny.
+            const cameFromRpc = !contract.contractNumber || /^(KS|UM|ZAD)\//.test(newContractNumber);
+            if (cameFromRpc) {
+                newContractNumber = await this.getNextContractNumber(brand);
+                if (await isNumberTaken(newContractNumber)) {
+                    throw new Error(`Numer umowy już istnieje: ${newContractNumber}`);
+                }
+            } else {
+                throw new Error(`Numer umowy już istnieje: ${newContractNumber}`);
+            }
+        }
+
+        // [AUTOMATION] Auto-calculate commission from sales rep's rate.
+        // Only when commission was NOT provided (undefined/null). An explicit 0 means
+        // "bez prowizji" (np. import archiwalny) and must NOT trigger auto-calculation.
+        const shouldAutoCalculateCommission = contract.commission === undefined || contract.commission === null;
+        let calculatedCommission = contract.commission ?? 0;
         const repUserId = contract.salesRepId || user.id;
 
-        if (calculatedCommission <= 0) {
+        if (shouldAutoCalculateCommission) {
             try {
                 const netPrice = Number(contract.pricing?.finalPriceNet) || Number(contract.pricing?.sellingPriceNet) || 0;
                 if (netPrice > 0) {
@@ -216,6 +272,7 @@ export const ContractService = {
 
         const contractData = {
             contractNumber: newContractNumber,
+            brand,
             client: contract.client,
             product: contract.product,
             pricing: contract.pricing,
@@ -237,7 +294,9 @@ export const ContractService = {
                 contract_data: contractData,
                 status: contract.status,
                 signed_at: contract.signedAt ? contract.signedAt.toISOString() : null,
-                sales_rep_id: user.id, // Default to creator
+                sales_rep_id: contract.salesRepId || user.id, // Spójnie z liczeniem prowizji (repUserId)
+                // Allow backdating for imported/archival contracts
+                ...(contract.createdAt ? { created_at: new Date(contract.createdAt).toISOString() } : {}),
                 // Sync advance payment to dedicated column so lists/procurement can read it
                 advance_amount: contract.pricing?.advancePayment || contract.advanceAmount || null,
                 // Sync installation days to dedicated column
@@ -248,49 +307,74 @@ export const ContractService = {
 
         if (error) throw error;
 
-        // Automation: Sync Offer and Lead Status
-        try {
-            // Mark Offer as 'sold'
-            await supabase.from('offers').update({ status: 'sold' }).eq('id', contract.offerId);
-
-            // Fetch the lead ID and customer ID if not in the contract object but in the Offer
-            const { data: offerData } = await supabase.from('offers').select('id, lead_id, customer_id').eq('id', contract.offerId).single();
-            if (offerData?.lead_id) {
-                // Mark Lead as 'won'
-                await supabase.from('leads').update({ status: 'won' }).eq('id', offerData.lead_id);
+        // Automation — każdy krok osobno, żeby błąd jednego nie zatrzymywał (ani nie ukrywał) pozostałych
+        if (contract.offerId) {
+            // Krok 1: Oferta → 'sold'
+            try {
+                const { error: offerStatusError } = await supabase
+                    .from('offers')
+                    .update({ status: 'sold' })
+                    .eq('id', contract.offerId);
+                if (offerStatusError) throw offerStatusError;
+            } catch (stepError) {
+                console.error('[Contract Automation] Krok "oferta → sold" nie powiódł się:', stepError);
             }
 
-            // Automation: Create Pending Installation
-            // We only create if one doesn't exist for this offer
-            const { count } = await supabase
-                .from('installations')
-                .select('*', { count: 'exact', head: true })
-                .eq('offer_id', contract.offerId);
-
-            if (count === 0 && offerData) {
-                const productSummary = contract.product ?
-                    (typeof contract.product === 'string' ? contract.product : `${contract.product.modelId.toUpperCase()} ${contract.product.width}x${contract.product.projection}`)
-                    : 'Produkt z Umowy';
-
-
-                await supabase.from('installations').insert({
-                    offer_id: contract.offerId,
-                    customer_id: offerData.customer_id, // Link directly to customer!
-                    user_id: user.id,
-                    status: 'pending',
-                    installation_data: {
-                        productSummary,
-                        client: contract.client, // Use client data from contract
-                        notes: 'Automatycznie utworzono po podpisaniu umowy.'
-                    }
-                });
+            // Krok 2: Lead → 'won'
+            try {
+                const { data: offerData, error: offerFetchError } = await supabase
+                    .from('offers')
+                    .select('id, lead_id')
+                    .eq('id', contract.offerId)
+                    .single();
+                if (offerFetchError) throw offerFetchError;
+                if (offerData?.lead_id) {
+                    const { error: leadError } = await supabase
+                        .from('leads')
+                        .update({ status: 'won' })
+                        .eq('id', offerData.lead_id);
+                    if (leadError) throw leadError;
+                }
+            } catch (stepError) {
+                console.error('[Contract Automation] Krok "lead → won" nie powiódł się:', stepError);
             }
-        } catch (syncError) {
-            console.error('Workflow Automation: Failed to sync Offer/Lead status:', syncError);
+
+            // Krok 3: Auto-montaż (tylko gdy nie istnieje jeszcze montaż dla tej oferty)
+            try {
+                const { count, error: countError } = await supabase
+                    .from('installations')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('offer_id', contract.offerId);
+                if (countError) throw countError;
+
+                if (count === 0) {
+                    const productSummary = contract.product ?
+                        (typeof contract.product === 'string' ? contract.product : `${contract.product.modelId.toUpperCase()} ${contract.product.width}x${contract.product.projection}`)
+                        : 'Produkt z Umowy';
+
+                    const { error: installError } = await supabase.from('installations').insert({
+                        offer_id: contract.offerId,
+                        user_id: user.id,
+                        status: 'pending',
+                        source_type: 'contract',
+                        source_id: data.id,
+                        expected_duration: contract.pricing?.installationCosts?.days || contract.installation_days_estimate || 1,
+                        installation_data: {
+                            productSummary,
+                            client: contract.client, // Use client data from contract
+                            notes: 'Automatycznie utworzono po podpisaniu umowy.'
+                        }
+                    });
+                    if (installError) throw installError;
+                }
+            } catch (stepError) {
+                console.error('[Contract Automation] Krok "auto-montaż" nie powiódł się:', stepError);
+            }
         }
 
         return {
             ...contract,
+            commission: calculatedCommission,
             contractNumber: newContractNumber,
             id: data.id,
             createdAt: new Date(data.created_at)
@@ -299,8 +383,7 @@ export const ContractService = {
 
     async updateContract(id: string, contract: Partial<Contract>): Promise<void> {
         // 1. Fetch existing contract to enable safe merging
-        const existing = await this.getContracts();
-        const current = existing.find(c => c.id === id);
+        const current = await this.getById(id);
         if (!current) throw new Error('Contract not found');
 
         const updates: Record<string, unknown> = {};
@@ -560,64 +643,18 @@ export const ContractService = {
         if (offersError) throw offersError;
         const offerIds = offers.map(o => o.id);
 
+        // Umowy są powiązane z klientem wyłącznie przez oferty
+        // (tabela contracts NIE MA kolumny customer_id)
         if (offerIds.length === 0) {
-            // Fallback: Fetch by customer_id directly if no offers found (orphaned contracts)
-            const { data, error } = await supabase
-                .from('contracts')
-                .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
-                .eq('customer_id', customerId) // Assuming customer_id exists on contracts as verified
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            // Map the data (same as below)
-            return data.map(row => ({
-                id: row.id,
-                offerId: row.offer_id,
-                contractNumber: row.contract_data.contractNumber,
-                client: row.contract_data.client,
-                product: row.contract_data.product,
-                pricing: {
-                    ...row.contract_data.pricing,
-                    paymentMethod: row.contract_data.pricing?.paymentMethod,
-                    advancePayment: row.contract_data.pricing?.advancePayment,
-                    advancePaymentDate: row.contract_data.pricing?.advancePaymentDate ? new Date(row.contract_data.pricing.advancePaymentDate) : undefined,
-                },
-                status: row.status as Contract['status'],
-                commission: row.contract_data.commission,
-                requirements: row.contract_data.requirements,
-                orderedItems: row.contract_data.orderedItems || [],
-                comments: row.contract_data.comments?.map((c: { id: string; text: string; author: string; createdAt: string | Date }) => ({ ...c, createdAt: new Date(c.createdAt) })) || [],
-                attachments: row.contract_data.attachments || [],
-                installationNotes: row.contract_data.installationNotes || '',
-                plannedInstallationWeeks: row.contract_data.plannedInstallationWeeks || undefined,
-                dachrechnerData: row.contract_data.dachrechnerData || undefined,
-                createdAt: new Date(row.created_at),
-                signedAt: row.signed_at ? new Date(row.signed_at) : undefined,
-                signedBy: row.signed_by,
-                signedByUser: row.signed_profile ? {
-                    firstName: (row.signed_profile.full_name || '').split(' ')[0] || '',
-                    lastName: (row.signed_profile.full_name || '').split(' ').slice(1).join(' ') || ''
-                } : undefined,
-                salesRepId: row.sales_rep_id,
-                salesRep: row.sales_rep_profile ? {
-                    firstName: (row.sales_rep_profile.full_name || '').split(' ')[0] || '',
-                    lastName: (row.sales_rep_profile.full_name || '').split(' ').slice(1).join(' ') || ''
-                } : undefined
-            }));
+            return [];
         }
 
-        // 2. Get Contracts for these offers OR directly for customer
-        let query = supabase
+        // 2. Get Contracts for these offers
+        const { data, error } = await supabase
             .from('contracts')
             .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
+            .in('offer_id', offerIds)
             .order('created_at', { ascending: false });
-
-        // Use OR filter to get contracts by offer_id OR customer_id
-        // Syntax: offer_id.in.(...ids),customer_id.eq.id
-        const orFilter = `offer_id.in.(${offerIds.join(',')}),customer_id.eq.${customerId}`;
-        query = query.or(orFilter);
-
-        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -625,6 +662,7 @@ export const ContractService = {
             id: row.id,
             offerId: row.offer_id,
             contractNumber: row.contract_data.contractNumber,
+            brand: (row.contract_data.brand || 'de') as 'de' | 'pl',
             client: row.contract_data.client,
             product: row.contract_data.product,
             pricing: {
@@ -655,19 +693,24 @@ export const ContractService = {
     },
 
     async findContractByOfferId(offerId: string): Promise<Contract | null> {
-        const { data, error } = await supabase
+        // Uwaga: dla jednej oferty może istnieć >1 umowa (historyczne duplikaty),
+        // więc .maybeSingle() padałoby błędem — bierzemy najnowszą.
+        const { data: rows, error } = await supabase
             .from('contracts')
             .select('*, signed_profile:signed_by(full_name), sales_rep_profile:sales_rep_id(full_name)')
             .eq('offer_id', offerId)
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(1);
 
         if (error) throw error;
+        const data = rows?.[0];
         if (!data) return null;
 
         return {
             id: data.id,
             offerId: data.offer_id,
             contractNumber: data.contract_data.contractNumber,
+            brand: (data.contract_data.brand || 'de') as 'de' | 'pl',
             client: data.contract_data.client,
             product: data.contract_data.product,
             pricing: {
@@ -728,6 +771,7 @@ export const ContractService = {
             id: row.id,
             offerId: row.offer_id,
             contractNumber: row.contract_data.contractNumber,
+            brand: (row.contract_data.brand || 'de') as 'de' | 'pl',
             status: row.status as Contract['status'],
             client: row.contract_data.client,
             product: row.contract_data.product,
@@ -895,7 +939,7 @@ export const ContractService = {
         const orderedItems: any[] = contractData?.orderedItems || [];
         const logisticsItems: { name: string; cost: number }[] = orderedItems
             .filter((item: any) => item.purchaseCost && item.purchaseCost > 0)
-            .map((item: any) => ({ name: item.name || 'Towar', cost: Number(item.purchaseCost) }));
+            .map((item: any) => ({ name: item.name || 'Towar', cost: Number(item.purchaseCost) * (item.quantity || 1) }));
 
         // 2b. Warehouse materials — inventory_transactions linked to this contract's installation
         if (offerId) {
@@ -1050,7 +1094,7 @@ export const ContractService = {
 
                 // Also sum hotel costs from work sessions (installer endDay flow)
                 const { data: wsSessions } = await supabase
-                    .from('work_sessions')
+                    .from('installer_work_sessions')
                     .select('hotel_cost')
                     .eq('installation_id', inst.id);
                 if (wsSessions) {
@@ -1064,7 +1108,7 @@ export const ContractService = {
 
                 // ── LABOR COST: prefer real data from work sessions ──
                 const { data: wsSess } = await supabase
-                    .from('work_sessions')
+                    .from('installer_work_sessions')
                     .select('labor_cost, total_work_minutes, crew_members')
                     .eq('installation_id', inst.id)
                     .eq('status', 'completed');
@@ -1202,6 +1246,7 @@ export const ContractService = {
         let fuelCostData: {
             total: number;
             monthlyTotal: number;
+            monthlyTotalPLN: number;
             totalLiters: number;
             contractsInMonth: number;
             internalCount: number;
@@ -1305,6 +1350,10 @@ export const ContractService = {
 
     async createManualContract(params: {
         customer: Customer;
+        // Marka umowy: 'de' = Polendach24 (EUR/VAT 19%), 'pl' = zadaszto.pl (PLN/VAT 8%|23%).
+        brand?: 'de' | 'pl';
+        // Stawka VAT jako ułamek (np. 0.19, 0.23, 0.08). Domyślnie z marki.
+        vatRate?: number;
         items: Array<{
             id: string;
             modelId: string;
@@ -1323,6 +1372,7 @@ export const ContractService = {
             installationDays?: number;
             paymentMethod?: 'cash' | 'transfer';
             installationNotes?: string;
+            plannedInstallationWeeks?: number;
             plannedInstallDate?: string;
             deliveryAddress?: {
                 street?: string;
@@ -1351,8 +1401,15 @@ export const ContractService = {
                 technicalNotes?: string;
             };
         };
-    }): Promise<void> {
+    }): Promise<Contract> {
         const { customer, items, totalPrice, contractDetails, productConfig } = params;
+        // Marka: jawnie podana albo wykryta z prefiksu numeru (ZAD/ → pl), domyślnie de.
+        const brand: 'de' | 'pl' = params.brand
+            || ((contractDetails.contractNumber || '').startsWith('ZAD/') ? 'pl' : 'de');
+        const currency: 'EUR' | 'PLN' = brand === 'pl' ? 'PLN' : 'EUR';
+        // Ułamek (0.19/0.23/0.08) → mnożnik (1.19) spójnie z dotychczasowym formatem JSONB.
+        const vatFraction = params.vatRate ?? (brand === 'pl' ? 0.23 : 0.19);
+        const vatMultiplier = 1 + vatFraction;
 
         const { data: userData } = await supabase.auth.getUser();
 
@@ -1432,7 +1489,9 @@ export const ContractService = {
                     marginPercentage: 0,
                     marginValue: 0,
                     basePrice: totalPrice,
-                    addonsPrice: 0
+                    addonsPrice: 0,
+                    currency,
+                    vatRate: vatMultiplier
                 },
                 commission: calculatedCommission,
                 snow_zone: { id: '1', value: 0, description: 'Default' }
@@ -1445,9 +1504,12 @@ export const ContractService = {
         const installDays = contractDetails.installationDays || 1;
 
         // 2. Create Contract
-        await this.createContract({
+        return await this.createContract({
             offerId: offerData.id,
+            brand,
             status: 'signed',
+            // Allow backdating for imported contracts (e.g. Google Calendar / archival)
+            createdAt: contractDetails.createdAt,
             signedAt: contractDetails.signedAt || new Date(),
             client: customer,
             product: {
@@ -1475,7 +1537,8 @@ export const ContractService = {
                 basePrice: totalPrice,
                 finalPriceNet: totalPrice,
                 sellingPriceNet: totalPrice,
-                vatRate: 1.19,
+                vatRate: vatMultiplier,
+                currency,
                 advancePayment: contractDetails.advance || 0,
                 paymentMethod: contractDetails.paymentMethod || 'transfer',
                 installationCosts: contractDetails.installationPriceNet ? {
@@ -1557,11 +1620,11 @@ export const ContractService = {
                 const detectCategory = (desc: string, model: string): string => {
                     const d = desc.toLowerCase();
                     const m = model.toLowerCase();
-                    if (d.includes('senkrechtmarkise') || d.includes('zip')) return 'ZIP Screen';
-                    if (d.includes('schiebewand') || d.includes('szyb') || d.includes('sliding')) return 'Sliding Glass';
-                    if (d.includes('seitenwand') || d.includes('ściana') || d.includes('festwand')) return 'Side Wall';
+                    if (d.includes('senkrechtmarkise') || d.includes('zip') || d.includes('roleta')) return 'ZIP Screen';
+                    if (d.includes('schiebewand') || d.includes('szyb') || d.includes('sliding') || d.includes('przesuwn')) return 'Sliding Glass';
+                    if (d.includes('seitenwand') || d.includes('ściana') || d.includes('festwand') || d.includes('windschutz') || d.includes('osłona')) return 'Side Wall';
                     if (d.includes('markise') || d.includes('markiza')) return 'Awning';
-                    if (d.includes('led') || d.includes('heizstrahler') || d.includes('lautsprecher') || d.includes('rinne')) return 'Accessories';
+                    if (d.includes('led') || d.includes('heizstrahler') || d.includes('lautsprecher') || d.includes('rinne') || d.includes('promiennik') || d.includes('głośnik') || d.includes('rynna') || d.includes('fotowoltaik') || d.includes('photovoltaik')) return 'Accessories';
                     if (d.includes('wpc') || d.includes('boden') || d.includes('podłog')) return 'Flooring';
                     if (d.includes('profil') || d.includes('ausgleich') || d.includes('wandanschluss')) return 'Profiles';
                     if (m === 'addon') return 'Accessories';

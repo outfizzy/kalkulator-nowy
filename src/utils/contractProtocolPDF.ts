@@ -1,5 +1,8 @@
 import jsPDF from 'jspdf';
 import type { Contract } from '../types';
+// jsPDF nie umie ładować obrazów z URL — '/logo.png' rzucał 'wrong PNG signature'
+// (połykane przez try/catch) i dokumenty wychodziły bez logo
+import { LOGO_BASE64 } from './assets';
 
 export type PhotoLayout = '2-per-page' | '1-per-page';
 
@@ -87,7 +90,7 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
 
     // Logo
     try {
-        doc.addImage('/logo.png', 'PNG', M, y, 35, 13);
+        doc.addImage(LOGO_BASE64.trim(), 'PNG', M, y, 35, 13);
     } catch { /* no logo */ }
 
     // Title
@@ -416,14 +419,16 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
         : (isPL ? 1.23 : 1.19);
     const currSuffix = isPL ? ' PLN' : ' EUR';
 
+    // finalPriceNet/sellingPriceNet ZAWIERAJĄ już montaż (pricing.service.ts:965) —
+    // wcześniejsze dosumowanie installGross liczyło montaż PODWÓJNIE i zawyżało
+    // "DO ODBIORU OD KLIENTA". Zaliczka przechowywana NETTO (ManualContractModal:251).
     const netPrice = pricing?.finalPriceNet || pricing?.sellingPriceNet || 0;
-    const grossPrice = netPrice * vatRate;
     const advanceAmount = contract.advanceAmount || pricing?.advancePayment || 0;
     const advancePaid = contract.advancePaid;
     const installCosts = pricing?.installationCosts;
-    const installNet = installCosts?.totalInstallation || 0;
+    const installNet = Math.min(installCosts?.totalInstallation || 0, netPrice);
     const installGross = installNet * vatRate;
-    const totalGross = grossPrice + installGross;
+    const totalGross = netPrice * vatRate;
     const remainingGross = totalGross - (advanceAmount * vatRate);
 
     const fmt = (n: number) => n.toFixed(2).replace('.', ',') + currSuffix;
@@ -439,11 +444,10 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
         txt('METODA PLATNOSCI: GOTOWKA PRZY ODBIORZE', M + 4, y + 6);
 
         doc.setFontSize(8); doc.setFont(F, 'normal'); setColor(darkSlate);
-        txt(`Wartosc zlecenia brutto: ${fmt(grossPrice)}`, M + 4, y + 13);
-        if (installNet > 0) txt(`Montaz brutto: ${fmt(installGross)}`, M + contentW / 2, y + 13);
-        txt(`Razem brutto: ${fmt(totalGross)}`, M + 4, y + 18);
+        txt(`Wartosc zlecenia brutto: ${fmt(totalGross)}`, M + 4, y + 13);
+        if (installNet > 0) txt(`w tym montaz brutto: ${fmt(installGross)}`, M + contentW / 2, y + 13);
         if (advanceAmount > 0) {
-            txt(`Zaliczka (${advancePaid ? 'oplacona' : 'nieoplacona'}): ${fmt(advanceAmount * vatRate)}`, M + contentW / 2, y + 18);
+            txt(`Zaliczka (${advancePaid ? 'oplacona' : 'nieoplacona'}): ${fmt(advanceAmount * vatRate)} brutto`, M + 4, y + 18);
         }
 
         // Big remaining amount
@@ -560,7 +564,7 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
     const contractNr = contract.contractNumber || '-';
 
     // ── Header — identical to page 1 of the protocol ──
-    try { doc.addImage('/logo.png', 'PNG', M, y, 35, 13); } catch { /* */ }
+    try { doc.addImage(LOGO_BASE64.trim(), 'PNG', M, y, 35, 13); } catch { /* */ }
     doc.setFontSize(16); doc.setFont(F, 'bold'); setColor(darkSlate);
     txt('ABNAHMEPROTOKOLL', W - M, y + 7, { align: 'right' });
     doc.setFontSize(9); doc.setFont(F, 'normal'); setColor(midSlate);
@@ -690,7 +694,7 @@ async function buildContractProtocol(contract: Contract, photoLayout: PhotoLayou
     y = M;
 
     // Header — lightweight, references main protocol
-    try { doc.addImage('/logo.png', 'PNG', M, y, 35, 13); } catch { /* */ }
+    try { doc.addImage(LOGO_BASE64.trim(), 'PNG', M, y, 35, 13); } catch { /* */ }
     doc.setFontSize(14); doc.setFont(F, 'bold'); setColor(darkSlate);
     txt('ANLAGE ZUM ABNAHMEPROTOKOLL', W - M, y + 7, { align: 'right' });
     doc.setFontSize(8); doc.setFont(F, 'normal'); setColor(midSlate);

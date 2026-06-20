@@ -38,16 +38,15 @@ const formatCurrency = (val: number) =>
  * Extract the net value from a contract, handling all possible sources:
  * - Manual contracts: pricing.finalPriceNet
  * - Offer-based contracts: pricing.sellingPriceNet (or finalPriceNet as override)
- * - Also considers installationCosts.totalNet for installation price
+ * - Also adds installationCosts.totalInstallation for installation price
+ *
+ * Formula is intentionally identical to ContractsList: finalPriceNet || sellingPriceNet
+ * (finalPriceNet is the override for signed contracts, sellingPriceNet is the original).
  */
 const getContractNetValue = (c: Contract): number => {
-    const finalNet = Number(c.pricing?.finalPriceNet || 0);
-    const sellingNet = Number(c.pricing?.sellingPriceNet || 0);
-    // Use the higher of finalPriceNet and sellingPriceNet as the source of truth
-    // finalPriceNet is the override for signed contracts, sellingPriceNet is the original
-    const baseNet = Math.max(finalNet, sellingNet);
-    // Add installation price if present
-    const installNet = Number(c.pricing?.installationCosts?.totalNet || 0);
+    const baseNet = Number(c.pricing?.finalPriceNet || c.pricing?.sellingPriceNet || 0);
+    // Add installation price if present (InstallationCostResult.totalInstallation)
+    const installNet = Number(c.pricing?.installationCosts?.totalInstallation || 0);
     return baseNet + installNet;
 };
 

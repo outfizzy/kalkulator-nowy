@@ -8,9 +8,14 @@ import { toast } from 'react-hot-toast';
 interface CustomerSelectorProps {
     onSelect: (customer: Customer) => void;
     onCancel: () => void;
+    /** 'pl' = formularz po polsku z polskimi domyślnymi (zadaszto.pl), 'de' = niemiecki (Polendach24) */
+    locale?: 'de' | 'pl';
 }
 
-export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, onCancel }) => {
+export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, onCancel, locale = 'de' }) => {
+    const isPL = locale === 'pl';
+    const L = (de: string, pl: string) => (isPL ? pl : de);
+    const salutations: Customer['salutation'][] = isPL ? ['Pan', 'Pani', 'Firma'] : ['Herr', 'Frau', 'Firma'];
     const [mode, setMode] = useState<'search' | 'new'>('search');
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState<Customer[]>([]);
@@ -19,8 +24,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
     const [customerStats, setCustomerStats] = useState<Map<string, { hasContract: boolean; hasOffer: boolean }>>(new Map());
 
     // New customer form state
-    const [newCustomer, setNewCustomer] = useState({
-        salutation: 'Herr' as 'Herr' | 'Frau' | 'Firma',
+    const [newCustomer, setNewCustomer] = useState<{ salutation: Customer['salutation']; firstName: string; lastName: string; companyName: string; street: string; houseNumber: string; postalCode: string; city: string; phone: string; email: string; country: string }>({
+        salutation: salutations[0],
         firstName: '',
         lastName: '',
         companyName: '',
@@ -30,7 +35,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
         city: '',
         phone: '',
         email: '',
-        country: 'Deutschland',
+        country: isPL ? 'Polska' : 'Deutschland',
     });
     const [isCreating, setIsCreating] = useState(false);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -306,9 +311,9 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
 
                     {/* Salutation */}
                     <div>
-                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Zwrot / Anrede</label>
+                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">{L('Zwrot / Anrede', 'Zwrot')}</label>
                         <div className="flex gap-2">
-                            {(['Herr', 'Frau', 'Firma'] as const).map(opt => (
+                            {salutations.map(opt => (
                                 <button
                                     key={opt}
                                     type="button"
@@ -326,28 +331,28 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                     </div>
 
                     {/* Name */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Imię / Vorname</label>
+                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('Imię / Vorname', 'Imię')}</label>
                             <input
                                 type="text"
                                 name="firstName"
                                 value={newCustomer.firstName}
                                 onChange={handleNewCustomerChange}
-                                placeholder="Hans"
+                                placeholder={L('Hans', 'Jan')}
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                             />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
-                                Nazwisko / Nachname <span className="text-red-500">*</span>
+                                {L('Nazwisko / Nachname', 'Nazwisko')} <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
                                 name="lastName"
                                 value={newCustomer.lastName}
                                 onChange={handleNewCustomerChange}
-                                placeholder="Müller"
+                                placeholder={L('Müller', 'Kowalski')}
                                 className={`w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none ${
                                     formErrors.lastName ? 'border-red-400 bg-red-50' : 'border-slate-300'
                                 }`}
@@ -372,15 +377,15 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                     )}
 
                     {/* Address */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="col-span-2">
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Ulica / Straße</label>
+                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('Ulica / Straße', 'Ulica')}</label>
                             <input
                                 type="text"
                                 name="street"
                                 value={newCustomer.street}
                                 onChange={handleNewCustomerChange}
-                                placeholder="Musterstraße"
+                                placeholder={L('Musterstraße', 'ul. Przykładowa')}
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                             />
                         </div>
@@ -397,34 +402,34 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">PLZ</label>
+                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('PLZ', 'Kod pocztowy')}</label>
                             <input
                                 type="text"
                                 name="postalCode"
                                 value={newCustomer.postalCode}
                                 onChange={handleNewCustomerChange}
-                                placeholder="12345"
-                                maxLength={5}
+                                placeholder={L('12345', '00-001')}
+                                maxLength={isPL ? 6 : 5}
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                             />
                         </div>
                         <div className="col-span-2">
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Miasto / Ort</label>
+                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{L('Miasto / Ort', 'Miasto')}</label>
                             <input
                                 type="text"
                                 name="city"
                                 value={newCustomer.city}
                                 onChange={handleNewCustomerChange}
-                                placeholder="Berlin"
+                                placeholder={L('Berlin', 'Warszawa')}
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                             />
                         </div>
                     </div>
 
                     {/* Contact */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Telefon</label>
                             <input
@@ -432,7 +437,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                                 name="phone"
                                 value={newCustomer.phone}
                                 onChange={handleNewCustomerChange}
-                                placeholder="+49..."
+                                placeholder={L('+49...', '+48 600 100 200')}
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                             />
                         </div>
@@ -443,7 +448,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, on
                                 name="email"
                                 value={newCustomer.email}
                                 onChange={handleNewCustomerChange}
-                                placeholder="kunde@example.de"
+                                placeholder={L('kunde@example.de', 'klient@example.pl')}
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-400 outline-none"
                             />
                         </div>

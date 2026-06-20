@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, MapPin, Camera, Loader2, Trash2, Star } from 'lucide-react';
+import { X, Upload, MapPin, Camera, Loader2, Trash2, Star, Sparkles } from 'lucide-react';
 import { DatabaseService } from '../../services/database';
 import { geocodeAddress } from '../../utils/geocoding';
 import { GeocodingService } from '../../services/geocoding.service';
@@ -36,11 +36,16 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
         description: realization.description || '',
         client_name: realization.client_name || '',
         completion_date: realization.completion_date || '',
+        seo_title: realization.seo_title || '',
+        meta_description: realization.meta_description || '',
     });
 
     const [existingPhotos, setExistingPhotos] = useState<RealizationPhoto[]>(realization.photos || []);
     const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
     const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
+    const [aiNewCaptions, setAiNewCaptions] = useState<string[]>([]);
+    const [aiTips, setAiTips] = useState<string[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGeocoding, setIsGeocoding] = useState(false);
     const [geocodeResult, setGeocodeResult] = useState<{ lat: number; lng: number } | null>(
@@ -60,7 +65,11 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
             description: realization.description || '',
             client_name: realization.client_name || '',
             completion_date: realization.completion_date || '',
+            seo_title: realization.seo_title || '',
+            meta_description: realization.meta_description || '',
         });
+        setAiNewCaptions([]);
+        setAiTips([]);
         setExistingPhotos(realization.photos || []);
         setGeocodeResult(realization.latitude && realization.longitude ? { lat: realization.latitude, lng: realization.longitude } : null);
         setNewPhotoFiles([]);
@@ -165,6 +174,46 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
         }
     };
 
+    const parseDimensions = (title: string): string | undefined => {
+        const m = title.match(/(\d{3,4})\s*[x×]\s*(\d{3,4})/i);
+        if (!m) return undefined;
+        const toM = (v: string) => (parseInt(v, 10) / 1000).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+        return `${toM(m[1])} × ${toM(m[2])} m`;
+    };
+
+    const handleGenerateAI = async () => {
+        setIsGenerating(true);
+        try {
+            const copy = await DatabaseService.generateCopy({
+                productType: form.product_type,
+                city: form.city,
+                postalCode: form.postal_code,
+                dimensions: parseDimensions(form.title || ''),
+                title: form.title,
+                draftDescription: form.description,
+                photoCount: existingPhotos.length + newPhotoFiles.length,
+            });
+            setForm(prev => ({
+                ...prev,
+                title: copy.title || prev.title,
+                description: copy.description || prev.description,
+                seo_title: copy.seoTitle || prev.seo_title,
+                meta_description: copy.metaDescription || prev.meta_description,
+            }));
+            const caps = copy.photoCaptions || [];
+            // Apply captions in order: existing photos first, then new uploads.
+            setExistingPhotos(prev => prev.map((p, i) => ({ ...p, caption: caps[i]?.trim() || p.caption })));
+            setAiNewCaptions(caps.slice(existingPhotos.length));
+            setAiTips(copy.tips || []);
+            toast.success('KI-Texte erstellt — bitte prüfen und ggf. anpassen.');
+        } catch (e) {
+            console.error('AI copy error:', e);
+            toast.error(e instanceof Error ? e.message : 'KI-Generierung fehlgeschlagen.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!form.title.trim()) {
             toast.error('Tytuł jest wymagany');
@@ -200,7 +249,7 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
 
                 uploadedPhotos.push({
                     url: urlData.publicUrl,
-                    caption: file.name.replace(/\.[^.]+$/, ''),
+                    caption: aiNewCaptions[i]?.trim() || file.name.replace(/\.[^.]+$/, ''),
                     is_cover: false
                 });
             }
@@ -223,6 +272,8 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
                 description: form.description || undefined,
                 client_name: form.client_name || undefined,
                 completion_date: form.completion_date || undefined,
+                seo_title: form.seo_title || undefined,
+                meta_description: form.meta_description || undefined,
                 latitude: geocodeResult?.lat || null,
                 longitude: geocodeResult?.lng || null,
                 photos: finalPhotos
@@ -285,6 +336,35 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
                         </div>
                     </div>
 
+                    {/* Asystent AI (Claude): opis, SEO i podpisy zdjęć */}
+                    <div className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-blue-50 p-4 space-y-2">
+                        <button
+                            type="button"
+                            onClick={handleGenerateAI}
+                            disabled={isGenerating}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-lg font-semibold text-sm hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                        >
+                            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                            {isGenerating ? 'AI pisze…' : 'AI: opis, SEO i podpisy zdjęć (po niemiecku)'}
+                        </button>
+                        <p className="text-[11px] text-violet-700/80 leading-snug">
+                            Tworzy zoptymalizowany pod SEO opis, tytuł SEO, meta-opis i podpisy zdjęć — <strong>po niemiecku</strong> (treść trafia na stronę).
+                            Podpisy przypisują się zdjęciom po kolei. Wszystko pozostaje edytowalne.
+                        </p>
+                    </div>
+
+                    {/* Podpowiedzi AI: co i jak ulepszyć tę realizację */}
+                    {aiTips.length > 0 && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                            <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> Podpowiedzi AI — jak ulepszyć tę realizację</p>
+                            <ul className="space-y-1.5">
+                                {aiTips.map((t, i) => (
+                                    <li key={i} className="text-xs text-amber-900/90 flex gap-2"><span className="text-amber-500 mt-0.5">●</span><span>{t}</span></li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {/* Description */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Opis</label>
@@ -292,10 +372,42 @@ export const EditRealizationModal: React.FC<EditRealizationModalProps> = ({ isOp
                             name="description"
                             value={form.description}
                             onChange={handleChange}
-                            placeholder="Dodatkowy opis realizacji..."
-                            rows={2}
+                            placeholder="Opis realizacji… lub wygeneruj przez AI."
+                            rows={4}
                             className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                         />
+                    </div>
+
+                    {/* Pola SEO */}
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-sm font-semibold text-slate-700">Tytuł SEO</label>
+                                <span className={`text-[11px] ${(form.seo_title || '').length > 60 ? 'text-red-500' : 'text-slate-400'}`}>{(form.seo_title || '').length}/60</span>
+                            </div>
+                            <input
+                                type="text"
+                                name="seo_title"
+                                value={form.seo_title || ''}
+                                onChange={handleChange}
+                                placeholder="np. Terrassenüberdachung Dresden – Polendach24 Referenz"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-sm font-semibold text-slate-700">Meta-opis (Google)</label>
+                                <span className={`text-[11px] ${(form.meta_description || '').length > 155 ? 'text-red-500' : 'text-slate-400'}`}>{(form.meta_description || '').length}/155</span>
+                            </div>
+                            <textarea
+                                name="meta_description"
+                                value={form.meta_description || ''}
+                                onChange={handleChange}
+                                placeholder="Krótki tekst do wyników wyszukiwania Google."
+                                rows={2}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                            />
+                        </div>
                     </div>
 
                     {/* Address */}

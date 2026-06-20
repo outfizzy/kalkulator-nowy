@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { BlogService } from '../services/database/blog.service';
+import type { GeneratedArticle } from '../services/database/blog.service';
 import type { BlogPost } from '../services/database/blog.service';
 import toast from 'react-hot-toast';
 
@@ -11,12 +12,15 @@ import toast from 'react-hot-toast';
 
 type ViewMode = 'list' | 'editor';
 
+// Kategorie (silo) MUSZĄ odpowiadać tym na stronie (polendach24.de/ratgeber → siloLabels/siloOrder).
 const SILO_OPTIONS = [
     { value: '', label: '-- Brak --' },
-    { value: 'terrassenueberdachung', label: 'Terrassenueberdachung' },
+    { value: 'terrassenueberdachung', label: 'Terrassenüberdachung' },
     { value: 'pergola', label: 'Pergola' },
+    { value: 'bioklimatische-pergola', label: 'Bioklimatische Pergola' },
     { value: 'carport', label: 'Carport' },
     { value: 'wintergarten', label: 'Wintergarten' },
+    { value: 'trust', label: 'Wissen & Vertrauen' },
 ];
 
 export const BlogDEPage: React.FC = () => {
@@ -29,7 +33,9 @@ export const BlogDEPage: React.FC = () => {
     const [aiPanel, setAiPanel] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
+    const [aiKeywords, setAiKeywords] = useState('');
     const [aiResult, setAiResult] = useState('');
+    const [aiArticle, setAiArticle] = useState<GeneratedArticle | null>(null);
     const [aiMode, setAiMode] = useState<'topics' | 'write' | 'seo' | 'improve'>('topics');
     const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
     const editorRef = useRef<HTMLDivElement>(null);
@@ -152,59 +158,105 @@ export const BlogDEPage: React.FC = () => {
 
     // ═══ AI Assistant (German prompts) ═══
     const handleAIGenerate = async () => {
+        setAiLoading(true); setAiResult(''); setAiArticle(null);
+
+        // WRITE → strukturierter, publikationsreifer Artikel: füllt ALLE SEO-Felder auf einmal.
+        if (aiMode === 'write') {
+            try {
+                const art = await BlogService.generateArticle({
+                    topic: aiPrompt || 'Aluminium-Terrassenüberdachungen',
+                    keywords: aiKeywords.trim() || undefined,
+                    silo: (editingPost as any)?.silo || undefined,
+                });
+                setAiArticle(art);
+                setAiResult(art.content);
+            } catch (err: any) {
+                toast.error(err.message || 'Blad AI');
+                setAiResult(`Blad: ${err.message || ''}`);
+            } finally { setAiLoading(false); }
+            return;
+        }
+
         const apiKey = currentUser?.emailConfig?.openaiKey;
-        setAiLoading(true); setAiResult('');
+
+        // Geteilter Experten-Kontext: Marke, echte interne Links, Sicherheit/E-E-A-T.
+        const SITE_CONTEXT = `KONTEXT — Polendach24 (polendach24.de):
+Premium-Hersteller maßgefertigter Aluminium-Terrassenüberdachungen, Pergolen (bioklimatisch), Carports, Wintergärten und Glas-Schiebewände. Eigene Produktion, eigenes Montageteam, Lieferung + Montage zum Festpreis nach Aufmaß.
+Modellnamen IMMER korrekt: Trendstyle, Trendstyle+, Topstyle, Topstyle XL, Skystyle, Designstyle, Orangestyle, Ultrastyle. NIEMALS interne Namen (Trendline/Topline/Skyline …).
+
+INTERNE LINKS — baue 3–6 thematisch passende natürlich in den Fließtext ein, als <a href="…">beschreibender Ankertext</a>:
+- Produkte: /terrassenueberdachung · /pergola · /carport · /wintergarten/wintergaerten · /glasschiebewaende
+- /terrassenueberdachung-aus-polen · /konfigurator (3D-Konfigurator) · /referenzen
+- Regionen: /liefergebiet · /liefergebiet/berlin-brandenburg · Städte z. B. /terrassenueberdachung-berlin, -dresden, -leipzig, -cottbus, -potsdam, -magdeburg, -halle
+- Ratgeber: /ratgeber/was-kostet-eine-terrassenueberdachung-aus-aluminium · /ratgeber/baugenehmigung-terrassenueberdachung · /ratgeber/terrassenueberdachung-schneelast · /ratgeber/glas-oder-polycarbonat-dach · /ratgeber/alu-oder-holz-terrassenueberdachung · /ratgeber/ral-farben-terrassenueberdachung
+
+SICHERHEIT / E-E-A-T:
+- KEINE konkreten Preise, Garantie-Jahre oder technischen Werte (Schneelast-kg, Spannweiten, RAL) erfinden. Wenn Kosten Thema sind: ausdrücklich als „Richtwerte/Orientierung" kennzeichnen und auf kostenloses Aufmaß + verbindliches Festpreisangebot verweisen.
+- Bauvorschriften nur allgemein halten (verbindliche Auskunft erteilt das zuständige Bauamt). Keine erfundenen Statistiken, Studien oder Kundenstimmen.
+- Sprache: Deutsch, Sie-Form. Hochwertig, ehrlich, hilfreich, ohne Floskel-Häufung und ohne Superlativ-Inflation.`;
 
         const systemPrompts: Record<string, string> = {
-            topics: `Du bist ein SEO- und Content-Marketing-Experte für den deutschen Markt der Terrassenüberdachungen, Pergolen, Carports und Wintergärten.
-Firma: Polendach24.de — führender Anbieter moderner Aluminium-Terrassenüberdachungen in Deutschland.
-Produkte: Terrassenüberdachungen, Pergolen (bioklimatisch), Carports, Wintergärten.
-Schlage 10 Blog-Artikel-Themen vor, die:
-- Für Google SEO optimiert sind (mit konkreten Keyword-Vorschlägen)
-- Fragen beantworten, die potenzielle Kunden in Google eingeben
-- Die Firma als Branchenexperte positionieren
-- Deutsche Bauvorschriften (DIN-Normen, Schneelast, Windlast, Baugenehmigung) berücksichtigen
-Format: Nummerierte Liste mit Titel, Keyword-Vorschlägen und kurzer Inhaltsbeschreibung.`,
+            topics: `${SITE_CONTEXT}
 
-            write: `Du bist ein professioneller SEO-Copywriter für Terrassenüberdachungen, Pergolen und Carports.
-Firma: Polendach24.de — führender Anbieter in Deutschland.
-Schreibe einen vollständigen Blog-Artikel in HTML (nur Inhalt, ohne <html>, <body>).
-Verwende Tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>.
-Der Artikel soll:
-- Mindestens 1500 Wörter haben
-- H2- und H3-Überschriften enthalten, die für SEO optimiert sind
-- Einen FAQ-Abschnitt (Häufig gestellte Fragen) enthalten
-- Keywords natürlich einbauen
-- In einem professionellen, aber zugänglichen Ton geschrieben sein
-- CTA (Call-to-Action) enthalten, der zur Kontaktaufnahme mit Polendach24 ermutigt
-- Deutsche Wetterbedingungen und Bauvorschriften berücksichtigen (DIN-Normen, Schneelast, Windlast)`,
+AUFGABE: Du bist Senior-SEO-Stratege. Schlage 10 Blog-Artikel-Ideen vor, die echte Google-Suchintentionen treffen. Gib pro Idee an:
+1) Titel (klickstark, mit Haupt-Keyword vorne),
+2) Haupt-Keyword + 3–5 sekundäre/LSI-Keywords,
+3) Suchintention (Information / Vergleich / Transaktion) + Funnel-Stufe (oben/mitte/unten),
+4) empfohlenes Silo (terrassenueberdachung / pergola / carport / wintergarten),
+5) Inhaltswinkel in 1 Satz + 1 passender interner Link aus der Liste.
+Priorisiere Themen mit Kauf- oder Lokalbezug (Stadt/Region) und echtem Suchvolumen-Potenzial. Klar nummerierte, scanbare Liste.`,
 
-            seo: `Du bist ein SEO-Experte. Analysiere den folgenden Artikeltext und schlage vor:
-1. Optimalen Meta-Titel (max 60 Zeichen)
-2. Meta-Beschreibung (max 155 Zeichen)
-3. 5-8 Keywords/Suchphrasen
-4. SEO-Qualitätsbewertung (Skala 1-10) mit Verbesserungsempfehlungen
-5. Verbesserungen der H2/H3-Überschriftenstruktur
-Antworte auf Deutsch.`,
+            write: `${SITE_CONTEXT}
 
-            improve: `Du bist ein professioneller Redakteur und SEO-Experte.
-Verbessere den folgenden Artikeltext:
-- Verbessere Stil und Lesbarkeit
-- Füge fehlende Keywords für die Terrassenüberdachungs-Branche hinzu
-- Verbessere die Überschriftenstruktur
-- Füge einen FAQ-Abschnitt hinzu oder verbessere ihn
-- Stärke den CTA
-- Behalte das HTML-Format bei
-Gib den gesamten verbesserten Artikel in HTML zurück.`
+AUFGABE: Schreibe einen vollständigen, erstklassigen SEO-Blogartikel — auf dem Niveau eines professionellen deutschen Copywriters.
+AUSGABE: NUR HTML-Inhalt (ohne <html>/<body>). Erlaubte Tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>, <a>, <table>.
+ANFORDERUNGEN:
+- 1500–2200 Wörter; klare H2/H3-Gliederung, die die Suchintention Schritt für Schritt beantwortet.
+- Haupt-Keyword in der Einleitung (erste 100 Wörter) und in mind. einer H2; sekundäre/LSI-Keywords natürlich verteilen — KEIN Keyword-Stuffing.
+- Echter Mehrwert: Entscheidungshilfen, Vergleiche, Checklisten; wo sinnvoll eine <table>-Vergleichstabelle.
+- 3–6 thematisch passende interne Links aus der Liste mit beschreibendem Ankertext.
+- Pflicht: ein <h2>Häufige Fragen</h2>-Abschnitt mit 3–5 echten Nutzerfragen als <h3> + jeweils kurzer, präziser Antwort (FAQ-Schema-tauglich).
+- Abschluss mit dezentem, ehrlichem CTA (kostenloses Aufmaß / Festpreisangebot / 3D-Konfigurator).
+- Beginne direkt mit Einleitung oder erstem <h2> — keine Vorbemerkung an mich, keine Markdown-Codefences.`,
+
+            seo: `${SITE_CONTEXT}
+
+AUFGABE: Führe ein professionelles SEO-Audit des folgenden Artikels durch und liefere KONKRETE, sofort nutzbare Ergebnisse:
+1) Optimaler Meta-Titel (≤60 Zeichen) — fertig zum Kopieren.
+2) Meta-Beschreibung (≤155 Zeichen) — fertig, mit dezenter CTA.
+3) Haupt-Keyword + 6–10 sekundäre/LSI-Keywords (kommagetrennt, direkt als Tags nutzbar).
+4) Keyword-Abdeckung & -Dichte: was fehlt, wo nachschärfen?
+5) Überschriften-Struktur (H2/H3): konkrete Verbesserungen.
+6) Interne Verlinkung: welche 3–5 internen Links aus der Liste ergänzen?
+7) SEO-Score (1–10) + die 3 wichtigsten Hebel.
+Antworte auf Deutsch, klar gegliedert (nutze <h3>/<ul> für Lesbarkeit).`,
+
+            improve: `${SITE_CONTEXT}
+
+AUFGABE: Überarbeite den folgenden Artikel auf Profi-Copywriter-Niveau und gib den GESAMTEN verbesserten Artikel als HTML zurück (gleiche Tag-Regeln wie beim Schreiben):
+- Stil, Lesefluss und Struktur verbessern; schwache/dünne Passagen umschreiben und vertiefen.
+- Fehlende relevante Keywords/LSI natürlich ergänzen (kein Stuffing).
+- H2/H3-Struktur an die Suchintention anpassen.
+- 3–6 passende interne Links aus der Liste ergänzen (sofern noch nicht vorhanden).
+- <h2>Häufige Fragen</h2>-Abschnitt ergänzen oder verbessern (3–5 Q&A).
+- CTA stärken — ehrlich, ohne erfundene Preise/Garantien.
+Gib ausschließlich den fertigen HTML-Artikel zurück, keine Vorbemerkung, keine Codefences.`
         };
 
+        const kw = aiKeywords.trim();
+        const ctxLines = [
+            editingPost?.title ? `Arbeitstitel: ${editingPost.title}` : '',
+            (editingPost as any)?.silo ? `Silo/Kategorie: ${(editingPost as any).silo}` : '',
+            kw ? `Ziel-Keywords (Haupt-Keyword zuerst, natürlich einbauen): ${kw}` : '',
+        ].filter(Boolean).join('\n');
+
         const userMessage = aiMode === 'topics'
-            ? (aiPrompt || 'Schlage Blog-Artikel-Themen für polendach24.de vor')
+            ? `Themenbereich: ${aiPrompt || 'allgemein für polendach24.de'}${kw ? `\nFokus-Keywords: ${kw}` : ''}`
             : aiMode === 'write'
-                ? (aiPrompt || 'Schreibe einen Artikel über Terrassenüberdachungen aus Aluminium')
+                ? `Thema des Artikels: ${aiPrompt || 'Aluminium-Terrassenüberdachungen'}${ctxLines ? `\n${ctxLines}` : ''}`
                 : aiMode === 'seo'
-                    ? `Analysiere das SEO dieses Artikels:\n\n${editingPost?.content || ''}`
-                    : `Verbessere diesen Artikel:\n\n${editingPost?.content || ''}`;
+                    ? `Analysiere das SEO dieses Artikels:${kw ? `\nZiel-Keywords: ${kw}` : ''}\n\n${editingPost?.content || ''}`
+                    : `Verbessere diesen Artikel:${ctxLines ? `\n${ctxLines}` : ''}\n\n${editingPost?.content || ''}`;
 
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -245,6 +297,27 @@ Gib den gesamten verbesserten Artikel in HTML zurück.`
     };
 
     const insertAIContent = () => {
+        // Strukturierter WRITE-Artikel → kompletten Beitrag inkl. aller SEO-Felder einfügen.
+        if (aiArticle) {
+            const a = aiArticle;
+            setEditingPost(prev => ({
+                ...(prev || { is_published: false, author_id: currentUser?.id }),
+                title: a.title || prev?.title || '',
+                content: a.content,
+                excerpt: a.excerpt || '',
+                meta_title: a.metaTitle || '',
+                meta_description: a.metaDescription || '',
+                tags: a.tags || [],
+                silo: a.suggestedSilo || (prev as any)?.silo || null,
+                image_alt: a.coverImageAlt || (prev as any)?.image_alt || '',
+                priority: (prev as any)?.priority || 3,
+            }) as any);
+            if (editorRef.current) editorRef.current.innerHTML = a.content;
+            setViewMode('editor');
+            setAiPanel(false);
+            toast.success('Artykuł + pola SEO wypełnione — sprawdź i opublikuj!');
+            return;
+        }
         if (!aiResult) return;
         if (aiMode === 'write' || aiMode === 'improve') {
             if (editorRef.current) {
@@ -277,7 +350,12 @@ Gib den gesamten verbesserten Artikel in HTML zurück.`
     // ═══ WYSIWYG Toolbar ═══
     const execCommand = (cmd: string, value?: string) => { document.execCommand(cmd, false, value); editorRef.current?.focus(); };
     const insertLink = () => { const url = prompt('Podaj URL:', 'https://'); if (url) execCommand('createLink', url); };
-    const insertImage = () => { const url = prompt('Podaj URL obrazka:'); if (url) execCommand('insertImage', url); };
+    const insertImage = () => {
+        const url = prompt('Podaj URL obrazka:');
+        if (!url) return;
+        const alt = prompt('Alt-Text (opis zdjęcia po niemiecku — ważne dla SEO):', '') || '';
+        execCommand('insertHTML', `<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" />`);
+    };
 
     // ═══ Filtered Posts ═══
     const filteredPosts = posts.filter(p => {
@@ -401,7 +479,7 @@ Gib den gesamten verbesserten Artikel in HTML zurück.`
                 )}
 
                 {/* AI Panel Modal */}
-                {aiPanel && <AIPanelDE aiMode={aiMode} setAiMode={setAiMode} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiLoading={aiLoading} aiResult={aiResult} onGenerate={handleAIGenerate} onClose={() => setAiPanel(false)} onInsert={insertAIContent} hasContent={!!editingPost?.content} />}
+                {aiPanel && <AIPanelDE aiMode={aiMode} setAiMode={setAiMode} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiKeywords={aiKeywords} setAiKeywords={setAiKeywords} aiLoading={aiLoading} aiResult={aiResult} onGenerate={handleAIGenerate} onClose={() => setAiPanel(false)} aiArticle={aiArticle} onInsert={insertAIContent} hasContent={!!editingPost?.content} />}
             </div>
         );
     }
@@ -542,7 +620,7 @@ Gib den gesamten verbesserten Artikel in HTML zurück.`
                         <h3 className="font-bold text-slate-800 mb-3 text-sm uppercase tracking-wider">Obrazek Okladki</h3>
                         {editingPost?.image_url ? (
                             <div className="relative group">
-                                <img src={editingPost.image_url} alt="Cover" className="w-full h-32 object-cover rounded-lg" />
+                                <img src={editingPost.image_url} alt={editingPost.image_alt || 'Cover'} className="w-full h-32 object-cover rounded-lg" />
                                 <button onClick={() => setEditingPost(prev => prev ? { ...prev, image_url: null } : prev)}
                                     className="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">x</button>
                             </div>
@@ -554,6 +632,13 @@ Gib den gesamten verbesserten Artikel in HTML zurück.`
                                 <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                             </label>
                         )}
+                        <div className="mt-3">
+                            <label className="text-xs text-slate-500 font-medium">Alt-Text (SEO)</label>
+                            <input type="text" placeholder="Titelbild-Beschreibung mit Keyword..."
+                                value={editingPost?.image_alt || ''}
+                                onChange={e => setEditingPost(prev => prev ? { ...prev, image_alt: e.target.value } : prev)}
+                                className="w-full text-sm border border-slate-200 rounded-lg p-2 mt-1 outline-none focus:ring-2 focus:ring-blue-100" />
+                        </div>
                     </div>
 
                     {/* Excerpt */}
@@ -635,7 +720,7 @@ Gib den gesamten verbesserten Artikel in HTML zurück.`
             </div>
 
             {/* AI Panel Modal */}
-            {aiPanel && <AIPanelDE aiMode={aiMode} setAiMode={setAiMode} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiLoading={aiLoading} aiResult={aiResult} onGenerate={handleAIGenerate} onClose={() => setAiPanel(false)} onInsert={insertAIContent} hasContent={!!(editingPost?.content && editingPost.content.length > 50)} />}
+            {aiPanel && <AIPanelDE aiMode={aiMode} setAiMode={setAiMode} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiKeywords={aiKeywords} setAiKeywords={setAiKeywords} aiLoading={aiLoading} aiResult={aiResult} onGenerate={handleAIGenerate} onClose={() => setAiPanel(false)} aiArticle={aiArticle} onInsert={insertAIContent} hasContent={!!(editingPost?.content && editingPost.content.length > 50)} />}
         </div>
     );
 };
@@ -654,10 +739,12 @@ const AIPanelDE: React.FC<{
     aiMode: 'topics' | 'write' | 'seo' | 'improve';
     setAiMode: (m: 'topics' | 'write' | 'seo' | 'improve') => void;
     aiPrompt: string; setAiPrompt: (s: string) => void;
+    aiKeywords: string; setAiKeywords: (s: string) => void;
     aiLoading: boolean; aiResult: string;
+    aiArticle: GeneratedArticle | null;
     onGenerate: () => void; onClose: () => void; onInsert: () => void;
     hasContent: boolean;
-}> = ({ aiMode, setAiMode, aiPrompt, setAiPrompt, aiLoading, aiResult, onGenerate, onClose, onInsert, hasContent }) => (
+}> = ({ aiMode, setAiMode, aiPrompt, setAiPrompt, aiKeywords, setAiKeywords, aiLoading, aiResult, aiArticle, onGenerate, onClose, onInsert, hasContent }) => (
     <>
         <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
         <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white z-50 shadow-2xl flex flex-col">
@@ -678,9 +765,9 @@ const AIPanelDE: React.FC<{
                 {/* Mode Tabs */}
                 <div className="flex gap-2 mt-4">
                     {[
-                        { key: 'topics' as const, label: 'Tematy', desc: 'Propozycje artykulow' },
-                        { key: 'write' as const, label: 'Napisz', desc: 'Pelny artykul' },
-                        { key: 'seo' as const, label: 'SEO', desc: 'Analiza SEO' },
+                        { key: 'topics' as const, label: 'Tematy', desc: 'Propozycje + keywords' },
+                        { key: 'write' as const, label: 'Napisz', desc: 'Artykuł + SEO + zdjęcia' },
+                        { key: 'seo' as const, label: 'SEO', desc: 'Analiza + meta/tagi' },
                         { key: 'improve' as const, label: 'Popraw', desc: 'Ulepsz tresc' },
                     ].map(m => (
                         <button key={m.key} onClick={() => setAiMode(m.key)} disabled={!hasContent && (m.key === 'seo' || m.key === 'improve')}
@@ -706,6 +793,15 @@ const AIPanelDE: React.FC<{
                             'np. Mehr Informationen ueber Preise und Verfuegbarkeit...'
                         }
                         rows={3} className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-purple-100 resize-none" />
+                </div>
+
+                {/* Ziel-Keywords */}
+                <div>
+                    <label className="text-sm font-bold text-slate-700 mb-2 block">Słowa kluczowe (Ziel-Keywords, opcjonalnie):</label>
+                    <input type="text" value={aiKeywords} onChange={e => setAiKeywords(e.target.value)}
+                        placeholder="np. terrassenüberdachung alu, kosten, baugenehmigung sachsen"
+                        className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-purple-100" />
+                    <p className="text-[11px] text-slate-400 mt-1">Pierwsze = główne słowo kluczowe (trafia do H1, wstępu i meta). Reszta wplatana naturalnie, bez przesycania.</p>
                 </div>
 
                 {/* Quick Prompts for Topics (German market) */}
@@ -742,6 +838,30 @@ const AIPanelDE: React.FC<{
                     )}
                 </button>
 
+                {/* Auto-gefüllte SEO-Felder + Bild-Empfehlungen (WRITE) */}
+                {aiMode === 'write' && aiArticle && (
+                    <div className="space-y-2 bg-violet-50 border border-violet-200 rounded-xl p-3">
+                        <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Pola SEO wypełnią się automatycznie</p>
+                        <div className="text-xs text-slate-600 space-y-1">
+                            <div><span className="font-semibold">Meta-Title:</span> {aiArticle.metaTitle} <span className="text-slate-400">({aiArticle.metaTitle.length}/60)</span></div>
+                            <div><span className="font-semibold">Meta-Desc:</span> {aiArticle.metaDescription} <span className="text-slate-400">({aiArticle.metaDescription.length}/155)</span></div>
+                            <div><span className="font-semibold">Silo:</span> {aiArticle.suggestedSilo || '—'} · <span className="font-semibold">Slug:</span> {aiArticle.slug}</div>
+                            <div><span className="font-semibold">Tagi:</span> {aiArticle.tags.join(', ')}</div>
+                            <div><span className="font-semibold">Alt okładki:</span> {aiArticle.coverImageAlt}</div>
+                        </div>
+                        {aiArticle.imageBriefs.length > 0 && (
+                            <div className="pt-1 border-t border-violet-200">
+                                <p className="text-xs font-bold text-violet-700 mt-1">Sugerowane zdjęcia (z gotowym alt):</p>
+                                <ul className="text-xs text-slate-600 space-y-1 mt-1">
+                                    {aiArticle.imageBriefs.map((b, i) => (
+                                        <li key={i}><span className="font-semibold">{b.placement || `Zdjęcie ${i + 1}`}:</span> {b.description} <span className="text-slate-400">— alt: „{b.alt}"</span></li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Result */}
                 {aiResult && (
                     <div className="space-y-3">
@@ -749,7 +869,7 @@ const AIPanelDE: React.FC<{
                             <h3 className="font-bold text-slate-800">Wynik AI:</h3>
                             {(aiMode === 'write' || aiMode === 'improve') && (
                                 <button onClick={onInsert} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-1">
-                                    Wstaw do edytora
+                                    {aiArticle ? 'Wstaw artykuł + pola SEO' : 'Wstaw do edytora'}
                                 </button>
                             )}
                         </div>

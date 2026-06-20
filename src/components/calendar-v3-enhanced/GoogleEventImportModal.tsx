@@ -3,6 +3,8 @@ import type { GoogleCalendarEvent } from './GoogleCalendarImportPanel';
 import { DatabaseService } from '../../services/database';
 import { InstallationService } from '../../services/database/installation.service';
 import { GoogleCalendarService } from '../../services/google-calendar.service';
+import { supabase } from '../../lib/supabase';
+import type { Customer } from '../../types';
 import toast from 'react-hot-toast';
 
 interface GoogleEventImportModalProps {
@@ -60,8 +62,7 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
                     return;
                 }
 
-                const sb = DatabaseService.getClient();
-                const { data: newCustomer, error: custErr } = await sb
+                const { data: newCustomer, error: custErr } = await supabase
                     .from('customers')
                     .insert({
                         first_name: form.firstName,
@@ -86,35 +87,50 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
                 customerId = newCustomer.id;
             }
 
-            // Step 2: Create contract if requested
+            // Step 2: Create contract if requested — via ContractService (tabela contracts
+            // nie ma kolumn customer_id/contract_number, bezpośredni insert zawsze padał)
             if (createContract && !contractId) {
-                const sb = DatabaseService.getClient();
+                const contractCustomer: Customer = {
+                    id: customerId,
+                    salutation: 'Herr',
+                    firstName: form.firstName,
+                    lastName: form.lastName,
+                    street: form.address || '',
+                    houseNumber: '',
+                    postalCode: form.postalCode || '',
+                    city: form.city || '',
+                    phone: form.phone || '',
+                    email: form.email || '',
+                    country: 'Deutschland',
+                };
 
-                // Auto-generate contract number if not provided
-                const contractNumber = form.contractNumber ||
-                    `GC/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-
-                const { data: newContract, error: contractErr } = await sb
-                    .from('contracts')
-                    .insert({
-                        customer_id: customerId,
-                        contract_number: contractNumber,
-                        contract_date: eventDate || new Date().toISOString().split('T')[0],
-                        product_summary: form.productSummary || event.googleEvent.summary || 'Import z Google Calendar',
-                        status: 'active',
-                        notes: `Import z Google Calendar: ${event.googleEvent.summary}\n${form.notes || ''}`.trim(),
-                    })
-                    .select('id')
-                    .single();
-
-                if (contractErr || !newContract) {
+                try {
+                    const newContract = await DatabaseService.createManualContract({
+                        customer: contractCustomer,
+                        items: [{
+                            id: crypto.randomUUID(),
+                            modelId: 'other',
+                            description: form.productSummary || event.googleEvent.summary || 'Import z Google Calendar',
+                            quantity: 1,
+                            price: 0,
+                        }],
+                        totalPrice: 0,
+                        contractDetails: {
+                            // Bez numeru → ContractService nada kolejny numer z RPC
+                            contractNumber: form.contractNumber || undefined,
+                            createdAt: eventDate ? new Date(eventDate) : undefined,
+                            signedAt: eventDate ? new Date(eventDate) : new Date(),
+                            comments: `Import z Google Calendar: ${event.googleEvent.summary}\n${form.notes || ''}`.trim(),
+                        },
+                    });
+                    contractId = newContract.id;
+                } catch (contractErr: any) {
                     console.error('Contract creation error:', contractErr);
-                    toast.error('Błąd tworzenia umowy (klient został utworzony)', { id: toastId });
+                    const msg = contractErr?.message ? ` ${contractErr.message}` : '';
+                    toast.error(`Błąd tworzenia umowy (klient został utworzony).${msg}`, { id: toastId });
                     setSaving(false);
                     return;
                 }
-
-                contractId = newContract.id;
             }
 
             // Step 3: Create installation
@@ -122,11 +138,10 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
                 : form.eventType === 'dokończenie' ? 'followup'
                 : 'contract';
 
-            const installationData = {
-                customerId: customerId,
-                contractNumber: form.contractNumber || undefined,
-                sourceType: sourceType as 'contract' | 'service' | 'manual' | 'followup',
-                sourceId: contractId || undefined,
+            const installationTitle = form.productSummary || event.googleEvent.summary || 'Import z Google Calendar';
+
+            const newInstallation = await InstallationService.createManualInstallation({
+                title: installationTitle,
                 client: {
                     firstName: form.firstName,
                     lastName: form.lastName,
@@ -136,32 +151,20 @@ export const GoogleEventImportModal: React.FC<GoogleEventImportModalProps> = ({
                     phone: form.phone,
                     email: form.email,
                 },
-                productSummary: form.productSummary || event.googleEvent.summary || 'Import z Google Calendar',
-                scheduledDate: eventDate,
+                description: form.notes || `Import z Google Calendar: ${event.googleEvent.summary}`,
+                scheduledDate: eventDate || undefined,
                 expectedDuration: form.durationDays,
-                notes: form.notes || `Import z Google Calendar: ${event.googleEvent.summary}`,
-                status: 'scheduled' as const,
-                google_event_id: event.googleEvent.id,
-            };
-
-            await InstallationService.createManualInstallation(installationData);
+                sourceType: sourceType as 'contract' | 'service' | 'manual' | 'followup',
+                sourceId: contractId || undefined,
+            });
 
             // Step 4: Update Google Calendar event with CRM link
             // This is fire-and-forget — we mark it so it won't show up in next import
             try {
-                const sb = DatabaseService.getClient();
-                const { data: inst } = await sb
-                    .from('installations')
-                    .select('id')
-                    .eq('google_event_id', event.googleEvent.id)
-                    .single();
-
-                if (inst) {
-                    await GoogleCalendarService.syncInstallation(
-                        { ...installationData, id: inst.id, createdAt: new Date() } as any,
-                        event.googleEvent.id,
-                    );
-                }
+                await GoogleCalendarService.syncInstallation(
+                    { ...newInstallation, productSummary: installationTitle },
+                    event.googleEvent.id,
+                );
             } catch {
                 // Non-blocking
             }

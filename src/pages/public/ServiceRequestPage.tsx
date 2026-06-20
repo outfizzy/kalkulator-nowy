@@ -51,7 +51,14 @@ const ServiceRequestPage = () => {
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const newFiles = Array.from(e.target.files);
+            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB (zgodnie z napisem "max 10MB")
+            const incoming = Array.from(e.target.files);
+            const tooBig = incoming.filter(f => f.size > MAX_FILE_SIZE);
+            const newFiles = incoming.filter(f => f.size <= MAX_FILE_SIZE);
+            if (tooBig.length > 0) {
+                toast.error(`${tooBig.length} Foto(s) über 10 MB wurden übersprungen.`);
+            }
+            if (newFiles.length === 0) return;
             setPhotos(prev => [...prev, ...newFiles]);
 
             // Generate previews
@@ -85,12 +92,15 @@ const ServiceRequestPage = () => {
 
             if (data) {
                 setTicketNumber(data.ticketNumber);
-                // Send confirmation email (handled by backend logic conceptually, 
-                // but here we call EmailService manually via separate endpoint if not automated in triggers)
-                // For now, let's assume ServiceService handles it or we call it here:
 
-                const { EmailService } = await import('../../services/email.service');
-                await EmailService.sendServiceAcknowledgment(email, data.ticketNumber, description);
+                // Mail potwierdzający = best-effort. Zgłoszenie JUŻ powstało — błąd
+                // wysyłki nie może cofnąć użytkownika do formularza (tworzyłby duplikaty).
+                try {
+                    const { EmailService } = await import('../../services/email.service');
+                    await EmailService.sendServiceAcknowledgment(email, data.ticketNumber, description);
+                } catch (mailErr) {
+                    console.error('Service-Bestätigungsmail fehlgeschlagen (Ticket wurde trotzdem erstellt):', mailErr);
+                }
 
                 setStep(3);
                 toast.success('Anfrage erfolgreich gesendet!');

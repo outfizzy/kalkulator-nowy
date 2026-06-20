@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { RealizationService } from '../services/database/realization.service';
 import toast from 'react-hot-toast';
 
 // ═══════════════════════════════════════════════
@@ -20,7 +21,8 @@ interface Realization {
     updated_at: string;
     installation_id: string | null;
     seo_title: string | null;
-    seo_description: string | null;
+    meta_description: string | null;
+    facts: { label: string; value: string }[] | null;
 }
 
 const PRODUCT_TYPES = [
@@ -40,6 +42,8 @@ export const RealizationsDEPage: React.FC = () => {
     const [uploading, setUploading] = useState(false);
     const [filter, setFilter] = useState<'all' | 'visible' | 'hidden'>('all');
     const [viewMode, setViewMode] = useState<'grid' | 'editor'>('grid');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiTips, setAiTips] = useState<string[]>([]);
 
     const loadItems = useCallback(async () => {
         setLoading(true);
@@ -62,14 +66,44 @@ export const RealizationsDEPage: React.FC = () => {
     const handleNew = () => {
         setEditing({
             title: '', description: '', product_type: '', city: '', model: '',
-            photos: [], is_visible: false, seo_title: '', seo_description: '',
+            photos: [], is_visible: false, seo_title: '', meta_description: '', facts: [],
         });
+        setAiTips([]);
         setViewMode('editor');
     };
 
     const handleEdit = (item: Realization) => {
         setEditing({ ...item });
+        setAiTips([]);
         setViewMode('editor');
+    };
+
+    const handleGenerateAI = async () => {
+        if (!editing) return;
+        setAiLoading(true);
+        try {
+            const copy = await RealizationService.generateCopy({
+                productType: editing.product_type || 'Terrassenüberdachung',
+                city: editing.city || undefined,
+                title: editing.title || undefined,
+                draftDescription: editing.description || undefined,
+                photoCount: (editing.photos || []).length,
+            });
+            setEditing(prev => prev ? {
+                ...prev,
+                title: copy.title || prev.title,
+                description: copy.description || prev.description,
+                seo_title: copy.seoTitle || prev.seo_title,
+                meta_description: copy.metaDescription || prev.meta_description,
+                facts: (copy.facts && copy.facts.length) ? copy.facts : prev.facts,
+            } : prev);
+            setAiTips(copy.tips || []);
+            toast.success('Teksty AI gotowe — sprawdź i zapisz.');
+        } catch (err: any) {
+            toast.error(err.message || 'Blad AI');
+        } finally {
+            setAiLoading(false);
+        }
     };
 
     const handleSave = async () => {
@@ -85,7 +119,8 @@ export const RealizationsDEPage: React.FC = () => {
                 photos: editing.photos || [],
                 is_visible: editing.is_visible ?? false,
                 seo_title: editing.seo_title || null,
-                seo_description: editing.seo_description || null,
+                meta_description: editing.meta_description || null,
+                facts: editing.facts || [],
             };
 
             if (editing.id) {
@@ -136,13 +171,13 @@ export const RealizationsDEPage: React.FC = () => {
                 const ext = file.name.split('.').pop() || 'jpg';
                 const path = `realizations/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-                const { error: uploadError } = await supabase.storage.from('blog-images').upload(path, file, {
+                const { error: uploadError } = await supabase.storage.from('realizations').upload(path, file, {
                     contentType: file.type,
                     upsert: false,
                 });
                 if (uploadError) throw uploadError;
 
-                const { data: urlData } = supabase.storage.from('blog-images').getPublicUrl(path);
+                const { data: urlData } = supabase.storage.from('realizations').getPublicUrl(path);
                 newPhotos.push(urlData.publicUrl);
             }
 
@@ -336,13 +371,46 @@ export const RealizationsDEPage: React.FC = () => {
                         value={editing?.title || ''} onChange={e => setEditing(prev => prev ? { ...prev, title: e.target.value } : prev)}
                         className="w-full text-2xl font-bold text-slate-900 border-0 border-b-2 border-slate-200 focus:border-blue-500 outline-none pb-3 bg-transparent placeholder-slate-300" />
 
-                    {/* Description */}
+                    {/* Description + KI */}
                     <div className="bg-white rounded-xl border border-slate-200 p-4">
-                        <h3 className="font-bold text-slate-800 mb-2 text-sm uppercase tracking-wider">Opis projektu</h3>
-                        <textarea placeholder="Szczegolowy opis realizacji (widoczny na stronie)..."
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Opis projektu</h3>
+                            <button onClick={handleGenerateAI} disabled={aiLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                                {aiLoading ? 'AI pisze…' : '✨ AI: opis + SEO'}
+                            </button>
+                        </div>
+                        <textarea placeholder="Szczegolowy opis realizacji (widoczny na stronie)… lub wygeneruj przez AI (po niemiecku)."
                             value={editing?.description || ''} onChange={e => setEditing(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                            rows={4} className="w-full text-sm border border-slate-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-100 resize-none" />
+                            rows={5} className="w-full text-sm border border-slate-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-100 resize-none" />
+                        <p className="text-[11px] text-violet-700/80 mt-1.5">AI pisze opis + SEO‑Titel + Meta‑opis (po niemiecku, pod SEO) i podpowiada, co dodać. Wpisz najpierw produkt/miasto. Wszystko edytowalne.</p>
+                        {aiTips.length > 0 && (
+                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+                                <p className="text-xs font-bold text-amber-800 mb-1.5">Podpowiedzi AI — jak ulepszyć tę realizację:</p>
+                                <ul className="space-y-1">
+                                    {aiTips.map((t, i) => (
+                                        <li key={i} className="text-[11px] text-amber-900/90 flex gap-1.5"><span className="text-amber-500">●</span><span>{t}</span></li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
+
+                    {/* Dane projektu (specyfikacja) — wyciągnięte przez AI, widoczne na stronie */}
+                    {(editing?.facts || []).length > 0 && (
+                        <div className="bg-white rounded-xl border border-slate-200 p-4">
+                            <h3 className="font-bold text-slate-800 mb-3 text-sm uppercase tracking-wider">Dane projektu (specyfikacja)</h3>
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                                {(editing?.facts || []).map((f, i) => (
+                                    <div key={i} className="flex justify-between gap-3 text-sm border-b border-slate-100 pb-1.5">
+                                        <dt className="text-slate-500">{f.label}</dt>
+                                        <dd className="font-medium text-slate-800 text-right">{f.value}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                            <p className="text-[11px] text-slate-400 mt-2">Wyciągnięte przez AI z notatek — pojawi się na stronie jako tabela. Aby zmienić: popraw notatki i wygeneruj ponownie.</p>
+                        </div>
+                    )}
 
                     {/* Photos */}
                     <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -436,10 +504,10 @@ export const RealizationsDEPage: React.FC = () => {
                             </div>
                             <div>
                                 <label className="text-xs text-slate-500 font-medium">SEO Description</label>
-                                <textarea placeholder="Opis dla Google..." value={editing?.seo_description || ''}
-                                    onChange={e => setEditing(prev => prev ? { ...prev, seo_description: e.target.value } : prev)}
+                                <textarea placeholder="Opis dla Google..." value={editing?.meta_description || ''}
+                                    onChange={e => setEditing(prev => prev ? { ...prev, meta_description: e.target.value } : prev)}
                                     rows={2} className="w-full text-sm border border-slate-200 rounded-lg p-2 mt-1 outline-none focus:ring-2 focus:ring-blue-100 resize-none" maxLength={155} />
-                                <div className={`text-[10px] mt-0.5 ${(editing?.seo_description?.length || 0) > 150 ? 'text-red-500' : 'text-slate-400'}`}>{editing?.seo_description?.length || 0}/155</div>
+                                <div className={`text-[10px] mt-0.5 ${(editing?.meta_description?.length || 0) > 150 ? 'text-red-500' : 'text-slate-400'}`}>{editing?.meta_description?.length || 0}/155</div>
                             </div>
                         </div>
                     </div>

@@ -17,20 +17,16 @@ export async function generateInstallationProtocolPDFAsBlob(installation: Instal
 
 // Internal helper to build the PDF document
 // Internal helper to build the PDF document
-import { robotoRegular } from './robotoFont';
+import { ensureUnicodeFont } from './pdfFontLoader';
 
 // Internal helper to build the PDF document
 async function buildProtocolPDF(installation: Installation): Promise<jsPDF> {
     const doc = new jsPDF();
 
-    // Add font for Polish characters (Roboto)
-    try {
-        doc.addFileToVFS('Roboto-Regular.ttf', robotoRegular);
-        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-        doc.setFont('Roboto'); // Set as default
-    } catch (e) {
-        console.warn('Failed to load Roboto font, falling back to Helvetica', e);
-    }
+    // Roboto z /public/fonts przez wspólny loader — poprzedni robotoFont.ts był
+    // 3-kilobajtowym kikutem (ucięty plik), a styl 'bold' nigdy nie był
+    // rejestrowany, mimo że setFont('Roboto','bold') jest używany poniżej
+    await ensureUnicodeFont(doc);
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
